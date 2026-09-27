@@ -3,12 +3,25 @@
   import { buildEventView, defaultRoundId, today } from '../lib/view';
   import { isAdmin } from '../lib/auth.svelte';
   import TeamTracker from '../components/TeamTracker.svelte';
+  import ScoreBar from '../components/ScoreBar.svelte';
   import MatchCard from '../components/MatchCard.svelte';
 
   const view = $derived(buildEventView(db));
   let chosen = $state<string | null>(null);
   const roundId = $derived(chosen ?? (view ? defaultRoundId(view.rounds.map((r) => r.round), today()) : null));
   const rv = $derived(view?.rounds.find((r) => r.round.id === roundId) ?? null);
+
+  // Full tracker card at the top; once it has scrolled up out of view, the compact bar slides in.
+  let full = $state<HTMLElement>();
+  let compact = $state(false);
+  $effect(() => {
+    if (!full) return;
+    const io = new IntersectionObserver(([e]) => {
+      compact = !e.isIntersecting && e.boundingClientRect.top < 0;
+    });
+    io.observe(full);
+    return () => io.disconnect();
+  });
 </script>
 
 {#if !view}
@@ -17,8 +30,11 @@
     {#if isAdmin()}<a href="#/admin/events">Set one up</a>{:else}Ask the organiser to set one up.{/if}
   </p>
 {:else}
-  <TeamTracker tracker={view.tracker} event={view.event} breakdown={view.rounds.map((r) => ({ name: r.round.name, points: r.pointsAvailable }))} />
   <h1>{view.event.name}</h1>
+  <div bind:this={full}>
+    <TeamTracker tracker={view.tracker} event={view.event} breakdown={view.rounds.map((r) => ({ name: r.round.name, points: r.pointsAvailable }))} />
+  </div>
+  <ScoreBar tracker={view.tracker} event={view.event} visible={compact} />
   <div class="tabs" role="tablist">
     {#each view.rounds as r (r.round.id)}
       <button role="tab" aria-selected={r.round.id === roundId} class:active={r.round.id === roundId} onclick={() => (chosen = r.round.id)}>

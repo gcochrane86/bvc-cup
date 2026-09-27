@@ -157,3 +157,17 @@ test('the admin can reset all scores back to the start', async ({ browser }) => 
   await expect(group1Card(trip).getByTestId('status')).toHaveText('Not started');
   await expect(trip.getByTestId('conf-a')).toHaveText('0');
 });
+
+test('the compact score bar slides in once the full tracker scrolls away', async ({ page }) => {
+  await login(page);
+  const bar = page.getByTestId('score-bar');
+  const inView = async () => ((await bar.boundingBox())?.y ?? -999) >= -1;
+  await page.getByRole('tab', { name: 'Day 3' }).click(); // 9 cards (singles day): long enough to scroll
+  await expect(bar).toHaveAttribute('aria-hidden', 'true');
+  await page.getByTestId('match-card').last().scrollIntoViewIfNeeded();
+  await expect(bar).toHaveAttribute('aria-hidden', 'false');
+  await expect.poll(inView).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(bar).toHaveAttribute('aria-hidden', 'true');
+  await expect(page.getByTestId('tracker')).toBeInViewport();
+});
