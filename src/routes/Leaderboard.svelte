@@ -27,6 +27,8 @@
     {/each}
   </div>
   {#if rv}
+    {@const course = db.courses.find((c) => c.id === rv.round.course_id)}
+    {#if course}<h2 class="course">{course.name}</h2>{/if}
     <p class="muted small">{rv.completed} of {rv.totalMatches} matches completed</p>
     {#each rv.groups as g (g.group.id)}
       {#each g.matches as mv (mv.def.id)}
@@ -41,5 +43,7 @@
 <style>
   .tabs { display: flex; gap: 8px; overflow-x: auto; margin: 4px 0 8px; }
   .tabs button { background: var(--surface); color: var(--text); border: 1px solid var(--line); flex: none; }
+  .course { font-size: 1.05rem; margin: 4px 0 2px; }
+  .course + p { margin-top: 0; }
   .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 </style>
