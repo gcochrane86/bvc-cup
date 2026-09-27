@@ -1,0 +1,10 @@
+node_modules
+dist
+.env.local
+.env.prod
+test-results
+playwright-report
+supabase/.temp
+supabase/.branches
+.DS_Store
+.superpowers

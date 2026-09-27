@@ -1,0 +1,34 @@
+{
+  "name": "golf-ryder-cup",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "users": "node --env-file=.env.local --import tsx scripts/create-users.ts",
+    "seed": "node --env-file=.env.local --import tsx scripts/seed.ts",
+    "icons": "node --import tsx scripts/make-icons.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.2",
+    "idb-keyval": "6.3.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@playwright/test": "1.63.0",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@tsconfig/svelte": "5.0.8",
+    "@types/node": "26.6.3",
+    "svelte": "5.57.1",
+    "svelte-check": "4.7.6",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
+  }
+}
