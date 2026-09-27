@@ -2,3 +2,8 @@ export * from './types';
 export * from './strokes';
 export * from './matches';
 export * from './matchState';
+export * from './tracker';
+export * from './locks';
+export * from './pairings';
+export * from './courses';
+export * from './format';
