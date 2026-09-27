@@ -166,10 +166,16 @@ describe('scoring list', () => {
     expect(resumeGroupId(null, scoringList(buildEventView(snapshot())!))).toBeNull();
   });
 
-  it('shows the pairing as surnames: A1/A2 vs B1/B2', () => {
+  it('shows the pairing as surnames, Coleraine pair first', () => {
     const short: Record<string, string> = { a1: 'Cochrane', a2: 'Trimble', b1: 'McCaughey', b2: 'Connaughty' };
     const g = buildEventView(snapshot())!.rounds[0].groups[0];
-    expect(pairingLabel(g, (id) => short[id])).toBe('Cochrane/Trimble vs McCaughey/Connaughty');
+    expect(pairingLabel(g, (id) => short[id])).toBe('Cochrane/Trimble vs Connaughty/McCaughey');
+  });
+
+  it('alphabetises each pair regardless of handicap slot', () => {
+    const short: Record<string, string> = { a1: 'Trimble', a2: 'cochrane', b1: 'Reid', b2: 'Holmes' };
+    const g = buildEventView(snapshot())!.rounds[0].groups[0];
+    expect(pairingLabel(g, (id) => short[id])).toBe('cochrane/Trimble vs Holmes/Reid');
   });
 
   it('labels a group by its match numbers', () => {
