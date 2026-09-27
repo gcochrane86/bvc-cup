@@ -182,3 +182,39 @@ test('saving the first hole moves on to hole 2 (not 3)', async ({ page }) => {
   await page.getByRole('button', { name: 'Save hole 2' }).click();
   await expect(page.getByRole('heading', { name: 'Hole 3', exact: true })).toBeVisible();
 });
+
+test('after reopening, correcting an earlier hole changes the outcome and can be re-confirmed', async ({ browser }) => {
+  const trip = await newPhone(browser);
+  trip.on('dialog', (d) => void d.accept());
+  await login(trip);
+  await openGroup1(trip);
+  for (let h = 1; h <= 10; h++) await enterHole(trip, h, 4, 5); // A wins 10 straight: 10&8
+  await trip.goto('/#/');
+  await group1Card(trip).click();
+  const matchUrl = trip.url();
+  const groupId = matchUrl.split('/match/')[1].split('/')[0];
+  await trip.getByRole('button', { name: 'Confirm result' }).click();
+  await expect(trip.getByTestId('match-card')).toContainText('FINAL');
+
+  const admin = await newPhone(browser);
+  admin.on('dialog', (d) => void d.accept());
+  await loginAdmin(admin);
+  await admin.goto('/#/admin/results');
+  await admin.getByTestId('reopen-row').filter({ hasText: /^Match 1\b/ }).getByRole('button', { name: 'Reopen' }).click();
+  await expect(admin.getByText('Match 1 reopened')).toBeVisible();
+
+  // Correct hole 3: team B actually won it. A is now 8 up after 10 with 8 to play — dormie, not decided.
+  await trip.goto(`/#/score/${groupId}`);
+  await enterHole(trip, 3, 5, 4);
+  await trip.goto('/#/');
+  await expect(group1Card(trip).getByTestId('status')).toHaveText('8 UP');
+  await expect(group1Card(trip)).toContainText('DORMIE');
+
+  // Play on: A wins hole 11 -> decided 9&7, and it can be confirmed again.
+  await trip.goto(`/#/score/${groupId}`);
+  await enterHole(trip, 11, 4, 5);
+  await trip.goto(matchUrl);
+  await expect(trip.getByTestId('status')).toHaveText('9&7');
+  await trip.getByRole('button', { name: 'Confirm result' }).click();
+  await expect(trip.getByTestId('match-card')).toContainText('FINAL');
+});
