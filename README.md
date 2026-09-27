@@ -44,6 +44,17 @@ npm run e2e                  # Playwright, phone viewport, against golf-dev
 Migrations live in `supabase/migrations/`. Apply new ones to golf-dev first, then golf-prod
 (via the Supabase MCP `apply_migration`, or paste them into the SQL editor).
 
+## Copying the dev setup to production
+
+Set everything up in golf-dev (players, photos, handicaps, courses, event, rounds, pairings), then:
+
+```bash
+npm run copy-to-prod -- --dry-run   # shows what will be copied
+npm run copy-to-prod -- --yes       # replaces golf-prod's setup with golf-dev's
+```
+
+Scores and results are never copied, and it refuses to run once golf-prod has any, so it can't wipe a live trip.
+
 ## Changing passwords
 
 Edit `TRIP_PASSWORD` / `ADMIN_PASSWORD` in `.env.prod`, then run
