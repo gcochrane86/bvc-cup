@@ -139,7 +139,7 @@
 
   <section class="card">
     <h2>Teams</h2>
-    <p class="muted small">Handicaps are set on the <a href="#/admin/players">Players</a> page.</p>
+    <p class="muted small">Handicap indexes are set on the <a href="#/admin/players">Players</a> page.</p>
     <p class="muted small">{event.team_a_name}: {countA} · {event.team_b_name}: {countB} (6 each for three fourballs)</p>
     {#each db.players as p (p.id)}
       {#if members[p.id]}
@@ -150,7 +150,7 @@
             <option value="A">{event.team_a_name}</option>
             <option value="B">{event.team_b_name}</option>
           </select>
-          <span class="hcp" aria-label="{p.name} handicap">{members[p.id].handicap}</span>
+          <span class="hcp" aria-label="{p.name} handicap index">{members[p.id].handicap}</span>
         </div>
       {/if}
     {/each}

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { db, loadAll } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
-  import { validateHoles, type HoleInfo } from '../../lib/scoring';
+  import { validateHoles, validateRating, type HoleInfo } from '../../lib/scoring';
 
   let { courseId }: { courseId: string } = $props();
 
@@ -17,6 +17,9 @@
   }
 
   let name = $state(initialName());
+  const existing = db.courses.find((c) => c.id === courseId);
+  let slope = $state<number | null>(existing?.slope_rating ?? null);
+  let rating = $state<number | null>(existing?.course_rating != null ? Number(existing.course_rating) : null);
   let holes = $state(initialHoles());
   let errors = $state<string[]>([]);
   let busy = $state(false);
@@ -25,7 +28,10 @@
 
   async function save() {
     const clean = holes.map((h) => ({ hole: h.hole, par: Number(h.par), strokeIndex: Number(h.strokeIndex) }));
-    errors = validateHoles(clean);
+    // An emptied number input can come back as '' or undefined; treat both as blank.
+    const s = slope === null || slope === undefined || (slope as unknown) === '' ? null : Number(slope);
+    const r = rating === null || rating === undefined || (rating as unknown) === '' ? null : Number(rating);
+    errors = [...validateRating(s, r), ...validateHoles(clean)];
     if (!name.trim()) errors = ['Course name is required', ...errors];
     if (errors.length) return;
     busy = true;
@@ -35,6 +41,8 @@
           p_course_id: isNew ? null : courseId,
           p_name: name.trim(),
           p_holes: clean.map((h) => ({ hole: h.hole, par: h.par, stroke_index: h.strokeIndex })),
+          p_slope_rating: s,
+          p_course_rating: r,
         }),
       );
       await loadAll();
@@ -50,6 +58,11 @@
 <p><a href="#/admin/courses">← Courses</a></p>
 <h1>{isNew ? 'New course' : 'Edit course'}</h1>
 <div class="field"><label for="cn">Course name</label><input id="cn" bind:value={name} /></div>
+<div class="row">
+  <div class="field"><label for="cs">Slope</label><input id="cs" type="number" inputmode="numeric" min="55" max="155" placeholder="e.g. 125" bind:value={slope} /></div>
+  <div class="field"><label for="cr">Course rating</label><input id="cr" type="number" inputmode="decimal" step="0.1" placeholder="e.g. 71.3" bind:value={rating} /></div>
+</div>
+<p class="muted small">From the scorecard, for the tees you'll play. Each player's Handicap Index is converted to a course handicap with these. Leave both blank to use indexes as they are.</p>
 <p class="muted small">Copy par and stroke index (SI) from the scorecard. Every SI from 1 to 18 must be used once. Total par: {totalPar}</p>
 
 <div class="card grid">

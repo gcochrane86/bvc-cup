@@ -186,7 +186,7 @@
       <div class="prow card" class:shot={sh.bb === 1} class:shot2={sh.bb >= 2} data-testid="row-{slot}">
         <Avatar name={playerName(pid)} url={photoUrl(pid)} colour={slot.startsWith('A') ? 'var(--team-a)' : 'var(--team-b)'} size={44} />
         <div class="who">
-          <strong>{playerName(pid)}</strong>
+          <strong>{playerName(pid)}</strong> <span class="muted small">({found.group.playingHcp[pid]})</span>
           <div class="chips">
             {#if sh.label}<span class="chip shotchip">{sh.label}</span>{/if}
             {#if isLocked}<span class="chip lock">Locked</span>{/if}

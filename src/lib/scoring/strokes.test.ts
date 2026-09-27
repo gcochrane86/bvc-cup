@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { roundHalfUp, playingStrokes, strokesOnHole } from './strokes';
+import { courseHandicap, roundHalfUp, playingStrokes, strokesOnHole } from './strokes';
 
 describe('roundHalfUp', () => {
   it('rounds .5 up', () => {
@@ -44,5 +44,23 @@ describe('strokesOnHole', () => {
     expect(strokesOnHole(20, 1)).toBe(2);
     expect(strokesOnHole(20, 2)).toBe(2);
     expect(strokesOnHole(20, 3)).toBe(1);
+  });
+});
+
+describe('courseHandicap', () => {
+  it('converts an index with slope and rating (WHS)', () => {
+    // 12.4 × 125/113 + (71.3 − 72) = 13.717 − 0.7 = 13.02 → 13
+    expect(courseHandicap(12.4, 125, 71.3, 72)).toBe(13);
+  });
+  it('rounds .5 up', () => {
+    // 10 × 113/113 + (72.5 − 72) = 10.5 → 11
+    expect(courseHandicap(10, 113, 72.5, 72)).toBe(11);
+  });
+  it('handles a plus handicap', () => {
+    // −2 × 130/113 + (70 − 72) = −2.30 − 2 = −4.30 → −4
+    expect(courseHandicap(-2, 130, 70, 72)).toBe(-4);
+  });
+  it('uses the index as-is when the course has no slope/rating', () => {
+    expect(courseHandicap(12.4, null, null, 72)).toBe(12);
   });
 });

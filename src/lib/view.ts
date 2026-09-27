@@ -2,6 +2,7 @@ import {
   buildMatches,
   computeMatchState,
   computeTracker,
+  courseHandicap,
   indexScores,
   roundPointsAvailable,
   scoreKey,
@@ -19,7 +20,11 @@ import {
 import type { EventRow, GroupRow, RoundRow, Snapshot } from './data/types';
 
 export interface MatchView { def: MatchDef; state: MatchState; result: ConfirmedResult | null }
-export interface GroupView { group: GroupRow; slots: Partial<Record<Slot, string>>; matches: MatchView[]; scores: ScoreIndex }
+export interface GroupView {
+  group: GroupRow; slots: Partial<Record<Slot, string>>; matches: MatchView[]; scores: ScoreIndex;
+  /** Each player's course handicap for this round (index converted with the course's slope/rating). */
+  playingHcp: Record<string, number>;
+}
 export interface RoundView {
   round: RoundRow; settings: RoundSettings; holes: HoleInfo[]; groups: GroupView[]; completed: number; totalMatches: number;
 }
@@ -55,6 +60,10 @@ export function buildEventView(s: Snapshot): EventView | null {
         .filter((h) => h.course_id === round.course_id)
         .map((h) => ({ hole: h.hole, par: h.par, strokeIndex: h.stroke_index }))
         .sort((a, b) => a.hole - b.hole);
+      const course = s.courses.find((c) => c.id === round.course_id);
+      const par = holes.reduce((sum, h) => sum + h.par, 0);
+      const slope = course?.slope_rating ?? null;
+      const rating = course?.course_rating != null ? Number(course.course_rating) : null;
       const scores = indexScores(
         s.scores
           .filter((x) => x.round_id === round.id)
@@ -66,14 +75,16 @@ export function buildEventView(s: Snapshot): EventView | null {
         .map((group): GroupView => {
           const members = s.groupPlayers.filter((gp) => gp.group_id === group.id);
           const slots = Object.fromEntries(members.map((gp) => [gp.slot, gp.player_id])) as Partial<Record<Slot, string>>;
+          const playingHcp = Object.fromEntries(
+            members.map((gp) => {
+              // A confirmed group plays off the index it was played with; others use the current one.
+              const index = gp.handicap !== null && gp.handicap !== undefined ? Number(gp.handicap) : (handicapOf[gp.player_id] ?? 0);
+              return [gp.player_id, courseHandicap(index, slope, rating, par)];
+            }),
+          );
           const defs = buildMatches(
             group.id,
-            members.map((gp) => ({
-              slot: gp.slot,
-              playerId: gp.player_id,
-              // A confirmed group plays off the handicaps it was played with; others use current ones.
-              handicap: gp.handicap !== null && gp.handicap !== undefined ? Number(gp.handicap) : (handicapOf[gp.player_id] ?? 0),
-            })),
+            members.map((gp) => ({ slot: gp.slot, playerId: gp.player_id, handicap: playingHcp[gp.player_id] })),
             settings,
           );
           const matches = defs.map((def): MatchView => {
@@ -92,7 +103,7 @@ export function buildEventView(s: Snapshot): EventView | null {
             return { def, state: computeMatchState(def, holes, scores), result };
           });
           everyMatch.push(...matches);
-          return { group, slots, matches, scores };
+          return { group, slots, matches, scores, playingHcp };
         });
       const ms = groups.flatMap((g) => g.matches);
       return { round, settings, holes, groups, completed: ms.filter((m) => m.result).length, totalMatches: ms.length };

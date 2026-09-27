@@ -83,7 +83,7 @@
   <h3>Match summary</h3>
   <HoleGrid state={mv.state} />
   <h3>Scorecard</h3>
-  <Scorecard def={mv.def} holes={found.round.holes} scores={found.group.scores} teamOf={view.teamOf} />
+  <Scorecard def={mv.def} holes={found.round.holes} scores={found.group.scores} teamOf={view.teamOf} playingHcp={found.group.playingHcp} />
   <p class="muted small">• = shot received on that hole in this match. P = picked up.</p>
 {/if}
 

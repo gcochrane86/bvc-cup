@@ -25,7 +25,7 @@
       <Avatar name={ep.player!.name} url={photoUrl(ep.player_id)} colour="var(--team-{t.team === 'A' ? 'a' : 'b'})" size={64} />
       <div class="who">
         <strong>{ep.player!.name}</strong>
-        <div class="muted small">Handicap {ep.handicap}</div>
+        <div class="muted small">Handicap index {ep.handicap}</div>
       </div>
       <PhotoUpload playerId={ep.player_id} label={ep.player!.photo_path ? 'Change' : 'Upload photo'} />
     </div>

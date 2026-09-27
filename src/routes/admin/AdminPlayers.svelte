@@ -50,7 +50,7 @@
 
 <p><a href="#/admin">← Admin</a></p>
 <h1>Players</h1>
-<p class="muted small">Handicap changes apply straight away to rounds still being played. Groups with a confirmed match keep the handicaps they played off.</p>
+<p class="muted small">Enter each player's Handicap Index. Each round converts it to a course handicap using that course's slope and rating. Changes apply straight away to rounds still being played; groups with a confirmed match keep the index they played off.</p>
 {#if msg}<p class:error={msg.startsWith('Error')}>{msg}</p>{/if}
 
 <form class="card" onsubmit={add}>
@@ -58,7 +58,7 @@
   <div class="field"><label for="n">Full name</label><input id="n" bind:value={name} required /></div>
   <div class="row">
     <div class="field"><label for="s">Short name (cards)</label><input id="s" bind:value={shortName} placeholder="Surname" /></div>
-    <div class="field"><label for="h">Handicap</label><input id="h" type="number" step="0.1" inputmode="decimal" bind:value={handicap} /></div>
+    <div class="field"><label for="h">Handicap index</label><input id="h" type="number" step="0.1" inputmode="decimal" bind:value={handicap} /></div>
   </div>
   <button type="submit">Add player</button>
 </form>
@@ -72,7 +72,7 @@
     <div class="field"><label for="n-{p.id}">Full name</label><input id="n-{p.id}" bind:value={p.name} /></div>
     <div class="row">
       <div class="field"><label for="s-{p.id}">Short name</label><input id="s-{p.id}" bind:value={p.short_name} /></div>
-      <div class="field"><label for="h-{p.id}">Handicap</label><input id="h-{p.id}" type="number" step="0.1" inputmode="decimal" bind:value={p.default_handicap} /></div>
+      <div class="field"><label for="h-{p.id}">Handicap index</label><input id="h-{p.id}" type="number" step="0.1" inputmode="decimal" bind:value={p.default_handicap} /></div>
     </div>
     <div class="row">
       <button onclick={() => save(p)}>Save</button>

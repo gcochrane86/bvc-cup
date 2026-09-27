@@ -2,7 +2,9 @@
   import { scoreKey, strokesOnHole, type HoleInfo, type MatchDef, type ScoreIndex, type Team } from '../lib/scoring';
   import { playerShort } from '../lib/data/store.svelte';
 
-  let { def, holes, scores, teamOf }: { def: MatchDef; holes: HoleInfo[]; scores: ScoreIndex; teamOf: Record<string, Team> } = $props();
+  let { def, holes, scores, teamOf, playingHcp = {} }: {
+    def: MatchDef; holes: HoleInfo[]; scores: ScoreIndex; teamOf: Record<string, Team>; playingHcp?: Record<string, number>;
+  } = $props();
 
   const nines = $derived([holes.slice(0, 9), holes.slice(9, 18)]);
   const players = $derived([...def.sideA, ...def.sideB]);
@@ -37,7 +39,7 @@
         <tr class="muted"><td>SI</td>{#each nine as h (h.hole)}<td>{h.strokeIndex}</td>{/each}<td></td></tr>
         {#each players as pid (pid)}
           <tr>
-            <td class="pname" style="color:var(--team-{teamOf[pid] === 'A' ? 'a' : 'b'})">{playerShort(pid)}</td>
+            <td class="pname" style="color:var(--team-{teamOf[pid] === 'A' ? 'a' : 'b'})">{playerShort(pid)}{#if playingHcp[pid] !== undefined} <small>({playingHcp[pid]})</small>{/if}</td>
             {#each nine as h (h.hole)}
               {@const shots = strokesOnHole(def.strokes[pid] ?? 0, h.strokeIndex)}
               <td class:shot={shots > 0}>{cell(pid, h)}{#if shots}<sup>{'•'.repeat(shots)}</sup>{/if}</td>
@@ -55,7 +57,8 @@
   table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
   th, td { padding: 6px 2px; border-bottom: 1px solid var(--line); }
   th:first-child, td:first-child { text-align: left; }
-  .pname { font-weight: 700; max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pname small { font-weight: 500; color: var(--muted); }
+  .pname { font-weight: 700; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   td.shot { background: var(--shot); }
   sup { color: var(--shot-text); font-size: 0.7em; }
 </style>

@@ -14,3 +14,12 @@ export function strokesOnHole(total: number, strokeIndex: number): number {
   const base = Math.floor(total / 18);
   return base + (strokeIndex <= total % 18 ? 1 : 0);
 }
+
+/**
+ * WHS course handicap: index × slope / 113 + (course rating − par), rounded (.5 up).
+ * Without a slope and rating, the index itself is used (rounded).
+ */
+export function courseHandicap(index: number, slope: number | null, rating: number | null, par: number): number {
+  if (slope === null || rating === null) return roundHalfUp(index);
+  return roundHalfUp((index * slope) / 113 + (rating - par));
+}

@@ -220,15 +220,31 @@ describe('admin RPCs', () => {
 
   it('saves a course for the admin', async () => {
     const id = await as(db, 'admin', async () =>
-      (await db.query<{ id: string }>(`select public.save_course(null, 'New Course', $1::jsonb) as id`, [holes])).rows[0].id,
+      (await db.query<{ id: string }>(`select public.save_course(null, 'New Course', $1::jsonb, 125, 71.3) as id`, [holes])).rows[0].id,
     );
     const r = await db.query<{ n: number }>(`select count(*)::int as n from public.course_holes where course_id = $1`, [id]);
     expect(r.rows[0].n).toBe(18);
   });
 
+  it('stores slope and course rating', async () => {
+    const id = await as(db, 'admin', async () =>
+      (await db.query<{ id: string }>(`select public.save_course(null, 'Rated', $1::jsonb, 125, 71.3) as id`, [holes])).rows[0].id,
+    );
+    const r = await db.query<{ slope_rating: number; course_rating: string }>(
+      `select slope_rating, course_rating::text from public.courses where id = $1`, [id],
+    );
+    expect(r.rows[0]).toEqual({ slope_rating: 125, course_rating: '71.3' });
+  });
+
+  it('rejects an impossible slope', async () => {
+    await expect(
+      as(db, 'admin', () => db.query(`select public.save_course(null, 'Bad', $1::jsonb, 200, 71)`, [holes])),
+    ).rejects.toThrow(/check constraint/);
+  });
+
   it('refuses save_course for the trip user', async () => {
     await expect(
-      as(db, 'trip', () => db.query(`select public.save_course(null, 'X', $1::jsonb)`, [holes])),
+      as(db, 'trip', () => db.query(`select public.save_course(null, 'X', $1::jsonb, null, null)`, [holes])),
     ).rejects.toThrow(/admin only/);
   });
 

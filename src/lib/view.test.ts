@@ -12,7 +12,7 @@ function snapshot(over: Partial<Snapshot> = {}): Snapshot {
   return {
     event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true },
     players: [],
-    courses: [{ id: 'c', name: 'Links' }],
+    courses: [{ id: 'c', name: 'Links', slope_rating: null, course_rating: null }],
     courseHoles: Array.from({ length: 18 }, (_, i) => ({ course_id: 'c', hole: i + 1, par: 4, stroke_index: i + 1 })),
     eventPlayers: ['a1', 'a2', 'b1', 'b2'].map((id) => ({ event_id: 'e', player_id: id, team: id[0].toUpperCase() as Team, handicap: 10 })),
     rounds: [baseRound],
@@ -74,6 +74,21 @@ describe('buildEventView', () => {
     expect(v.rounds[0].groups[0].matches[0].def.strokes).toEqual({ a1: 0, a2: 13, b1: 5, b2: 9 });
     const live = buildEventView(s)!;
     expect(live.rounds[0].groups[0].matches[0].def.strokes).toEqual({ a1: 0, a2: 0, b1: 0, b2: 0 });
+  });
+
+  it('converts each index to a course handicap with the round’s slope and rating', () => {
+    const s = snapshot();
+    const idx: Record<string, number> = { a1: 4, a2: 18, b1: 9, b2: 14 };
+    const v = buildEventView({
+      ...s,
+      courses: [{ id: 'c', name: 'Links', slope_rating: 125, course_rating: 71.3 }],
+      eventPlayers: s.eventPlayers.map((ep) => ({ ...ep, handicap: idx[ep.player_id] })),
+    })!;
+    const g = v.rounds[0].groups[0];
+    // CH = index × 125/113 + (71.3 − 72): 3.72→4, 19.21→19, 9.26→9, 14.79→15
+    expect(g.playingHcp).toEqual({ a1: 4, a2: 19, b1: 9, b2: 15 });
+    // 90% of the gaps from 4: 13.5→14, 4.5→5, 9.9→10
+    expect(g.matches[0].def.strokes).toEqual({ a1: 0, a2: 14, b1: 5, b2: 10 });
   });
 
   it('finds groups and the first incomplete hole', () => {

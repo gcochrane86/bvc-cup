@@ -1,7 +1,7 @@
 import type { MatchType, Outcome, Slot, Team } from '../scoring';
 
 export interface PlayerRow { id: string; name: string; short_name: string; default_handicap: number; photo_path: string | null }
-export interface CourseRow { id: string; name: string }
+export interface CourseRow { id: string; name: string; slope_rating: number | null; course_rating: number | null }
 export interface CourseHoleRow { course_id: string; hole: number; par: number; stroke_index: number }
 export interface EventRow {
   id: string; name: string;
