@@ -16,7 +16,8 @@
 </script>
 
 <main class="login">
-  <h1>⛳ {mode === 'admin' ? 'Admin login' : 'Golf Trip Cup'}</h1>
+  <img class="logo" src="./icon.svg" alt="" width="96" height="96" />
+  <h1>{mode === 'admin' ? 'Admin login' : 'BvC Cup'}</h1>
   <form class="card" onsubmit={submit}>
     <div class="field">
       <label for="pw">Password</label>
@@ -34,6 +35,7 @@
 
 <style>
   .login { padding-top: 15vh; }
+  .logo { display: block; margin: 0 auto 12px; border-radius: 22px; }
   h1 { text-align: center; margin-bottom: 24px; }
   button { width: 100%; }
   p { text-align: center; }

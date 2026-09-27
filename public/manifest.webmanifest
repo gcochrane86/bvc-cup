@@ -1,6 +1,6 @@
 {
-  "name": "Golf Trip Cup",
-  "short_name": "Golf Cup",
+  "name": "BvC Cup",
+  "short_name": "BvC Cup",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -1,4 +1,4 @@
-# Golf Trip Cup
+# BvC Cup
 
 Live Ryder Cup–style scoring for a golf trip: 12 players, 2 teams, 3 fourballs, better-ball matchplay
 (plus optional low/high singles), handicaps at 90% off the lowest in each group, a live team tracker,

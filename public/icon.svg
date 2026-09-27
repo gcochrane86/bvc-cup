@@ -1,7 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0b3d2e"/>
-  <ellipse cx="256" cy="410" rx="150" ry="36" fill="#1d6b4f"/>
-  <rect x="244" y="96" width="16" height="316" rx="8" fill="#ffffff"/>
-  <path d="M260 104 L408 152 L260 200 Z" fill="#e8b21f"/>
-  <circle cx="318" cy="396" r="20" fill="#ffffff"/>
+  <defs>
+    <clipPath id="ball"><circle cx="256" cy="256" r="176"/></clipPath>
+    <radialGradient id="shine" cx="0.36" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.28"/>
+    </radialGradient>
+    <pattern id="dimples" width="34" height="30" patternUnits="userSpaceOnUse">
+      <circle cx="8" cy="8" r="6.5" fill="#000" fill-opacity="0.22"/>
+      <circle cx="25" cy="23" r="6.5" fill="#000" fill-opacity="0.22"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#f3efe6"/>
+  <ellipse cx="262" cy="446" rx="150" ry="18" fill="#000" fill-opacity="0.12"/>
+  <g clip-path="url(#ball)">
+    <!-- Maroon (top-left) vs navy (bottom-right), split on the diagonal -->
+    <rect width="512" height="512" fill="#1b2b52"/>
+    <polygon points="0,0 512,0 0,512" fill="#7b1e32"/>
+    <rect width="512" height="512" fill="url(#dimples)"/>
+    <line x1="0" y1="512" x2="512" y2="0" stroke="#f3efe6" stroke-width="12"/>
+    <circle cx="256" cy="256" r="176" fill="url(#shine)"/>
+  </g>
+  <circle cx="256" cy="256" r="176" fill="none" stroke="#10182e" stroke-opacity="0.35" stroke-width="4"/>
 </svg>
