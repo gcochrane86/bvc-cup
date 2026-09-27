@@ -3,6 +3,7 @@ import { createStore, del, get, set, values } from 'idb-keyval';
 import { must, supabase } from '../supabase';
 import { applyPending, isBehind, removeScoreRow, upsertScoreRow } from './merge';
 import { freshOnly } from './fresh';
+import { planPhotoUrls, PHOTO_URL_TTL_S, type SignedPhoto } from './photoUrls';
 import { createOutbox, pendingKey, type OutboxStorage, type PendingScore, type SendResult } from './outbox';
 import type {
   CourseHoleRow, CourseRow, EventPlayerRow, EventRow, GroupPlayerRow, GroupRow,
@@ -141,15 +142,18 @@ async function doLoad() {
   }
 }
 
+let signedPhotos: Record<string, SignedPhoto> = {};
+
 async function refreshPhotoUrls() {
   const paths = db.players.map((p) => p.photo_path).filter((p): p is string => !!p);
-  const kept = Object.fromEntries(Object.entries(db.photoUrls).filter(([path]) => paths.includes(path)));
-  const missing = paths.filter((p) => !kept[p]);
-  if (missing.length) {
-    const signed = await must(supabase.storage.from('player-photos').createSignedUrls(missing, 60 * 60 * 24));
-    for (const s of signed ?? []) if (s.path && s.signedUrl) kept[s.path] = s.signedUrl;
+  const now = Date.now();
+  const { keep, sign } = planPhotoUrls(signedPhotos, paths, now);
+  if (sign.length) {
+    const signed = await must(supabase.storage.from('player-photos').createSignedUrls(sign, PHOTO_URL_TTL_S));
+    for (const s of signed ?? []) if (s.path && s.signedUrl) keep[s.path] = { url: s.signedUrl, signedAt: now };
   }
-  db.photoUrls = kept;
+  signedPhotos = keep;
+  db.photoUrls = Object.fromEntries(Object.entries(keep).map(([path, s]) => [path, s.url]));
 }
 
 export function photoUrl(playerId: string): string | null {
