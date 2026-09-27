@@ -18,7 +18,7 @@
   </p>
 {:else}
   <h1>{view.event.name}</h1>
-  <TeamTracker tracker={view.tracker} event={view.event} />
+  <TeamTracker tracker={view.tracker} event={view.event} breakdown={view.rounds.map((r) => ({ name: r.round.name, points: r.pointsAvailable }))} />
   <div class="tabs" role="tablist">
     {#each view.rounds as r (r.round.id)}
       <button role="tab" aria-selected={r.round.id === roundId} class:active={r.round.id === roundId} onclick={() => (chosen = r.round.id)}>

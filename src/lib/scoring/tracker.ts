@@ -14,7 +14,20 @@ export interface TrackedMatch {
   result: ConfirmedResult | null;
 }
 
-export function computeTracker(matches: TrackedMatch[], total: number): Tracker {
+/**
+ * Smallest amount a team's total can move by: half of each match's points (a halved match).
+ * E.g. 1-point fourballs only -> ½; add ½-point singles -> ¼.
+ */
+export function pointsStep(rounds: RoundSettings[]): number {
+  const halves = rounds.flatMap((r) => [r.betterBallPoints / 2, ...(r.singlesEnabled ? [r.singlesPoints / 2] : [])]);
+  const units = halves.map((h) => Math.round(h * 100)).filter((u) => u > 0);
+  if (units.length === 0) return 0.5;
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  return units.reduce(gcd) / 100;
+}
+
+/** step: see pointsStep. To win outright a team needs one step more than half the points. */
+export function computeTracker(matches: TrackedMatch[], total: number, step = 0.5): Tracker {
   let confirmedA = 0;
   let confirmedB = 0;
   let liveA = 0;
@@ -34,7 +47,7 @@ export function computeTracker(matches: TrackedMatch[], total: number): Tracker 
     projectedA: confirmedA + liveA,
     projectedB: confirmedB + liveB,
     total,
-    toWin: total / 2 + 0.5,
+    toWin: total / 2 + step,
   };
 }
 

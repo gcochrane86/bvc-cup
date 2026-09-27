@@ -2,6 +2,7 @@ import {
   buildMatches,
   computeMatchState,
   computeTracker,
+  pointsStep,
   courseHandicap,
   indexScores,
   roundPointsAvailable,
@@ -27,6 +28,8 @@ export interface GroupView {
 }
 export interface RoundView {
   round: RoundRow; settings: RoundSettings; holes: HoleInfo[]; groups: GroupView[]; completed: number; totalMatches: number;
+  /** Points on offer this round (fourballs, plus singles when switched on). */
+  pointsAvailable: number;
 }
 export interface EventView {
   event: EventRow; rounds: RoundView[]; tracker: Tracker; teamOf: Record<string, Team>; handicapOf: Record<string, number>;
@@ -55,7 +58,8 @@ export function buildEventView(s: Snapshot): EventView | null {
     .sort((a, b) => a.round_no - b.round_no)
     .map((round): RoundView => {
       const settings = settingsOf(round);
-      total += roundPointsAvailable(settings, groupCount);
+      const pointsAvailable = roundPointsAvailable(settings, groupCount);
+      total += pointsAvailable;
       const holes = s.courseHoles
         .filter((h) => h.course_id === round.course_id)
         .map((h) => ({ hole: h.hole, par: h.par, strokeIndex: h.stroke_index }))
@@ -106,10 +110,10 @@ export function buildEventView(s: Snapshot): EventView | null {
           return { group, slots, matches, scores, playingHcp };
         });
       const ms = groups.flatMap((g) => g.matches);
-      return { round, settings, holes, groups, completed: ms.filter((m) => m.result).length, totalMatches: ms.length };
+      return { round, settings, holes, groups, completed: ms.filter((m) => m.result).length, totalMatches: ms.length, pointsAvailable };
     });
 
-  return { event: s.event, rounds, tracker: computeTracker(everyMatch, total), teamOf, handicapOf };
+  return { event: s.event, rounds, tracker: computeTracker(everyMatch, total, pointsStep(rounds.map((r) => r.settings))), teamOf, handicapOf };
 }
 
 export function defaultRoundId(rounds: RoundRow[], todayIso: string): string | null {

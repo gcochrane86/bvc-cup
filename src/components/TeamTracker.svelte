@@ -2,7 +2,9 @@
   import { formatPoints, type Tracker } from '../lib/scoring';
   import type { EventRow } from '../lib/data/types';
 
-  let { tracker, event }: { tracker: Tracker; event: EventRow } = $props();
+  let { tracker, event, breakdown = [] }: {
+    tracker: Tracker; event: EventRow; breakdown?: { name: string; points: number }[];
+  } = $props();
   const pct = (n: number) => (tracker.total ? (n / tracker.total) * 100 : 0);
 </script>
 
@@ -27,6 +29,11 @@
     </div>
   </div>
   <p class="towin muted small">{formatPoints(tracker.toWin)} to win · {formatPoints(tracker.total)} points available</p>
+  {#if breakdown.length}
+    <p class="breakdown muted small" data-testid="breakdown">
+      {breakdown.map((b) => `${b.name}: ${formatPoints(b.points)}`).join(' · ')}
+    </p>
+  {/if}
 </section>
 
 <style>
@@ -43,4 +50,5 @@
   .big { font-size: 1.6rem; font-weight: 800; }
   .big small { font-size: 0.8rem; font-weight: 600; }
   .towin { text-align: center; margin: 10px 0 0; }
+  .breakdown { text-align: center; margin: 2px 0 0; font-size: 0.75rem; }
 </style>

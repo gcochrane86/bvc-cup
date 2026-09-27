@@ -56,7 +56,17 @@ describe('buildEventView', () => {
   it('counts singles points in the total available', () => {
     const v = buildEventView(snapshot({ rounds: [baseRound, { ...baseRound, id: 'r2', round_no: 2, singles_enabled: true }] }))!;
     expect(v.tracker.total).toBe(3);
-    expect(v.tracker.toWin).toBe(2);
+    expect(v.tracker.toWin).toBe(1.75); // ½-point singles can be halved: ¼ steps
+  });
+
+  it('totals 9 with no singles, 12 with ½-point singles on one day, and breaks it down per round', () => {
+    const r = (id: string, n: number, singles: boolean) => ({ ...baseRound, id, round_no: n, singles_enabled: singles });
+    const players = Array.from({ length: 12 }, (_, i) => ({ event_id: 'e', player_id: `p${i}`, team: (i < 6 ? 'A' : 'B') as Team, handicap: 10 }));
+    const off = buildEventView(snapshot({ eventPlayers: players, rounds: [r('d1', 1, false), r('d2', 2, false), r('d3', 3, false)] }))!;
+    expect(off.tracker).toMatchObject({ total: 9, toWin: 5 });
+    const on = buildEventView(snapshot({ eventPlayers: players, rounds: [r('d1', 1, false), r('d2', 2, false), r('d3', 3, true)] }))!;
+    expect(on.tracker).toMatchObject({ total: 12, toWin: 6.25 });
+    expect(on.rounds.map((x) => x.pointsAvailable)).toEqual([3, 3, 6]);
   });
 
   it('survives an incomplete group', () => {

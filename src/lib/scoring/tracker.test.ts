@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTracker, resultFromState, roundPointsAvailable } from './tracker';
+import { computeTracker, pointsStep, resultFromState, roundPointsAvailable } from './tracker';
 import type { ConfirmedResult, MatchDef, MatchState } from './types';
 
 const state = (over: Partial<MatchState>): MatchState => ({
@@ -23,6 +23,26 @@ describe('computeTracker', () => {
       12,
     );
     expect(t).toEqual({ confirmedA: 1, confirmedB: 0, projectedA: 1.5, projectedB: 1.5, total: 12, toWin: 6.5 });
+  });
+});
+
+describe('to win', () => {
+  const rs = (singlesEnabled: boolean, singlesPoints = 0.5, betterBallPoints = 1) =>
+    ({ allowancePct: 90, betterBallPoints, singlesEnabled, singlesPoints, singlesAllowancePct: 90 });
+  it('steps in halves when only better-ball matches are played', () => {
+    expect(pointsStep([rs(false), rs(false), rs(false)])).toBe(0.5);
+    expect(computeTracker([], 9, 0.5).toWin).toBe(5);
+  });
+  it('steps in quarters once ½-point singles are on (a halved singles is ¼ each)', () => {
+    expect(pointsStep([rs(false), rs(false), rs(true)])).toBe(0.25);
+    expect(computeTracker([], 12, 0.25).toWin).toBe(6.25);
+  });
+  it('follows the singles points setting', () => {
+    expect(pointsStep([rs(true, 1)])).toBe(0.5);
+    expect(pointsStep([rs(true, 1.5)])).toBe(0.25);
+  });
+  it('defaults to halves with no rounds', () => {
+    expect(pointsStep([])).toBe(0.5);
   });
 });
 
