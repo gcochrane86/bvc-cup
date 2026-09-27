@@ -5,6 +5,10 @@
   import { db, startData, stopData } from './lib/data/store.svelte';
   import Login from './routes/Login.svelte';
   import Leaderboard from './routes/Leaderboard.svelte';
+  import AdminHome from './routes/admin/AdminHome.svelte';
+  import AdminPlayers from './routes/admin/AdminPlayers.svelte';
+  import AdminCourses from './routes/admin/AdminCourses.svelte';
+  import AdminCourse from './routes/admin/AdminCourse.svelte';
   import Players from './routes/Players.svelte';
   import ScoreEntry from './routes/ScoreEntry.svelte';
   import Match from './routes/Match.svelte';
@@ -50,6 +54,16 @@
         {/key}
       {:else if route.name === 'players'}
         <Players />
+      {:else if route.name === 'admin'}
+        <AdminHome />
+      {:else if route.name === 'admin-players'}
+        <AdminPlayers />
+      {:else if route.name === 'admin-courses'}
+        <AdminCourses />
+      {:else if route.name === 'admin-course'}
+        {#key route.courseId}
+          <AdminCourse courseId={route.courseId} />
+        {/key}
       <!-- ROUTES: add new {:else if} branches above this line -->
       {:else}
         <p class="center">Page not found. <a href="#/">Back to the leaderboard</a></p>
