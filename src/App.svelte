@@ -5,6 +5,7 @@
   import { db, startData, stopData } from './lib/data/store.svelte';
   import Login from './routes/Login.svelte';
   import Leaderboard from './routes/Leaderboard.svelte';
+  import Match from './routes/Match.svelte';
   import Nav from './components/Nav.svelte';
 
   onMount(initAuth);
@@ -37,6 +38,10 @@
         <p class="center muted">Loading…</p>
       {:else if route.name === 'home'}
         <Leaderboard />
+      {:else if route.name === 'match'}
+        {#key route.groupId + route.matchType}
+          <Match groupId={route.groupId} matchType={route.matchType} />
+        {/key}
       <!-- ROUTES: add new {:else if} branches above this line -->
       {:else}
         <p class="center">Page not found. <a href="#/">Back to the leaderboard</a></p>
