@@ -5,6 +5,7 @@
   import { db, startData, stopData } from './lib/data/store.svelte';
   import Login from './routes/Login.svelte';
   import Leaderboard from './routes/Leaderboard.svelte';
+  import Players from './routes/Players.svelte';
   import ScoreEntry from './routes/ScoreEntry.svelte';
   import Match from './routes/Match.svelte';
   import Nav from './components/Nav.svelte';
@@ -47,6 +48,8 @@
         {#key route.groupId}
           <ScoreEntry groupId={route.groupId} />
         {/key}
+      {:else if route.name === 'players'}
+        <Players />
       <!-- ROUTES: add new {:else if} branches above this line -->
       {:else}
         <p class="center">Page not found. <a href="#/">Back to the leaderboard</a></p>
