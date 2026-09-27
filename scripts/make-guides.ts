@@ -18,8 +18,15 @@ const page = await browser.newPage();
 await page.route('http://guide.local/**', (route) => {
   const path = new URL(route.request().url()).pathname;
   if (path === '/') return route.fulfill({ body: '<html><body></body></html>', contentType: 'text/html' });
-  const file = path === '/doc.pdf' ? pdfPath : `node_modules/pdfjs-dist/build${path}`;
-  return route.fulfill({ body: readFileSync(file), contentType: path.endsWith('.pdf') ? 'application/pdf' : 'text/javascript' });
+  const file = path === '/doc.pdf' ? pdfPath : `node_modules/pdfjs-dist${path}`;
+  const type = path.endsWith('.pdf') ? 'application/pdf' : path.endsWith('.wasm') ? 'application/wasm' : path.endsWith('.mjs') || path.endsWith('.js') ? 'text/javascript' : 'application/octet-stream';
+  return route.fulfill({ body: readFileSync(file), contentType: type });
+});
+// Any content PDF.js can't draw (e.g. an image codec it couldn't load) is only a console warning
+// and the rest of the page is silently skipped — treat it as fatal so nothing goes missing.
+const problems: string[] = [];
+page.on('console', (m) => {
+  if (/ignoring errors|failed|Error/i.test(m.text())) problems.push(m.text());
 });
 await page.goto('http://guide.local/');
 
@@ -28,10 +35,17 @@ mkdirSync(outDir, { recursive: true });
 for (let hole = 1; hole <= 18; hole++) {
   const images = await page.evaluate(
     async ({ pages, width }) => {
-      const lib = 'http://guide.local/pdf.min.mjs'; // loaded in the browser page, not by Node
+      const lib = 'http://guide.local/build/pdf.min.mjs'; // loaded in the browser page, not by Node
       const pdfjs = (await import(lib)) as typeof import('pdfjs-dist');
-      pdfjs.GlobalWorkerOptions.workerSrc = 'http://guide.local/pdf.worker.min.mjs';
-      const doc = await pdfjs.getDocument({ url: 'http://guide.local/doc.pdf' }).promise;
+      pdfjs.GlobalWorkerOptions.workerSrc = 'http://guide.local/build/pdf.worker.min.mjs';
+      const doc = await pdfjs.getDocument({
+        url: 'http://guide.local/doc.pdf',
+        wasmUrl: 'http://guide.local/wasm/', // JBIG2/JPX image decoders (the Turnberry guides use JBIG2)
+        standardFontDataUrl: 'http://guide.local/standard_fonts/',
+        cMapUrl: 'http://guide.local/cmaps/',
+        cMapPacked: true,
+        iccUrl: 'http://guide.local/iccs/',
+      }).promise;
       const out: string[] = [];
       for (const n of pages) {
         const p = await doc.getPage(n);
@@ -50,6 +64,7 @@ for (let hole = 1; hole <= 18; hole++) {
   ['layout', 'approach'].forEach((kind, i) =>
     writeFileSync(`${outDir}/hole-${n}-${kind}.webp`, Buffer.from(images[i].split(',')[1], 'base64')),
   );
+  if (problems.length) throw new Error(`hole ${hole} did not render cleanly:\n${problems.join('\n')}`);
   process.stdout.write(`${hole} `);
 }
 await browser.close();

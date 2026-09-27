@@ -244,6 +244,9 @@ test('the course guide remembers the course and hole on this phone', async ({ pa
   await page.getByRole('tab', { name: 'Dundonald' }).click();
   await page.getByRole('button', { name: 'Guide hole 12', exact: true }).click();
   await expect(page.getByTestId('guide-notes')).toContainText('shortest Par 4');
-  await expect(page.getByTestId('guide-notes')).toContainText('Championship');
+  await expect(page.getByTestId('guide-notes')).not.toContainText('Championship'); // no tee table
+  const notesY = (await page.getByTestId('guide-notes').boundingBox())!.y;
+  const imageY = (await page.getByTestId('guide-layout').boundingBox())!.y;
+  expect(notesY).toBeLessThan(imageY); // pro tips above the aerial
   await expect.poll(() => page.getByTestId('guide-layout').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
 });

@@ -68,7 +68,10 @@
 <p class="course-name muted small">{guide.name}</p>
 
 {#if notes}
-  <p class="summary">{notes.yards} yards from the Championship tees</p>
+  <section class="card notes" data-testid="guide-notes">
+    <h3>Pro tips</h3>
+    <p>{notes.tips}</p>
+  </section>
 {/if}
 
 {#key pages[0]}
@@ -84,18 +87,6 @@
   {/each}
 {/key}
 
-{#if notes}
-  <section class="card notes" data-testid="guide-notes">
-    <h3>Pro tips</h3>
-    <p>{notes.tips}</p>
-    <table>
-      <thead><tr><th>Tee</th><th>Yards</th><th>Par</th></tr></thead>
-      <tbody>
-        {#each notes.tees as t (t.tee)}<tr><td>{t.tee}</td><td>{t.yards}</td><td>{t.par}</td></tr>{/each}
-      </tbody>
-    </table>
-  </section>
-{/if}
 
 <div class="nav">
   <button class="secondary" disabled={hole === 1} onclick={() => go(slug, hole - 1)}>← Hole {hole - 1}</button>
@@ -119,11 +110,8 @@
   .page:not(.pdf) { max-height: 60vh; object-fit: contain; }
   .page.pdf { aspect-ratio: 900 / 1406; background: #efe9dc; }
   .course-name { margin: -6px 0 8px; }
-  .summary { margin: 0 0 10px; }
   .notes h3 { margin-bottom: 6px; }
-  .notes p { margin: 0 0 10px; line-height: 1.45; }
-  .notes table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-  .notes th, .notes td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+  .notes p { margin: 0; line-height: 1.45; }
   .nav { display: flex; justify-content: space-between; gap: 8px; }
   .nav button { flex: 1; }
   .nav button:disabled { visibility: hidden; }
