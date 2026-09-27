@@ -2,6 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readdirSync, readFileSync } from 'node:fs';
 
 export const TRIP_ID = '11111111-1111-1111-1111-111111111111';
+export const STRANGER_ID = '33333333-3333-3333-3333-333333333333';
 export const ADMIN_ID = '22222222-2222-2222-2222-222222222222';
 
 const SUPABASE_SHIM = `
@@ -27,14 +28,17 @@ export async function makeDb(): Promise<PGlite> {
   return db;
 }
 
-export type Who = 'anon' | 'trip' | 'admin';
+/** stranger = a self-signed-up account: authenticated, but no app_metadata role. */
+export type Who = 'anon' | 'trip' | 'admin' | 'stranger';
 
 /** Run fn as a Supabase API caller: the Postgres role plus JWT claims, exactly as PostgREST sets them. */
 export async function as<T>(db: PGlite, who: Who, fn: () => Promise<T>): Promise<T> {
   const claims =
     who === 'anon'
       ? { role: 'anon' }
-      : { sub: who === 'trip' ? TRIP_ID : ADMIN_ID, role: 'authenticated', app_metadata: who === 'admin' ? { role: 'admin' } : {} };
+      : who === 'stranger'
+        ? { sub: STRANGER_ID, role: 'authenticated', app_metadata: {} }
+        : { sub: who === 'trip' ? TRIP_ID : ADMIN_ID, role: 'authenticated', app_metadata: { role: who } };
   await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify(claims)]);
   await db.exec(`set role ${who === 'anon' ? 'anon' : 'authenticated'}`);
   try {

@@ -60,6 +60,32 @@ describe('read access', () => {
   });
 });
 
+describe('self-signed-up accounts (no role)', () => {
+  it('cannot read anything', async () => {
+    const r = await as(db, 'stranger', () => db.query(`select * from public.players`));
+    expect(r.rows).toHaveLength(0);
+  });
+  it('cannot write scores', async () => {
+    await expect(upsert('stranger', s.players.a1, 1, 4)).rejects.toThrow(/not a trip member/);
+    expect(await readScore(s.players.a1, 1)).toBeNull();
+  });
+  it('cannot insert scores directly', async () => {
+    await expect(
+      as(db, 'stranger', () =>
+        db.query(`insert into public.scores(round_id, player_id, hole, gross, client_updated_at) values ($1, $2, 1, 4, now())`, [s.roundId, s.players.a1]),
+      ),
+    ).rejects.toThrow(/row-level security/);
+  });
+  it('cannot confirm results', async () => {
+    await expect(confirm('stranger', 'better_ball', 15)).rejects.toThrow(/not a trip member/);
+  });
+  it('cannot set photos', async () => {
+    await expect(
+      as(db, 'stranger', () => db.query(`select public.set_player_photo($1::uuid, $2)`, [s.players.a1, `${s.players.a1}/1.jpg`])),
+    ).rejects.toThrow(/not a trip member/);
+  });
+});
+
 describe('setup tables', () => {
   it('lets the admin write', async () => {
     await as(db, 'admin', () => db.query(`insert into public.players(name, short_name) values ('New', 'New')`));

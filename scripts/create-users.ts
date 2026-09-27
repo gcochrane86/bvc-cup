@@ -12,7 +12,7 @@ if (!url || !secret || !tripPassword || !adminPassword) {
 
 const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
 
-async function ensureUser(email: string, password: string, role: 'admin' | null) {
+async function ensureUser(email: string, password: string, role: 'trip' | 'admin') {
   const { data, error } = await admin.auth.admin.listUsers();
   if (error) throw error;
   const existing = data.users.find((u) => u.email === email);
@@ -24,5 +24,5 @@ async function ensureUser(email: string, password: string, role: 'admin' | null)
   console.log(`${existing ? 'Updated' : 'Created'} ${email}`);
 }
 
-await ensureUser(process.env.VITE_TRIP_EMAIL ?? 'trip@example.com', tripPassword, null);
+await ensureUser(process.env.VITE_TRIP_EMAIL ?? 'trip@example.com', tripPassword, 'trip');
 await ensureUser(process.env.VITE_ADMIN_EMAIL ?? 'admin@example.com', adminPassword, 'admin');
