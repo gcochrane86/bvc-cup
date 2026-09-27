@@ -17,8 +17,8 @@
     {#if isAdmin()}<a href="#/admin/events">Set one up</a>{:else}Ask the organiser to set one up.{/if}
   </p>
 {:else}
-  <h1>{view.event.name}</h1>
   <TeamTracker tracker={view.tracker} event={view.event} breakdown={view.rounds.map((r) => ({ name: r.round.name, points: r.pointsAvailable }))} />
+  <h1>{view.event.name}</h1>
   <div class="tabs" role="tablist">
     {#each view.rounds as r (r.round.id)}
       <button role="tab" aria-selected={r.round.id === roundId} class:active={r.round.id === roundId} onclick={() => (chosen = r.round.id)}>
