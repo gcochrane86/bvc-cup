@@ -175,3 +175,9 @@ export function resumeGroupId(remembered: string | null, list: { groups: GroupVi
   if (!remembered) return null;
   return list.some((d) => d.groups.some((g) => g.group.id === remembered)) ? remembered : null;
 }
+
+/** "Cochrane/Trimble vs McCaughey/Connaughty" — team A pair vs team B pair, by short name. */
+export function pairingLabel(group: GroupView, short: (playerId: string) => string): string {
+  const side = (slots: Slot[]) => slots.map((s) => group.slots[s]).filter((x): x is string => !!x).map(short).join('/');
+  return `${side(['A1', 'A2'])} vs ${side(['B1', 'B2'])}`;
+}

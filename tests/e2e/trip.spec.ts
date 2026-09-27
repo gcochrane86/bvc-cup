@@ -126,6 +126,7 @@ test('non-admins only see the Leaderboard and Scores tabs', async ({ page }) => 
 test('the Scores tab goes back to the match this phone is scoring', async ({ page }) => {
   await login(page);
   await page.goto('/#/score');
+  await expect(page.getByTestId('score-pick').filter({ hasText: /^Match 1\b/ })).toContainText('Adams/Brown vs Green/Hill');
   await page.getByTestId('score-pick').filter({ hasText: /^Match 2\b/ }).click();
   await expect(page.getByText(/· Match 2$/)).toBeVisible();
   await page.getByRole('link', { name: 'Leaderboard' }).click();
@@ -133,4 +134,26 @@ test('the Scores tab goes back to the match this phone is scoring', async ({ pag
   await expect(page.getByText(/· Match 2$/)).toBeVisible();
   await page.getByRole('link', { name: '← All matches' }).click();
   await expect(page.getByTestId('score-pick')).not.toHaveCount(0);
+});
+
+test('the admin can reset all scores back to the start', async ({ browser }) => {
+  const trip = await newPhone(browser);
+  trip.on('dialog', (d) => void d.accept());
+  await login(trip);
+  await openGroup1(trip);
+  for (let h = 1; h <= 10; h++) await enterHole(trip, h, 4, 5);
+  await trip.goto('/#/');
+  await group1Card(trip).click();
+  await trip.getByRole('button', { name: 'Confirm result' }).click();
+  await expect(trip.getByTestId('match-card')).toContainText('FINAL');
+
+  const admin = await newPhone(browser);
+  admin.on('dialog', (d) => void (d.type() === 'prompt' ? d.accept('RESET') : d.accept()));
+  await loginAdmin(admin);
+  await admin.getByRole('button', { name: 'Reset all scores' }).click();
+  await expect(admin.getByText('All scores reset.')).toBeVisible();
+
+  await trip.goto('/#/');
+  await expect(group1Card(trip).getByTestId('status')).toHaveText('Not started');
+  await expect(trip.getByTestId('conf-a')).toHaveText('0');
 });

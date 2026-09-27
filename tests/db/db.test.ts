@@ -215,6 +215,34 @@ describe('handicap freezing', () => {
   });
 });
 
+describe('reset_event_scores', () => {
+  it('lets the admin wipe every score and result for the event, unfreezing handicaps', async () => {
+    await upsert('trip', s.players.a1, 1, 4);
+    await upsert('trip', s.players.b1, 2, 5);
+    await confirm('trip', 'better_ball', 15);
+    await as(db, 'admin', () => db.query(`select public.reset_event_scores($1::uuid)`, [s.eventId]));
+    const n = async (t: string) => (await db.query<{ n: number }>(`select count(*)::int as n from public.${t}`)).rows[0].n;
+    expect(await n('scores')).toBe(0);
+    expect(await n('match_results')).toBe(0);
+    const frozen = await db.query(`select 1 from public.group_players where handicap is not null`);
+    expect(frozen.rows).toHaveLength(0);
+    expect(await n('players')).toBe(4); // setup untouched
+  });
+
+  it('leaves other events alone', async () => {
+    await upsert('trip', s.players.a1, 1, 4);
+    const other = (await db.query<{ id: string }>(`insert into public.events(name) values ('Other') returning id`)).rows[0].id;
+    await as(db, 'admin', () => db.query(`select public.reset_event_scores($1::uuid)`, [other]));
+    expect(await readScore(s.players.a1, 1)).toEqual({ gross: 4, picked_up: false });
+  });
+
+  it('refuses the trip user', async () => {
+    await upsert('trip', s.players.a1, 1, 4);
+    await expect(as(db, 'trip', () => db.query(`select public.reset_event_scores($1::uuid)`, [s.eventId]))).rejects.toThrow(/admin only/);
+    expect(await readScore(s.players.a1, 1)).toEqual({ gross: 4, picked_up: false });
+  });
+});
+
 describe('admin RPCs', () => {
   const holes = JSON.stringify(Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, stroke_index: 18 - i })));
 

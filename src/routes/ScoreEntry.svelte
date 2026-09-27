@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { db, enterScore, photoUrl, playerName } from '../lib/data/store.svelte';
-  import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, resumeGroupId, scoringList } from '../lib/view';
+  import { db, enterScore, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
+  import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
   import { isScoreLocked, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
 
@@ -139,9 +139,7 @@
     {#each day.groups as g (g.group.id)}
       <a class="card group-pick" href="#/score/{g.group.id}" data-testid="score-pick">
         <strong>{matchesLabel(g)}</strong>
-        <span class="muted small">
-          {SLOTS.map((s) => g.slots[s]).filter((x): x is string => !!x).map(playerName).join(', ')}
-        </span>
+        <span class="muted small">{pairingLabel(g, playerShort)}</span>
       </a>
     {/each}
   {:else}

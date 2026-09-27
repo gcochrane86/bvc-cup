@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, matchesLabel, resumeGroupId, scoringList } from './view';
+import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, matchesLabel, pairingLabel, resumeGroupId, scoringList } from './view';
 import type { RoundRow, ScoreRow, Snapshot } from './data/types';
 import type { Slot, Team } from './scoring';
 
@@ -164,6 +164,12 @@ describe('scoring list', () => {
     expect(resumeGroupId('g1', scoringList(buildEventView(snapshot({ results: [confirmedBB] }))!))).toBeNull();
     expect(resumeGroupId('deleted', scoringList(buildEventView(snapshot())!))).toBeNull();
     expect(resumeGroupId(null, scoringList(buildEventView(snapshot())!))).toBeNull();
+  });
+
+  it('shows the pairing as surnames: A1/A2 vs B1/B2', () => {
+    const short: Record<string, string> = { a1: 'Cochrane', a2: 'Trimble', b1: 'McCaughey', b2: 'Connaughty' };
+    const g = buildEventView(snapshot())!.rounds[0].groups[0];
+    expect(pairingLabel(g, (id) => short[id])).toBe('Cochrane/Trimble vs McCaughey/Connaughty');
   });
 
   it('labels a group by its match numbers', () => {
