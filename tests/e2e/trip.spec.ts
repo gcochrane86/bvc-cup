@@ -108,7 +108,11 @@ test('the admin can reopen a confirmed match for scoring', async ({ browser }) =
   await admin.getByTestId('reopen-row').filter({ hasText: /^Match 1\b/ }).getByRole('button', { name: 'Reopen' }).click();
   await expect(admin.getByText('Match 1 reopened')).toBeVisible();
 
+  // The scorer's phone still remembers Match 1, so Scores goes straight back into it...
   await trip.goto('/#/score');
+  await expect(trip.getByText(/· Match 1$/)).toBeVisible();
+  // ...and it is back on the list of matches to score.
+  await trip.getByRole('link', { name: '← All matches' }).click();
   await expect(trip.getByTestId('score-pick').filter({ hasText: /^Match 1\b/ })).toHaveCount(1);
   await trip.goto('/#/');
   await expect(trip.getByTestId('conf-a')).toHaveText('0'); // points back to projected
@@ -117,4 +121,16 @@ test('the admin can reopen a confirmed match for scoring', async ({ browser }) =
 test('non-admins only see the Leaderboard and Scores tabs', async ({ page }) => {
   await login(page);
   await expect(page.locator('nav a')).toHaveText(['Leaderboard', 'Scores']);
+});
+
+test('the Scores tab goes back to the match this phone is scoring', async ({ page }) => {
+  await login(page);
+  await page.goto('/#/score');
+  await page.getByTestId('score-pick').filter({ hasText: /^Match 2\b/ }).click();
+  await expect(page.getByText(/· Match 2$/)).toBeVisible();
+  await page.getByRole('link', { name: 'Leaderboard' }).click();
+  await page.getByRole('link', { name: 'Scores' }).click();
+  await expect(page.getByText(/· Match 2$/)).toBeVisible();
+  await page.getByRole('link', { name: '← All matches' }).click();
+  await expect(page.getByTestId('score-pick')).not.toHaveCount(0);
 });

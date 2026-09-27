@@ -169,3 +169,9 @@ export function matchesLabel(group: GroupView): string {
   if (ns.length === 0) return `Group ${group.group.group_no}`;
   return ns.length === 1 ? `Match ${ns[0]}` : `Matches ${Math.min(...ns)}–${Math.max(...ns)}`;
 }
+
+/** The match this phone was scoring, if it's still on the scoring list (i.e. not yet confirmed). */
+export function resumeGroupId(remembered: string | null, list: { groups: GroupView[] }[]): string | null {
+  if (!remembered) return null;
+  return list.some((d) => d.groups.some((g) => g.group.id === remembered)) ? remembered : null;
+}

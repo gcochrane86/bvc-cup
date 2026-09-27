@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, matchesLabel, scoringList } from './view';
+import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, matchesLabel, resumeGroupId, scoringList } from './view';
 import type { RoundRow, ScoreRow, Snapshot } from './data/types';
 import type { Slot, Team } from './scoring';
 
@@ -153,6 +153,17 @@ describe('scoring list', () => {
   it('skips groups without full pairings', () => {
     const s = snapshot();
     expect(scoringList(buildEventView({ ...s, groupPlayers: s.groupPlayers.slice(0, 3) })!)).toEqual([]);
+  });
+
+  it('resumes the remembered match while it is still being played', () => {
+    const v = buildEventView(snapshot())!;
+    expect(resumeGroupId('g1', scoringList(v))).toBe('g1');
+  });
+
+  it('forgets the remembered match once it is confirmed (or gone)', () => {
+    expect(resumeGroupId('g1', scoringList(buildEventView(snapshot({ results: [confirmedBB] }))!))).toBeNull();
+    expect(resumeGroupId('deleted', scoringList(buildEventView(snapshot())!))).toBeNull();
+    expect(resumeGroupId(null, scoringList(buildEventView(snapshot())!))).toBeNull();
   });
 
   it('labels a group by its match numbers', () => {

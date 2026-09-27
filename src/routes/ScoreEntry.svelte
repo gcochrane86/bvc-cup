@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { db, enterScore, photoUrl, playerName } from '../lib/data/store.svelte';
-  import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, scoringList } from '../lib/view';
+  import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, resumeGroupId, scoringList } from '../lib/view';
   import { isScoreLocked, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
 
@@ -12,6 +12,38 @@
   const view = $derived(buildEventView(db));
   const found = $derived(view && groupId ? findGroup(view, groupId) : null);
   const toScore = $derived(view ? scoringList(view) : []);
+
+  // This phone remembers the match it's scoring: Scores goes straight back to it until it's confirmed.
+  const REMEMBER = 'golf.scoringGroup';
+  function remembered(): string | null {
+    try {
+      return localStorage.getItem(REMEMBER);
+    } catch {
+      return null; // private mode: the list is shown each time instead
+    }
+  }
+  function remember(id: string | null) {
+    try {
+      if (id) localStorage.setItem(REMEMBER, id);
+      else localStorage.removeItem(REMEMBER);
+    } catch {
+      /* ignore */
+    }
+  }
+  $effect(() => {
+    if (groupId) {
+      if (found) remember(groupId);
+      return;
+    }
+    const resume = resumeGroupId(remembered(), toScore);
+    if (resume) location.replace(`#/score/${resume}`);
+    else remember(null); // confirmed or gone: forget it and show the list
+  });
+  function allMatches(e: MouseEvent) {
+    e.preventDefault();
+    remember(null);
+    location.hash = '#/score';
+  }
 
   let pickedHole = $state<number | null>(null);
   const hole = $derived(found ? (pickedHole ?? firstIncompleteHole(found.group, found.round.holes)) : 1);
@@ -176,7 +208,7 @@
   {/each}
 
   <button class="save" onclick={save} disabled={allLocked}>Save hole {hole}</button>
-  <p class="muted small"><a href="#/score">← All matches</a></p>
+  <p class="muted small"><a href="#/score" onclick={allMatches}>← All matches</a></p>
 {/if}
 
 <style>
