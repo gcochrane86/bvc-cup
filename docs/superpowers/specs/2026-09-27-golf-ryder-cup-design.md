@@ -207,8 +207,17 @@ large tap targets and team colours throughout.
      device.
    - A hole selector strip (1–18) shows filled, empty and locked states.
      Tapping any hole opens it for editing.
-   - Per hole: the 4 players with photo, strokes-received dots, and a big
-     −/+ stepper that starts at par. There is a "Picked up" toggle.
+   - The hole header shows the hole number, par and stroke index.
+   - Per hole: the 4 players with photo, and a big −/+ stepper that starts at
+     par. There is a "Picked up" toggle.
+   - **Shot highlighting:** the row of any player who receives a stroke on
+     this hole is highlighted green, with a "1 shot" chip. A player receiving
+     2 shots gets a stronger green and a "2 shots" chip. This is so the group
+     can see at a glance, on the tee, who has a shot.
+     - The highlight uses better-ball strokes.
+     - When singles are enabled, the chip also shows singles strokes where
+       they differ, for example "BB 1 · Singles 0". This matters because the
+       better-ball and singles matches measure strokes from different players.
    - Save moves on to the next hole.
    - A mini status of the group's matches is shown at the top.
    - A badge shows "N scores waiting to send" while offline.
