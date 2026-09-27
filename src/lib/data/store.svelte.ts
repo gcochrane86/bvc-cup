@@ -2,6 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createStore, del, get, set, values } from 'idb-keyval';
 import { must, supabase } from '../supabase';
 import { applyPending, isBehind, removeScoreRow, upsertScoreRow } from './merge';
+import { freshOnly } from './fresh';
 import { createOutbox, pendingKey, type OutboxStorage, type PendingScore, type SendResult } from './outbox';
 import type {
   CourseHoleRow, CourseRow, EventPlayerRow, EventRow, GroupPlayerRow, GroupRow,
@@ -78,12 +79,17 @@ export async function enterScore(p: PendingScore) {
 }
 
 // ---- loading ----
-let loading: Promise<void> | null = null;
+let loading = false;
 
-export function loadAll(): Promise<void> {
-  loading ??= doLoad().finally(() => (loading = null));
-  return loading;
-}
+/** Reload everything. A call made mid-load waits for a fresh load, so callers never see pre-write data. */
+export const loadAll = freshOnly(async () => {
+  loading = true;
+  try {
+    await doLoad();
+  } finally {
+    loading = false;
+  }
+});
 
 async function doLoad() {
   try {
