@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyPending, hasPendingFor, removeScoreRow, upsertScoreRow } from './merge';
+import { applyPending, hasPendingFor, isBehind, removeScoreRow, upsertScoreRow } from './merge';
 import type { PendingScore } from './outbox';
 import type { ScoreRow } from './types';
 
@@ -44,5 +44,24 @@ describe('score merging', () => {
     expect(hasPendingFor(pending, 'r', ['x', 'y'])).toBe(true);
     expect(hasPendingFor(pending, 'r', ['y'])).toBe(false);
     expect(hasPendingFor(pending, 'other', ['x'])).toBe(false);
+  });
+});
+
+describe('isBehind', () => {
+  const rows = [row(1, 4, '2026-10-01T10:00:00+00:00'), row(2, 5, '2026-10-01T10:05:00+00:00')];
+  it('is up to date when counts and the latest edit match', () => {
+    expect(isBehind(rows, 1, { scores: 2, latest: '2026-10-01T10:05:00.000Z', results: 1 })).toBe(false);
+  });
+  it('is behind when the server has more scores', () => {
+    expect(isBehind(rows, 1, { scores: 3, latest: '2026-10-01T10:05:00.000Z', results: 1 })).toBe(true);
+  });
+  it('is behind when a score was edited on the server', () => {
+    expect(isBehind(rows, 1, { scores: 2, latest: '2026-10-01T10:09:00.000Z', results: 1 })).toBe(true);
+  });
+  it('is behind when a result was confirmed or unlocked', () => {
+    expect(isBehind(rows, 1, { scores: 2, latest: '2026-10-01T10:05:00.000Z', results: 0 })).toBe(true);
+  });
+  it('is up to date with no scores anywhere', () => {
+    expect(isBehind([], 0, { scores: 0, latest: null, results: 0 })).toBe(false);
   });
 });

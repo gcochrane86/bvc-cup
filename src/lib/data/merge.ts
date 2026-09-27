@@ -37,3 +37,19 @@ export function applyPending(rows: ScoreRow[], pending: PendingScore[]): ScoreRo
 export function hasPendingFor(pending: PendingScore[], roundId: string, playerIds: string[]): boolean {
   return pending.some((p) => p.roundId === roundId && playerIds.includes(p.playerId));
 }
+
+/** The server's view of the active event, as returned by the cheap catch-up check. */
+export interface RemoteVersion {
+  scores: number;
+  /** Newest client_updated_at among the server's scores. */
+  latest: string | null;
+  results: number;
+}
+
+/** True when local state has missed a change (e.g. Realtime dropped messages under its rate limit). */
+export function isBehind(rows: ScoreRow[], results: number, remote: RemoteVersion): boolean {
+  if (rows.length !== remote.scores || results !== remote.results) return true;
+  if (remote.latest === null) return false;
+  const localLatest = Math.max(-Infinity, ...rows.map((r) => Date.parse(r.client_updated_at)));
+  return Date.parse(remote.latest) > localLatest;
+}

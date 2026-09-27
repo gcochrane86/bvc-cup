@@ -1,7 +1,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createStore, del, get, set, values } from 'idb-keyval';
 import { must, supabase } from '../supabase';
-import { applyPending, removeScoreRow, upsertScoreRow } from './merge';
+import { applyPending, isBehind, removeScoreRow, upsertScoreRow } from './merge';
 import { createOutbox, pendingKey, type OutboxStorage, type PendingScore, type SendResult } from './outbox';
 import type {
   CourseHoleRow, CourseRow, EventPlayerRow, EventRow, GroupPlayerRow, GroupRow,
@@ -153,6 +153,30 @@ export function photoUrl(playerId: string): string | null {
 export const playerName = (id: string) => db.players.find((p) => p.id === id)?.name ?? '?';
 export const playerShort = (id: string) => db.players.find((p) => p.id === id)?.short_name ?? '?';
 
+// ---- catch-up check ----
+// Realtime drops messages silently when the project hits its per-second message limit (e.g. an
+// admin saving a course while every phone is watching). Every 15s, compare two tiny server
+// summaries with local state and reload if anything was missed.
+async function checkForMissed() {
+  if (!db.loaded || loading || document.visibilityState !== 'visible') return;
+  const roundIds = db.rounds.map((r) => r.id);
+  const groupIds = db.groups.map((g) => g.id);
+  if (!roundIds.length) return;
+  try {
+    const [s, r] = await Promise.all([
+      supabase.from('scores').select('client_updated_at', { count: 'exact' }).in('round_id', roundIds)
+        .order('client_updated_at', { ascending: false }).limit(1),
+      supabase.from('match_results').select('group_id', { count: 'exact', head: true })
+        .in('group_id', groupIds.length ? groupIds : ['00000000-0000-0000-0000-000000000000']),
+    ]);
+    if (s.error || r.error) return; // offline; the online/visibility handlers catch up later
+    const remote = { scores: s.count ?? 0, latest: s.data?.[0]?.client_updated_at ?? null, results: r.count ?? 0 };
+    if (isBehind(db.scores, db.results.length, remote)) void loadAll();
+  } catch {
+    /* offline — ignore */
+  }
+}
+
 // ---- realtime ----
 const SETUP_TABLES = ['players', 'courses', 'course_holes', 'events', 'event_players', 'rounds', 'groups', 'group_players'];
 let channel: RealtimeChannel | null = null;
@@ -209,6 +233,7 @@ export function startData() {
   window.addEventListener('online', onOnline);
   pollTimer = setInterval(() => {
     if (db.pending.length) void flushOutbox();
+    void checkForMissed();
   }, 15_000);
 }
 
