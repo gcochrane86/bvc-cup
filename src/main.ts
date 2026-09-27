@@ -3,3 +3,7 @@ import './app.css';
 import App from './App.svelte';
 
 mount(App, { target: document.getElementById('app')! });
+
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  void navigator.serviceWorker.register('./sw.js');
+}
