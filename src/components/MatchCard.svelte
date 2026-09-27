@@ -3,7 +3,7 @@
   import { photoUrl, playerShort } from '../lib/data/store.svelte';
   import { matchLabel, type MatchView } from '../lib/view';
 
-  let { mv, groupNo, teeTime = null, link = true }: { mv: MatchView; groupNo: number; teeTime?: string | null; link?: boolean } = $props();
+  let { mv, teeTime = null, link = true }: { mv: MatchView; teeTime?: string | null; link?: boolean } = $props();
 
   const s = $derived(mv.state);
   const lead = $derived(mv.result ? (mv.result.winner === 'A' ? 1 : mv.result.winner === 'B' ? -1 : 0) : s.lead);
@@ -22,9 +22,14 @@
   data-testid="match-card"
   data-match-id={mv.def.id}
 >
+  <!-- The badge sits on the leading team's side (left when level). -->
   <header>
-    <span class="muted small">{matchLabel(mv.def.type)} · Group {groupNo}</span>
-    {#if badge}<span class="badge" style="background:{colour}">{badge}</span>{/if}
+    <span class="slot">{#if badge && lead >= 0}<span class="badge" style="background:{colour}">{badge}</span>{/if}</span>
+    <span class="title">
+      <strong>Match {mv.number}</strong>
+      {#if mv.def.type !== 'better_ball'}<small class="muted">{matchLabel(mv.def.type)}</small>{/if}
+    </span>
+    <span class="slot right">{#if badge && lead < 0}<span class="badge" style="background:{colour}">{badge}</span>{/if}</span>
   </header>
   <div class="body">
     <div class="side">
@@ -47,7 +52,11 @@
 </svelte:element>
 
 <style>
-  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; min-height: 24px; }
+  header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-bottom: 10px; min-height: 24px; }
+  .slot.right { text-align: right; }
+  .title { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+  .title strong { font-size: 0.95rem; }
+  .title small { font-size: 0.7rem; }
   .badge { color: #fff; font-weight: 800; font-size: 0.75rem; padding: 4px 10px; border-radius: 999px; letter-spacing: 0.04em; }
   .body { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
   .side { min-width: 0; }

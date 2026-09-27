@@ -1,47 +1,17 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { db, enterScore, photoUrl, playerName } from '../lib/data/store.svelte';
-  import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, matchLabel, today } from '../lib/view';
+  import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, scoringList } from '../lib/view';
   import { isScoreLocked, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
 
   let { groupId }: { groupId: string | null } = $props();
 
-  const REMEMBER = 'golf.scoringGroup';
   const SLOTS: Slot[] = ['A1', 'A2', 'B1', 'B2'];
 
-  function readRemembered(): string | null {
-    try {
-      return localStorage.getItem(REMEMBER);
-    } catch {
-      return null;
-    }
-  }
-  let remembered = $state(readRemembered());
-
-  function choose(id: string) {
-    try {
-      localStorage.setItem(REMEMBER, id);
-    } catch {
-      /* private mode — fine, the URL still carries the group */
-    }
-    remembered = id;
-    location.hash = `#/score/${id}`;
-  }
-  function changeGroup() {
-    try {
-      localStorage.removeItem(REMEMBER);
-    } catch {
-      /* ignore */
-    }
-    remembered = null;
-    location.hash = '#/score';
-  }
-
   const view = $derived(buildEventView(db));
-  const gid = $derived(groupId ?? remembered);
-  const found = $derived(view && gid ? findGroup(view, gid) : null);
-  const pickerRoundId = $derived(view ? defaultRoundId(view.rounds.map((r) => r.round), today()) : null);
+  const found = $derived(view && groupId ? findGroup(view, groupId) : null);
+  const toScore = $derived(view ? scoringList(view) : []);
 
   let pickedHole = $state<number | null>(null);
   const hole = $derived(found ? (pickedHole ?? firstIncompleteHole(found.group, found.round.holes)) : 1);
@@ -131,19 +101,19 @@
 {#if !view}
   <p class="center">No active event yet.</p>
 {:else if !found}
-  <h1>Which group are you scoring?</h1>
-  {#each view.rounds.filter((r) => r.round.id === pickerRoundId) as rv (rv.round.id)}
-    <p class="muted">{rv.round.name}</p>
-    {#each rv.groups as g (g.group.id)}
-      <button class="group-pick secondary" onclick={() => choose(g.group.id)}>
-        <strong>Group {g.group.group_no}</strong>
+  <h1>Which match are you scoring?</h1>
+  {#each toScore as day (day.round.round.id)}
+    <h2 class="day">{day.round.round.name}</h2>
+    {#each day.groups as g (g.group.id)}
+      <a class="card group-pick" href="#/score/{g.group.id}" data-testid="score-pick">
+        <strong>{matchesLabel(g)}</strong>
         <span class="muted small">
           {SLOTS.map((s) => g.slots[s]).filter((x): x is string => !!x).map(playerName).join(', ')}
         </span>
-      </button>
-    {:else}
-      <p class="muted">No pairings yet for this round.</p>
+      </a>
     {/each}
+  {:else}
+    <p class="muted">No matches left to score. Confirmed matches drop off this list; the admin can reopen one if needed.</p>
   {/each}
 {:else if !info}
   <p class="center">This round's course has no holes set up yet.</p>
@@ -151,7 +121,7 @@
   <header class="head">
     <div>
       <h1>Hole {hole}</h1>
-      <p class="muted">Par {info.par} · SI {info.strokeIndex} · {found.round.round.name} · Group {found.group.group.group_no}</p>
+      <p class="muted">Par {info.par} · SI {info.strokeIndex} · {found.round.round.name} · {matchesLabel(found.group)}</p>
     </div>
     {#if db.pending.length}
       <span class="pending" data-testid="pending">{db.pending.length} waiting to send</span>
@@ -206,11 +176,12 @@
   {/each}
 
   <button class="save" onclick={save} disabled={allLocked}>Save hole {hole}</button>
-  <p class="muted small">Scoring for a different group? <button class="linklike" onclick={changeGroup}>Change group</button></p>
+  <p class="muted small"><a href="#/score">← All matches</a></p>
 {/if}
 
 <style>
-  .group-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; margin-bottom: 10px; text-align: left; }
+  .group-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .day { font-size: 1rem; margin: 16px 0 8px; }
   .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
   .head h1 { margin-bottom: 2px; }
   .head p { margin: 0 0 10px; }
@@ -238,5 +209,4 @@
   .val.untouched { color: var(--muted); }
   .pu { grid-area: pu; display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--muted); margin: 0; }
   .save { width: 100%; font-size: 1.1rem; margin-top: 4px; }
-  .linklike { background: none; color: var(--accent); padding: 0; min-height: 0; text-decoration: underline; font-weight: 500; }
 </style>

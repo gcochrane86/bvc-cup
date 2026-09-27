@@ -32,7 +32,7 @@
     <p class="muted small">{rv.completed} of {rv.totalMatches} matches completed</p>
     {#each rv.groups as g (g.group.id)}
       {#each g.matches as mv (mv.def.id)}
-        <MatchCard {mv} groupNo={g.group.group_no} teeTime={g.group.tee_time} />
+        <MatchCard {mv} teeTime={g.group.tee_time} />
       {/each}
     {:else}
       <p class="muted">Pairings haven't been set for this round yet.</p>

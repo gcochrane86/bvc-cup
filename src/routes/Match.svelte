@@ -73,7 +73,7 @@
   <p class="center">Match not found.</p>
 {:else}
   <h2>{found.round.round.name}</h2>
-  <MatchCard {mv} groupNo={found.group.group.group_no} teeTime={found.group.group.tee_time} link={false} />
+  <MatchCard {mv} teeTime={found.group.group.tee_time} link={false} />
   {#if mv.state.decided && !mv.result}
     <button class="wide" disabled={busy} onclick={confirmResult}>Confirm result</button>
   {/if}

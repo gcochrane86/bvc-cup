@@ -12,6 +12,7 @@ describe('parseRoute', () => {
     ['#/admin', { name: 'admin' }],
     ['#/admin/login', { name: 'admin-login' }],
     ['#/admin/players', { name: 'admin-players' }],
+    ['#/admin/results', { name: 'admin-results' }],
     ['#/admin/courses', { name: 'admin-courses' }],
     ['#/admin/courses/new', { name: 'admin-course', courseId: 'new' }],
     ['#/admin/events', { name: 'admin-events' }],

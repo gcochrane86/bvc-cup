@@ -20,7 +20,11 @@ import {
 } from './scoring';
 import type { EventRow, GroupRow, RoundRow, Snapshot } from './data/types';
 
-export interface MatchView { def: MatchDef; state: MatchState; result: ConfirmedResult | null }
+export interface MatchView {
+  def: MatchDef; state: MatchState; result: ConfirmedResult | null;
+  /** Event-wide match number: day by day, group by group, fourball then low then high singles. */
+  number: number;
+}
 export interface GroupView {
   group: GroupRow; slots: Partial<Record<Slot, string>>; matches: MatchView[]; scores: ScoreIndex;
   /** Each player's course handicap for this round (index converted with the course's slope/rating). */
@@ -53,6 +57,7 @@ export function buildEventView(s: Snapshot): EventView | null {
   const groupCount = Math.floor(s.eventPlayers.length / 4);
   const everyMatch: MatchView[] = [];
   let total = 0;
+  let matchNo = 0;
 
   const rounds = [...s.rounds]
     .sort((a, b) => a.round_no - b.round_no)
@@ -104,7 +109,7 @@ export function buildEventView(s: Snapshot): EventView | null {
                   finalHole: row.final_hole,
                 }
               : null;
-            return { def, state: computeMatchState(def, holes, scores), result };
+            return { def, state: computeMatchState(def, holes, scores), result, number: ++matchNo };
           });
           everyMatch.push(...matches);
           return { group, slots, matches, scores, playingHcp };
@@ -150,3 +155,17 @@ const LABELS: Record<MatchType, string> = {
 export const matchLabel = (type: MatchType) => LABELS[type];
 
 export const today = () => new Date().toLocaleDateString('en-CA');
+
+/** Groups that still need scoring (have matches, not all confirmed), by day. Days with none are left out. */
+export function scoringList(view: EventView): { round: RoundView; groups: GroupView[] }[] {
+  return view.rounds
+    .map((round) => ({ round, groups: round.groups.filter((g) => g.matches.length > 0 && g.matches.some((m) => !m.result)) }))
+    .filter((d) => d.groups.length > 0);
+}
+
+/** "Match 4", or "Matches 7–9" when a group also plays singles. */
+export function matchesLabel(group: GroupView): string {
+  const ns = group.matches.map((m) => m.number);
+  if (ns.length === 0) return `Group ${group.group.group_no}`;
+  return ns.length === 1 ? `Match ${ns[0]}` : `Matches ${Math.min(...ns)}–${Math.max(...ns)}`;
+}

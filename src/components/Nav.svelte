@@ -5,8 +5,13 @@
   const items = $derived([
     { href: '#/', label: 'Leaderboard', active: ['home', 'match'].includes(router.route.name) },
     { href: '#/score', label: 'Scores', active: router.route.name === 'score' },
-    { href: '#/players', label: 'Players', active: router.route.name === 'players' },
-    ...(isAdmin() ? [{ href: '#/admin', label: 'Admin', active: router.route.name.startsWith('admin') }] : []),
+    // Players (photo uploads) is admin-only; everyone else just sees the leaderboard and scores.
+    ...(isAdmin()
+      ? [
+          { href: '#/players', label: 'Players', active: router.route.name === 'players' },
+          { href: '#/admin', label: 'Admin', active: router.route.name.startsWith('admin') },
+        ]
+      : []),
   ]);
 </script>
 

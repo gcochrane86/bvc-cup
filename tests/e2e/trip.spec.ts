@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { enterHole, group1Card, login, newPhone, openGroup1, reseed } from './helpers';
+import { enterHole, group1Card, login, loginAdmin, newPhone, openGroup1, reseed } from './helpers';
 
 test.beforeEach(() => reseed());
 
@@ -46,13 +46,20 @@ test('confirming a decided match locks it and turns the points solid', async ({ 
   await page.goto('/#/');
   await expect(group1Card(page).getByTestId('status')).toHaveText('10&8');
   await group1Card(page).click();
+  const groupId = page.url().split('/match/')[1].split('/')[0];
   await page.getByRole('button', { name: 'Confirm result' }).click();
   await expect(page.getByTestId('match-card')).toContainText('FINAL');
 
   await page.goto('/#/');
   await expect(page.getByTestId('conf-a')).toHaveText('1');
 
+  // A confirmed match drops off the Scores list...
   await page.goto('/#/score');
+  await expect(page.getByTestId('score-pick').first()).toBeVisible();
+  await expect(page.getByTestId('score-pick').filter({ hasText: /^Match 1\b/ })).toHaveCount(0);
+
+  // ...and its holes are locked if opened directly.
+  await page.goto(`/#/score/${groupId}`);
   await page.getByRole('button', { name: 'Hole 5', exact: true }).click();
   await expect(page.getByTestId('row-A1')).toContainText('Locked');
   await expect(page.getByTestId('row-A1').getByRole('button', { name: /^Increase/ })).toBeDisabled();
@@ -81,4 +88,33 @@ test('a player photo can be uploaded', async ({ page }) => {
   const row = page.getByTestId('player-row').first();
   await row.locator('input[type=file]').setInputFiles('public/icon-512.png');
   await expect(row.locator('img')).toBeVisible();
+});
+
+test('the admin can reopen a confirmed match for scoring', async ({ browser }) => {
+  const trip = await newPhone(browser);
+  trip.on('dialog', (d) => void d.accept());
+  await login(trip);
+  await openGroup1(trip);
+  for (let h = 1; h <= 10; h++) await enterHole(trip, h, 4, 5);
+  await trip.goto('/#/');
+  await group1Card(trip).click();
+  await trip.getByRole('button', { name: 'Confirm result' }).click();
+  await expect(trip.getByTestId('match-card')).toContainText('FINAL');
+
+  const admin = await newPhone(browser);
+  admin.on('dialog', (d) => void d.accept());
+  await loginAdmin(admin);
+  await admin.goto('/#/admin/results');
+  await admin.getByTestId('reopen-row').filter({ hasText: /^Match 1\b/ }).getByRole('button', { name: 'Reopen' }).click();
+  await expect(admin.getByText('Match 1 reopened')).toBeVisible();
+
+  await trip.goto('/#/score');
+  await expect(trip.getByTestId('score-pick').filter({ hasText: /^Match 1\b/ })).toHaveCount(1);
+  await trip.goto('/#/');
+  await expect(trip.getByTestId('conf-a')).toHaveText('0'); // points back to projected
+});
+
+test('non-admins only see the Leaderboard and Scores tabs', async ({ page }) => {
+  await login(page);
+  await expect(page.locator('nav a')).toHaveText(['Leaderboard', 'Scores']);
 });

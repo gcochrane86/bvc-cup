@@ -10,6 +10,7 @@
   import AdminPairings from './routes/admin/AdminPairings.svelte';
   import AdminHome from './routes/admin/AdminHome.svelte';
   import AdminPlayers from './routes/admin/AdminPlayers.svelte';
+  import AdminResults from './routes/admin/AdminResults.svelte';
   import AdminCourses from './routes/admin/AdminCourses.svelte';
   import AdminCourse from './routes/admin/AdminCourse.svelte';
   import Players from './routes/Players.svelte';
@@ -61,6 +62,8 @@
         <AdminHome />
       {:else if route.name === 'admin-players'}
         <AdminPlayers />
+      {:else if route.name === 'admin-results'}
+        <AdminResults />
       {:else if route.name === 'admin-courses'}
         <AdminCourses />
       {:else if route.name === 'admin-course'}

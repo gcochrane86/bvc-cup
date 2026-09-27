@@ -19,7 +19,7 @@ export async function login(page: Page, password = process.env.TRIP_PASSWORD!) {
 
 export async function openGroup1(page: Page) {
   await page.goto('/#/score');
-  await page.getByRole('button', { name: /^Group 1/ }).click();
+  await page.getByTestId('score-pick').filter({ hasText: /^Match 1\b/ }).click();
   await expect(page.getByRole('heading', { name: /^Hole \d+$/ })).toBeVisible();
 }
 
@@ -46,4 +46,11 @@ export async function enterHole(page: Page, hole: number, a: number, b: number) 
 }
 
 export const group1Card = (page: Page) =>
-  page.locator('[data-match-id$=":better_ball"]').filter({ hasText: 'Group 1' });
+  page.locator('[data-match-id$=":better_ball"]').filter({ hasText: /\bMatch 1\b/ });
+
+export async function loginAdmin(page: Page) {
+  await page.goto('/#/admin/login');
+  await page.getByLabel('Password').fill(process.env.ADMIN_PASSWORD!);
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await expect(page.getByRole('heading', { name: 'Admin', exact: true })).toBeVisible();
+}

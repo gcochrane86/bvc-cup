@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole } from './view';
+import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, matchesLabel, scoringList } from './view';
 import type { RoundRow, ScoreRow, Snapshot } from './data/types';
 import type { Slot, Team } from './scoring';
 
@@ -107,6 +107,58 @@ describe('buildEventView', () => {
     expect(found.round.round.id).toBe('r1');
     expect(firstIncompleteHole(found.group, found.round.holes)).toBe(2);
     expect(findGroup(v, 'nope')).toBeNull();
+  });
+});
+
+describe('match numbers', () => {
+  it('numbers matches across the whole event: day, then group, then fourball/low/high', () => {
+    const players = Array.from({ length: 8 }, (_, i) => ({ event_id: 'e', player_id: `p${i}`, team: (i % 2 ? 'B' : 'A') as Team, handicap: 10 }));
+    const gp = (g: string, ids: string[]) =>
+      (['A1', 'B1', 'A2', 'B2'] as Slot[]).map((slot, i) => ({ group_id: g, slot, player_id: ids[i], handicap: null }));
+    const v = buildEventView(
+      snapshot({
+        eventPlayers: players,
+        rounds: [{ ...baseRound, id: 'r2', round_no: 2, singles_enabled: true }, baseRound],
+        groups: [
+          { id: 'g2', round_id: 'r1', group_no: 2, tee_time: null },
+          { id: 'g1', round_id: 'r1', group_no: 1, tee_time: null },
+          { id: 'g3', round_id: 'r2', group_no: 1, tee_time: null },
+        ],
+        groupPlayers: [...gp('g1', ['p0', 'p1', 'p2', 'p3']), ...gp('g2', ['p4', 'p5', 'p6', 'p7']), ...gp('g3', ['p0', 'p1', 'p2', 'p3'])],
+      }),
+    )!;
+    const numbers = v.rounds.map((r) => r.groups.map((g) => g.matches.map((m) => `${m.def.id}=${m.number}`)));
+    expect(numbers).toEqual([[['g1:better_ball=1'], ['g2:better_ball=2']], [['g3:better_ball=3', 'g3:low_singles=4', 'g3:high_singles=5']]]);
+  });
+});
+
+describe('scoring list', () => {
+  const confirmedBB = { group_id: 'g1', match_type: 'better_ball' as const, winner: 'A' as const, points_a: 1, points_b: 0, result_text: '2&1', final_hole: 17, confirmed_at: 'x' };
+
+  it('lists every group still to be finished, by day', () => {
+    const v = buildEventView(snapshot())!;
+    expect(scoringList(v).map((d) => [d.round.round.id, d.groups.map((g) => g.group.id)])).toEqual([['r1', ['g1']]]);
+  });
+
+  it('drops a group once all its matches are confirmed', () => {
+    const v = buildEventView(snapshot({ results: [confirmedBB] }))!;
+    expect(scoringList(v)).toEqual([]);
+  });
+
+  it('keeps a singles-day group until its last match is confirmed', () => {
+    const v = buildEventView(snapshot({ rounds: [{ ...baseRound, singles_enabled: true }], results: [confirmedBB] }))!;
+    expect(scoringList(v)[0].groups.map((g) => g.group.id)).toEqual(['g1']);
+  });
+
+  it('skips groups without full pairings', () => {
+    const s = snapshot();
+    expect(scoringList(buildEventView({ ...s, groupPlayers: s.groupPlayers.slice(0, 3) })!)).toEqual([]);
+  });
+
+  it('labels a group by its match numbers', () => {
+    const v = buildEventView(snapshot({ rounds: [{ ...baseRound, singles_enabled: true }] }))!;
+    expect(matchesLabel(v.rounds[0].groups[0])).toBe('Matches 1–3');
+    expect(matchesLabel(buildEventView(snapshot())!.rounds[0].groups[0])).toBe('Match 1');
   });
 });
 
