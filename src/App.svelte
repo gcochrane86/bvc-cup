@@ -5,6 +5,7 @@
   import { db, startData, stopData } from './lib/data/store.svelte';
   import Login from './routes/Login.svelte';
   import Leaderboard from './routes/Leaderboard.svelte';
+  import ScoreEntry from './routes/ScoreEntry.svelte';
   import Match from './routes/Match.svelte';
   import Nav from './components/Nav.svelte';
 
@@ -41,6 +42,10 @@
       {:else if route.name === 'match'}
         {#key route.groupId + route.matchType}
           <Match groupId={route.groupId} matchType={route.matchType} />
+        {/key}
+      {:else if route.name === 'score'}
+        {#key route.groupId}
+          <ScoreEntry groupId={route.groupId} />
         {/key}
       <!-- ROUTES: add new {:else if} branches above this line -->
       {:else}
