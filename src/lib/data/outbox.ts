@@ -27,7 +27,7 @@ export function createOutbox(opts: {
   onLocked?: (p: PendingScore) => void;
 }) {
   const { storage, send, onChange, onLocked } = opts;
-  let flushing = false;
+  let inFlight: Promise<'done' | 'failed'> | null = null;
 
   const pending = async () => (await storage.getAll()).sort(byTime);
   const notify = async () => onChange?.(await pending());
@@ -38,8 +38,18 @@ export function createOutbox(opts: {
   }
 
   async function flush(): Promise<'done' | 'busy' | 'failed'> {
-    if (flushing) return 'busy';
-    flushing = true;
+    if (inFlight) return 'busy';
+    inFlight = run().finally(() => (inFlight = null));
+    return inFlight;
+  }
+
+  /** Like flush, but waits for any in-flight flush first instead of returning 'busy'. */
+  async function drain(): Promise<'done' | 'failed'> {
+    while (inFlight) await inFlight;
+    return (await flush()) as 'done' | 'failed';
+  }
+
+  async function run(): Promise<'done' | 'failed'> {
     try {
       for (;;) {
         const items = await pending();
@@ -58,10 +68,9 @@ export function createOutbox(opts: {
         }
       }
     } finally {
-      flushing = false;
       await notify();
     }
   }
 
-  return { enqueue, flush, pending };
+  return { enqueue, flush, drain, pending };
 }

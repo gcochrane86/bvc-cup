@@ -81,6 +81,20 @@ describe('outbox', () => {
     expect(await first).toBe('done');
   });
 
+  it('drain waits for an in-flight flush and leaves nothing pending', async () => {
+    const storage = memoryStorage();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const ob = createOutbox({ storage, send: async () => { await gate; return 'ok'; } });
+    await ob.enqueue(p(1, '2026-10-01T10:00:00Z'));
+    const first = ob.flush();
+    const drained = ob.drain();
+    release();
+    expect(await drained).toBe('done');
+    expect(storage.map.size).toBe(0);
+    expect(await first).toBe('done');
+  });
+
   it('reports the pending list on change', async () => {
     const onChange = vi.fn();
     const ob = createOutbox({ storage: memoryStorage(), send: async () => 'ok', onChange });

@@ -62,7 +62,7 @@ const rounds = await run(
       { event_id: event.id, course_id: course.id, round_no: 1, name: 'Day 1', date: today },
       { event_id: event.id, course_id: course.id, round_no: 2, name: 'Day 2' },
       { event_id: event.id, course_id: course.id, round_no: 3, name: 'Day 3', singles_enabled: true },
-    ])
+    ], { defaultToNull: false }) // missing keys use column defaults, not null
     .select(),
 );
 

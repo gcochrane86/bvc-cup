@@ -61,7 +61,7 @@ let retryDelay = 2000;
 
 export async function flushOutbox(): Promise<boolean> {
   clearTimeout(retryTimer);
-  const result = await outbox.flush();
+  const result = await outbox.drain(); // waits out an in-flight flush, so callers see the real queue
   if (result === 'done') retryDelay = 2000;
   if (result === 'failed') {
     retryTimer = setTimeout(() => void flushOutbox(), retryDelay);
