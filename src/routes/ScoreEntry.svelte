@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { db, enterScore, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
+  import { db, enterScore, loadAll, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
   import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
   import { isScoreLocked, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
@@ -30,11 +30,17 @@
       /* ignore */
     }
   }
+  // Decide from fresh data: a match reopened moments ago must not look confirmed and be forgotten.
+  let fresh = $state(false);
+  $effect(() => {
+    if (!groupId && !fresh) void loadAll().then(() => (fresh = true));
+  });
   $effect(() => {
     if (groupId) {
       if (found) remember(groupId);
       return;
     }
+    if (!fresh) return;
     const resume = resumeGroupId(remembered(), toScore);
     if (resume) location.replace(`#/score/${resume}`);
     else remember(null); // confirmed or gone: forget it and show the list

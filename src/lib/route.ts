@@ -5,6 +5,7 @@ export type Route =
   | { name: 'match'; groupId: string; matchType: MatchType }
   | { name: 'score'; groupId: string | null }
   | { name: 'players' }
+  | { name: 'guide' }
   | { name: 'admin-login' }
   | { name: 'admin' }
   | { name: 'admin-players' }
@@ -26,6 +27,7 @@ export function parseRoute(hash: string): Route {
     return { name: 'match', groupId: b, matchType: c as MatchType };
   if (a === 'score' && p.length <= 2) return { name: 'score', groupId: b ?? null };
   if (a === 'players' && p.length === 1) return { name: 'players' };
+  if (a === 'guide' && p.length === 1) return { name: 'guide' };
   if (a === 'admin') {
     if (p.length === 1) return { name: 'admin' };
     if (p.length === 2 && b === 'login') return { name: 'admin-login' };

@@ -9,6 +9,7 @@ describe('parseRoute', () => {
     ['#/score', { name: 'score', groupId: null }],
     ['#/score/g1', { name: 'score', groupId: 'g1' }],
     ['#/players', { name: 'players' }],
+    ['#/guide', { name: 'guide' }],
     ['#/admin', { name: 'admin' }],
     ['#/admin/login', { name: 'admin-login' }],
     ['#/admin/players', { name: 'admin-players' }],

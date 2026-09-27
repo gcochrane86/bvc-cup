@@ -118,9 +118,9 @@ test('the admin can reopen a confirmed match for scoring', async ({ browser }) =
   await expect(trip.getByTestId('conf-a')).toHaveText('0'); // points back to projected
 });
 
-test('non-admins only see the Leaderboard and Scores tabs', async ({ page }) => {
+test('non-admins only see the Leaderboard, Scores and Guide tabs', async ({ page }) => {
   await login(page);
-  await expect(page.locator('nav a')).toHaveText(['Leaderboard', 'Scores']);
+  await expect(page.locator('nav a')).toHaveText(['Leaderboard', 'Scores', 'Guide']);
 });
 
 test('the Scores tab goes back to the match this phone is scoring', async ({ page }) => {
@@ -217,4 +217,33 @@ test('after reopening, correcting an earlier hole changes the outcome and can be
   await expect(trip.getByTestId('status')).toHaveText('9&7');
   await trip.getByRole('button', { name: 'Confirm result' }).click();
   await expect(trip.getByTestId('match-card')).toContainText('FINAL');
+});
+
+test('the course guide remembers the course and hole on this phone', async ({ page }) => {
+  await login(page);
+  await page.getByRole('link', { name: 'Guide' }).click();
+  await page.getByRole('tab', { name: 'Robert the Bruce' }).click();
+  await page.getByRole('button', { name: 'Guide hole 3', exact: true }).click();
+  await expect(page.getByTestId('guide-title')).toContainText('Hole 3');
+  await expect(page.getByTestId('guide-layout')).toHaveAttribute('src', 'guides/krtb/hole-03-layout.webp');
+  await expect.poll(() => page.getByTestId('guide-layout').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(900);
+
+  await page.getByRole('link', { name: 'Scores' }).click();
+  await page.getByRole('link', { name: 'Guide' }).click();
+  await expect(page.getByTestId('guide-title')).toContainText('Hole 3');
+  await expect(page.getByRole('tab', { name: 'Robert the Bruce' })).toHaveAttribute('aria-selected', 'true');
+
+  // Each course keeps its own hole.
+  await page.getByRole('tab', { name: 'Ailsa' }).click();
+  await page.getByRole('button', { name: 'Hole 2 →' }).click();
+  await expect(page.getByTestId('guide-title')).toContainText('Hole 2');
+  await page.getByRole('tab', { name: 'Robert the Bruce' }).click();
+  await expect(page.getByTestId('guide-title')).toContainText('Hole 3');
+
+  // Dundonald shows the aerial plus pro tips and tee yardages.
+  await page.getByRole('tab', { name: 'Dundonald' }).click();
+  await page.getByRole('button', { name: 'Guide hole 12', exact: true }).click();
+  await expect(page.getByTestId('guide-notes')).toContainText('shortest Par 4');
+  await expect(page.getByTestId('guide-notes')).toContainText('Championship');
+  await expect.poll(() => page.getByTestId('guide-layout').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
 });

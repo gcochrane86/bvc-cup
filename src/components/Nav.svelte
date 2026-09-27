@@ -5,6 +5,7 @@
   const items = $derived([
     { href: '#/', label: 'Leaderboard', active: ['home', 'match'].includes(router.route.name) },
     { href: '#/score', label: 'Scores', active: router.route.name === 'score' },
+    { href: '#/guide', label: 'Guide', active: router.route.name === 'guide' },
     // Players (photo uploads) is admin-only; everyone else just sees the leaderboard and scores.
     ...(isAdmin()
       ? [

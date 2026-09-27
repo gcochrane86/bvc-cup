@@ -1,0 +1,506 @@
+[
+  {
+    "hole": 1,
+    "par": 4,
+    "yards": 460,
+    "tips": "A solid tee shot to the right centre of the fairway sets up this strong opening Par 4. Once you find the fairway, you’ll have a mid to long iron to the green which is protected by a bunker lying 20 yards short of the putting surface. The green slopes back to front with a hollow on the front right and all the trouble on the left.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 460,
+        "par": 4
+      },
+      {
+        "tee": "Medal",
+        "yards": 430,
+        "par": 4
+      },
+      {
+        "tee": "Middle",
+        "yards": 410,
+        "par": 4
+      },
+      {
+        "tee": "Front",
+        "yards": 320,
+        "par": 4
+      }
+    ]
+  },
+  {
+    "hole": 2,
+    "par": 4,
+    "yards": 405,
+    "tips": "The second is a medium length Par 4 with a slight dogleg right. Long hitters can take an aggressive line but aiming for a spot just to the right of the pot bunker on the left side of the fairway puts you in good position. Take an extra club for your approach to the slightly elevated green which slopes back to front and has run off areas on both sides waiting to penalise less accurate shots.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 405,
+        "par": 4
+      },
+      {
+        "tee": "Medal",
+        "yards": 375,
+        "par": 4
+      },
+      {
+        "tee": "Middle",
+        "yards": 365,
+        "par": 4
+      },
+      {
+        "tee": "Front",
+        "yards": 310,
+        "par": 4
+      }
+    ]
+  },
+  {
+    "hole": 3,
+    "par": 5,
+    "yards": 540,
+    "tips": "A great opening Par 5 (one of four on the course) requiring an accurate tee shot to avoid the ditch encroaching on the right. The smart play is to lay up short of the fairway bunker from the tee and then play to the left of the ditch to set up your approach. Longer hitters can go for the green in two, but there’s trouble to the right of the putting surface and a bunker at the back of the undulating green ready to catch any long balls.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 540,
+        "par": 5
+      },
+      {
+        "tee": "Medal",
+        "yards": 530,
+        "par": 5
+      },
+      {
+        "tee": "Middle",
+        "yards": 510,
+        "par": 5
+      },
+      {
+        "tee": "Front",
+        "yards": 470,
+        "par": 5
+      }
+    ]
+  },
+  {
+    "hole": 4,
+    "par": 3,
+    "yards": 215,
+    "tips": "This par three normally plays into the prevailing wind and with trouble both back left and right, a shot into the front right of the green is recommended. Even if you come up a little short, the tight links fairways will allow you the option of putting, even if you’ve not quite made the green.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 215,
+        "par": 3
+      },
+      {
+        "tee": "Medal",
+        "yards": 195,
+        "par": 3
+      },
+      {
+        "tee": "Middle",
+        "yards": 175,
+        "par": 3
+      },
+      {
+        "tee": "Front",
+        "yards": 120,
+        "par": 3
+      }
+    ]
+  },
+  {
+    "hole": 5,
+    "par": 5,
+    "yards": 550,
+    "tips": "The second Par 5 on the course is a gradual dogleg from right to left and for most will require three shots. Favour the right centre of the fairway with your tee shot and avoid the small pot bunker around 50 yards short of the green with your second. The undulating putting surface is guarded both left and right with bunkers and there’s a hidden run-off at the back. Club selection and distance control are essential to get close to the pin.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 550,
+        "par": 5
+      },
+      {
+        "tee": "Medal",
+        "yards": 535,
+        "par": 5
+      },
+      {
+        "tee": "Middle",
+        "yards": 515,
+        "par": 5
+      },
+      {
+        "tee": "Front",
+        "yards": 480,
+        "par": 5
+      }
+    ]
+  },
+  {
+    "hole": 6,
+    "par": 3,
+    "yards": 170,
+    "tips": "This is a very tricky Par 3 with numerous obstacles surrounding the green and a prevailing right to left wind that can be difficult to detect from the sheltered tee. Tee shots should be played to land on the right half of the green, avoiding the cavernous ditch gathering any shot hit left and taking advantage of the contours to bounce towards the centre of the green. A test of even the strongest short game.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 170,
+        "par": 3
+      },
+      {
+        "tee": "Medal",
+        "yards": 155,
+        "par": 3
+      },
+      {
+        "tee": "Middle",
+        "yards": 135,
+        "par": 3
+      },
+      {
+        "tee": "Front",
+        "yards": 120,
+        "par": 3
+      }
+    ]
+  },
+  {
+    "hole": 7,
+    "par": 4,
+    "yards": 405,
+    "tips": "This superb Par 4 dogleg plays from right to left. There are deep, revetted bunkers to avoid so the safe route from the tee is down the right side of the fairway. Longer hitters may wish to cut the corner to leave a shorter approach, but whichever way you go, the 27-yard-long green is a challenge. There’s a bowl and steep slope protecting the front and a back drop offering players a tricky pitch to make par. Take a four and walk to the next tee.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 405,
+        "par": 4
+      },
+      {
+        "tee": "Medal",
+        "yards": 375,
+        "par": 4
+      },
+      {
+        "tee": "Middle",
+        "yards": 370,
+        "par": 4
+      },
+      {
+        "tee": "Front",
+        "yards": 325,
+        "par": 4
+      }
+    ]
+  },
+  {
+    "hole": 8,
+    "par": 4,
+    "yards": 395,
+    "tips": "With the Isle of Arran providing a spectacular backdrop to this shorter Par 4, a tee shot down the left centre of the fairway will set up your approach to the plateau green. Play for the back half to avoid contending with the pot bunker and steep slope leading to a reasonably benign putting surface.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 395,
+        "par": 4
+      },
+      {
+        "tee": "Medal",
+        "yards": 385,
+        "par": 4
+      },
+      {
+        "tee": "Middle",
+        "yards": 370,
+        "par": 4
+      },
+      {
+        "tee": "Front",
+        "yards": 325,
+        "par": 4
+      }
+    ]
+  },
+  {
+    "hole": 9,
+    "par": 4,
+    "yards": 410,
+    "tips": "Favour the left of the fairway off the tee and if you have the power (and talent) to carry the two pot bunkers in the centre of the fairway, you’ll have a straightforward approach to a green protected by a ditch and two pot bunkers at the front. These hazards leave no margin for error if approaching with a long iron or wood, so if your drive comes up short, consider playing this as a three shot green.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 410,
+        "par": 4
+      },
+      {
+        "tee": "Medal",
+        "yards": 385,
+        "par": 4
+      },
+      {
+        "tee": "Middle",
+        "yards": 360,
+        "par": 4
+      },
+      {
+        "tee": "Front",
+        "yards": 315,
+        "par": 4
+      }
+    ]
+  },
+  {
+    "hole": 10,
+    "par": 4,
+    "yards": 465,
+    "tips": "Despite the fact this is the 10th hole, the 11th green in the distance is the ideal line from the tee. It’ll require two good shots to get home, but if your tee shot finishes on the left side of the generous fairway you’ll be in pole position. A typical links golf shot is perfect for your approach to the 38-yard-long green which has no protection to the front and a plateau at the back.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 465,
+        "par": 4
+      },
+      {
+        "tee": "Medal",
+        "yards": 430,
+        "par": 4
+      },
+      {
+        "tee": "Middle",
+        "yards": 375,
+        "par": 4
+      },
+      {
+        "tee": "Front",
+        "yards": 325,
+        "par": 4
+      }
+    ]
+  },
+  {
+    "hole": 11,
+    "par": 3,
+    "yards": 120,
+    "tips": "This is the shortest hole on the course but that doesn’t make it any less special. Good distance control is essential if the many pitfalls, including bunkers and steep slopes around the green, are to be avoided. Play over the right hand front bunker and your ball will gather towards the centre of green providing a good chance of par. Chase a pin on the left at your peril.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 120,
+        "par": 3
+      },
+      {
+        "tee": "Medal",
+        "yards": 120,
+        "par": 3
+      },
+      {
+        "tee": "Middle",
+        "yards": 120,
+        "par": 3
+      },
+      {
+        "tee": "Front",
+        "yards": 100,
+        "par": 3
+      }
+    ]
+  },
+  {
+    "hole": 12,
+    "par": 4,
+    "yards": 350,
+    "tips": "The shortest Par 4 on the course with stunning views of the Firth of Clyde. Aim for the top of the plateau fairway with your tee shot as anything to the right will leave only a glimpse of the green. The flat, elevated putting surface is guarded by three hidden pot bunkers, a grassy mound and the prevailing left to right cross winds making an accurate, well control approach essential if you’re to make par.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 350,
+        "par": 4
+      },
+      {
+        "tee": "Medal",
+        "yards": 335,
+        "par": 4
+      },
+      {
+        "tee": "Middle",
+        "yards": 330,
+        "par": 4
+      },
+      {
+        "tee": "Front",
+        "yards": 310,
+        "par": 4
+      }
+    ]
+  },
+  {
+    "hole": 13,
+    "par": 4,
+    "yards": 410,
+    "tips": "A memorable Par 4 running parallel with the railway line – a typical feature of a traditional links golf course. Hitting the fairway from the tee is essential to set up an approach to the two-tier green. There’s a meandering ditch protecting the front, so a good drive will provide an opportunity to hit the right spot on this challenging green and walk off with par.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 410,
+        "par": 4
+      },
+      {
+        "tee": "Medal",
+        "yards": 370,
+        "par": 4
+      },
+      {
+        "tee": "Middle",
+        "yards": 360,
+        "par": 4
+      },
+      {
+        "tee": "Front",
+        "yards": 320,
+        "par": 4
+      }
+    ]
+  },
+  {
+    "hole": 14,
+    "par": 5,
+    "yards": 540,
+    "tips": "The penultimate Par 5 on the course doglegs right for the final 120 yards and can be a birdie chance for the longer hitters. Mere mortals should aim for the left centre of the fairway off the tee to avoid the lone fairway bunker on the right. Leaving yourself well back with your lay-up will allow you to see the bottom of the pin on an elevated green which can cast off any shot with less than perfect line and trajectory.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 540,
+        "par": 5
+      },
+      {
+        "tee": "Medal",
+        "yards": 510,
+        "par": 5
+      },
+      {
+        "tee": "Middle",
+        "yards": 500,
+        "par": 5
+      },
+      {
+        "tee": "Front",
+        "yards": 415,
+        "par": 5
+      }
+    ]
+  },
+  {
+    "hole": 15,
+    "par": 3,
+    "yards": 215,
+    "tips": "A very challenging Par 3 that plays every inch of its yardage. Favour the right half of this relatively small green to avoid the large bunker protecting the front left and to give yourself the best chance of par – a very good score here.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 215,
+        "par": 3
+      },
+      {
+        "tee": "Medal",
+        "yards": 205,
+        "par": 3
+      },
+      {
+        "tee": "Middle",
+        "yards": 170,
+        "par": 3
+      },
+      {
+        "tee": "Front",
+        "yards": 125,
+        "par": 3
+      }
+    ]
+  },
+  {
+    "hole": 16,
+    "par": 4,
+    "yards": 470,
+    "tips": "The 16th is the most challenging hole on the course playing into the prevailing wind. Aim for the right centre of the fairway from the tee, avoiding the first fairway bunker and setting up a long approach to a two-tier green protected by a solitary bunker on the left. Some prefer to lay up and take their chances with an accurate pitch and putt, but whatever you do, a par will feel like a birdie and a bogey here is still a good score.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 470,
+        "par": 4
+      },
+      {
+        "tee": "Medal",
+        "yards": 450,
+        "par": 4
+      },
+      {
+        "tee": "Middle",
+        "yards": 405,
+        "par": 4
+      },
+      {
+        "tee": "Front",
+        "yards": 385,
+        "par": 4
+      }
+    ]
+  },
+  {
+    "hole": 17,
+    "par": 4,
+    "yards": 420,
+    "tips": "It may be tempting to cut the corner of this right to left dogleg but it is not to be recommended. The second shot will play longer than expected but a good approach from the right will avoid the pot bunker left and feed into the large, flat green.",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 420,
+        "par": 4
+      },
+      {
+        "tee": "Medal",
+        "yards": 395,
+        "par": 4
+      },
+      {
+        "tee": "Middle",
+        "yards": 385,
+        "par": 4
+      },
+      {
+        "tee": "Front",
+        "yards": 350,
+        "par": 4
+      }
+    ]
+  },
+  {
+    "hole": 18,
+    "par": 5,
+    "yards": 560,
+    "tips": "The longest hole on the course and almost always a three shot hole. Playing down the left side of the fairway from the tee will avoid the two bunkers on the right. An accurate second will ensure you miss the cross bunkers waiting to catch any wayward shots and will set up an approach to a green guarded at the front by an imposing ditch and to the rear by pot bunkers. Don’t get greedy here, it just might spoil your card!",
+    "tees": [
+      {
+        "tee": "Championship",
+        "yards": 560,
+        "par": 5
+      },
+      {
+        "tee": "Medal",
+        "yards": 545,
+        "par": 5
+      },
+      {
+        "tee": "Middle",
+        "yards": 515,
+        "par": 5
+      },
+      {
+        "tee": "Front",
+        "yards": 480,
+        "par": 5
+      }
+    ]
+  }
+]

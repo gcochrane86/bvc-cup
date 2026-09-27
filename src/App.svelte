@@ -5,6 +5,7 @@
   import { db, startData, stopData } from './lib/data/store.svelte';
   import Login from './routes/Login.svelte';
   import Leaderboard from './routes/Leaderboard.svelte';
+  import Guide from './routes/Guide.svelte';
   import AdminEvents from './routes/admin/AdminEvents.svelte';
   import AdminEvent from './routes/admin/AdminEvent.svelte';
   import AdminPairings from './routes/admin/AdminPairings.svelte';
@@ -80,6 +81,8 @@
         {#key route.roundId}
           <AdminPairings roundId={route.roundId} />
         {/key}
+      {:else if route.name === 'guide'}
+        <Guide />
       <!-- ROUTES: add new {:else if} branches above this line -->
       {:else}
         <p class="center">Page not found. <a href="#/">Back to the leaderboard</a></p>
