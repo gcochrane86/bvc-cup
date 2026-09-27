@@ -68,7 +68,12 @@ export function buildEventView(s: Snapshot): EventView | null {
           const slots = Object.fromEntries(members.map((gp) => [gp.slot, gp.player_id])) as Partial<Record<Slot, string>>;
           const defs = buildMatches(
             group.id,
-            members.map((gp) => ({ slot: gp.slot, playerId: gp.player_id, handicap: handicapOf[gp.player_id] ?? 0 })),
+            members.map((gp) => ({
+              slot: gp.slot,
+              playerId: gp.player_id,
+              // A confirmed group plays off the handicaps it was played with; others use current ones.
+              handicap: gp.handicap !== null && gp.handicap !== undefined ? Number(gp.handicap) : (handicapOf[gp.player_id] ?? 0),
+            })),
             settings,
           );
           const matches = defs.map((def): MatchView => {

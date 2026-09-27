@@ -24,7 +24,7 @@
     members = Object.fromEntries(
       db.players.map((p) => {
         const m = eps.find((x) => x.player_id === p.id);
-        return [p.id, { team: m?.team ?? '', handicap: m ? Number(m.handicap) : Number(p.default_handicap) }];
+        return [p.id, { team: m?.team ?? '', handicap: Number(p.default_handicap) }];
       }),
     );
   }
@@ -76,7 +76,7 @@
       const removed = entries.filter(([, m]) => !m.team).map(([id]) => id);
       if (rows.length) await must(supabase.from('event_players').upsert(rows));
       if (removed.length) await must(supabase.from('event_players').delete().eq('event_id', eventId).in('player_id', removed));
-    }, 'Teams & handicaps saved');
+    }, 'Teams saved');
 
   const addRound = (e: SubmitEvent) => {
     e.preventDefault();
@@ -138,7 +138,8 @@
   </section>
 
   <section class="card">
-    <h2>Teams &amp; handicaps</h2>
+    <h2>Teams</h2>
+    <p class="muted small">Handicaps are set on the <a href="#/admin/players">Players</a> page.</p>
     <p class="muted small">{event.team_a_name}: {countA} · {event.team_b_name}: {countB} (6 each for three fourballs)</p>
     {#each db.players as p (p.id)}
       {#if members[p.id]}
@@ -149,11 +150,11 @@
             <option value="A">{event.team_a_name}</option>
             <option value="B">{event.team_b_name}</option>
           </select>
-          <input aria-label="{p.name} handicap" type="number" step="0.1" inputmode="decimal" bind:value={members[p.id].handicap} />
+          <span class="hcp" aria-label="{p.name} handicap">{members[p.id].handicap}</span>
         </div>
       {/if}
     {/each}
-    <button onclick={saveMembers}>Save teams &amp; handicaps</button>
+    <button onclick={saveMembers}>Save teams</button>
   </section>
 
   <section class="card">
@@ -212,6 +213,7 @@
   section h2 { margin-bottom: 10px; }
   section button { margin-top: 8px; }
   .member { display: grid; grid-template-columns: 1fr 120px 80px; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .hcp { text-align: center; color: var(--muted); }
   .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .round { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
   input[type='color'] { padding: 4px; }

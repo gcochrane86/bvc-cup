@@ -162,6 +162,59 @@ describe('confirmation and locking', () => {
   });
 });
 
+describe('handicap freezing', () => {
+  const frozen = async () =>
+    (
+      await db.query<{ slot: string; handicap: string | null }>(
+        `select slot, handicap::text from public.group_players where group_id = $1 order by slot`,
+        [s.groupId],
+      )
+    ).rows.map((r) => [r.slot, r.handicap]);
+  const setEventHandicap = (player: string, h: number) =>
+    as(db, 'admin', () => db.query(`update public.event_players set handicap = $2 where player_id = $1`, [player, h]));
+
+  it('is not frozen before any match is confirmed', async () => {
+    expect(await frozen()).toEqual([['A1', null], ['A2', null], ['B1', null], ['B2', null]]);
+  });
+
+  it('confirming a match (even as the trip user) freezes the group’s handicaps', async () => {
+    await confirm('trip', 'better_ball', 15);
+    expect(await frozen()).toEqual([['A1', '4.0'], ['A2', '18.0'], ['B1', '9.0'], ['B2', '14.0']]);
+  });
+
+  it('later handicap changes do not touch a frozen group', async () => {
+    await confirm('trip', 'better_ball', 15);
+    await setEventHandicap(s.players.a2, 30);
+    expect(await frozen()).toContainEqual(['A2', '18.0']);
+  });
+
+  it('unlocking the last result lifts the freeze', async () => {
+    await confirm('trip', 'better_ball', 15);
+    await as(db, 'admin', () => db.query(`delete from public.match_results`));
+    expect(await frozen()).toEqual([['A1', null], ['A2', null], ['B1', null], ['B2', null]]);
+  });
+
+  it('keeps the freeze while another result in the group remains', async () => {
+    await confirm('trip', 'better_ball', 15);
+    await confirm('trip', 'low_singles', 16);
+    await as(db, 'admin', () => db.query(`delete from public.match_results where match_type = 'low_singles'`));
+    expect(await frozen()).toContainEqual(['A1', '4.0']);
+  });
+
+  it('re-saving the pairings of a confirmed group keeps it frozen at the played handicaps', async () => {
+    await confirm('trip', 'better_ball', 15);
+    await setEventHandicap(s.players.a2, 30);
+    const slots = JSON.stringify([
+      { slot: 'A1', player_id: s.players.a1 },
+      { slot: 'A2', player_id: s.players.a2 },
+      { slot: 'B1', player_id: s.players.b1 },
+      { slot: 'B2', player_id: s.players.b2 },
+    ]);
+    await as(db, 'admin', () => db.query(`select public.save_group($1::uuid, 1, null, $2::jsonb)`, [s.roundId, slots]));
+    expect(await frozen()).toContainEqual(['A2', '18.0']);
+  });
+});
+
 describe('admin RPCs', () => {
   const holes = JSON.stringify(Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, stroke_index: 18 - i })));
 

@@ -17,7 +17,7 @@ function snapshot(over: Partial<Snapshot> = {}): Snapshot {
     eventPlayers: ['a1', 'a2', 'b1', 'b2'].map((id) => ({ event_id: 'e', player_id: id, team: id[0].toUpperCase() as Team, handicap: 10 })),
     rounds: [baseRound],
     groups: [{ id: 'g1', round_id: 'r1', group_no: 1, tee_time: '09:00:00' }],
-    groupPlayers: (['A1', 'A2', 'B1', 'B2'] as Slot[]).map((slot) => ({ group_id: 'g1', slot, player_id: slot.toLowerCase() })),
+    groupPlayers: (['A1', 'A2', 'B1', 'B2'] as Slot[]).map((slot) => ({ group_id: 'g1', slot, player_id: slot.toLowerCase(), handicap: null })),
     scores: [],
     results: [],
     ...over,
@@ -64,6 +64,16 @@ describe('buildEventView', () => {
     const v = buildEventView({ ...s, groupPlayers: s.groupPlayers.slice(0, 3) })!;
     expect(v.rounds[0].groups[0].matches).toEqual([]);
     expect(v.tracker.total).toBe(1);
+  });
+
+  it('plays off frozen handicaps when a group has them, current ones otherwise', () => {
+    const s = snapshot();
+    // Current event handicaps: all 10. Group frozen at a1 4, a2 18, b1 9, b2 14.
+    const frozen = { A1: 4, A2: 18, B1: 9, B2: 14 } as Record<string, number>;
+    const v = buildEventView({ ...s, groupPlayers: s.groupPlayers.map((gp) => ({ ...gp, handicap: frozen[gp.slot] })) })!;
+    expect(v.rounds[0].groups[0].matches[0].def.strokes).toEqual({ a1: 0, a2: 13, b1: 5, b2: 9 });
+    const live = buildEventView(s)!;
+    expect(live.rounds[0].groups[0].matches[0].def.strokes).toEqual({ a1: 0, a2: 0, b1: 0, b2: 0 });
   });
 
   it('finds groups and the first incomplete hole', () => {

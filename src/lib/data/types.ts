@@ -16,7 +16,11 @@ export interface RoundRow {
   singles_enabled: boolean; singles_points: number; singles_allowance_pct: number;
 }
 export interface GroupRow { id: string; round_id: string; group_no: number; tee_time: string | null }
-export interface GroupPlayerRow { group_id: string; slot: Slot; player_id: string }
+export interface GroupPlayerRow {
+  group_id: string; slot: Slot; player_id: string;
+  /** Frozen when a match in the group is confirmed; null = use the current event handicap. */
+  handicap: number | null;
+}
 export interface ScoreRow {
   round_id: string; player_id: string; hole: number;
   gross: number | null; picked_up: boolean; client_updated_at: string;

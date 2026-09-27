@@ -35,7 +35,12 @@
   };
   const save = (p: PlayerRow) =>
     act(
-      () => must(supabase.from('players').update({ name: p.name, short_name: p.short_name, default_handicap: p.default_handicap }).eq('id', p.id)),
+      async () => {
+        await must(supabase.from('players').update({ name: p.name, short_name: p.short_name, default_handicap: p.default_handicap }).eq('id', p.id));
+        // The active event plays off this handicap too (confirmed groups stay frozen at what they played off).
+        if (db.event)
+          await must(supabase.from('event_players').update({ handicap: p.default_handicap }).eq('event_id', db.event.id).eq('player_id', p.id));
+      },
       `Saved ${p.name}`,
     );
   const remove = (p: PlayerRow) => {
@@ -45,6 +50,7 @@
 
 <p><a href="#/admin">← Admin</a></p>
 <h1>Players</h1>
+<p class="muted small">Handicap changes apply straight away to rounds still being played. Groups with a confirmed match keep the handicaps they played off.</p>
 {#if msg}<p class:error={msg.startsWith('Error')}>{msg}</p>{/if}
 
 <form class="card" onsubmit={add}>
@@ -66,7 +72,7 @@
     <div class="field"><label for="n-{p.id}">Full name</label><input id="n-{p.id}" bind:value={p.name} /></div>
     <div class="row">
       <div class="field"><label for="s-{p.id}">Short name</label><input id="s-{p.id}" bind:value={p.short_name} /></div>
-      <div class="field"><label for="h-{p.id}">Default handicap</label><input id="h-{p.id}" type="number" step="0.1" inputmode="decimal" bind:value={p.default_handicap} /></div>
+      <div class="field"><label for="h-{p.id}">Handicap</label><input id="h-{p.id}" type="number" step="0.1" inputmode="decimal" bind:value={p.default_handicap} /></div>
     </div>
     <div class="row">
       <button onclick={() => save(p)}>Save</button>
