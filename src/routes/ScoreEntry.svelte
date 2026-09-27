@@ -112,22 +112,26 @@
 
   async function save() {
     if (!found) return;
+    // Pin the hole being saved: `hole` is derived and, when no hole was tapped, moves on to the next
+    // incomplete hole as soon as these scores land — so reading it afterwards would skip a hole.
+    const saving = hole;
     const at = new Date().toISOString();
     for (const slot of SLOTS) {
       const pid = found.group.slots[slot];
-      if (!pid || locked(pid, hole) || !draft[pid]) continue;
+      if (!pid || locked(pid, saving) || !draft[pid]) continue;
       const d = draft[pid];
       await enterScore({
         roundId: found.round.round.id,
         playerId: pid,
-        hole,
+        hole: saving,
         gross: d.pickedUp ? null : d.gross,
         pickedUp: d.pickedUp,
         clientUpdatedAt: at,
       });
     }
-    pickedHole = Math.min(18, hole + 1);
+    pickedHole = Math.min(18, saving + 1);
   }
+
 </script>
 
 {#if !view}

@@ -171,3 +171,14 @@ test('the compact score bar slides in once the full tracker scrolls away', async
   await expect(bar).toHaveAttribute('aria-hidden', 'true');
   await expect(page.getByTestId('tracker')).toBeInViewport();
 });
+
+test('saving the first hole moves on to hole 2 (not 3)', async ({ page }) => {
+  await login(page);
+  await openGroup1(page); // opens on hole 1 without tapping a hole number
+  await expect(page.getByRole('heading', { name: 'Hole 1', exact: true })).toBeVisible();
+  await page.getByTestId('row-B1').getByRole('button', { name: /^Increase/ }).click(); // Ballymena drop one
+  await page.getByRole('button', { name: 'Save hole 1' }).click();
+  await expect(page.getByRole('heading', { name: 'Hole 2', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save hole 2' }).click();
+  await expect(page.getByRole('heading', { name: 'Hole 3', exact: true })).toBeVisible();
+});
