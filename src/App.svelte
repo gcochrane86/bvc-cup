@@ -1,14 +1,23 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { auth, initAuth, isAdmin, logout } from './lib/auth.svelte';
+  import { auth, initAuth, isAdmin } from './lib/auth.svelte';
   import { router } from './lib/router.svelte';
+  import { db, startData, stopData } from './lib/data/store.svelte';
   import Login from './routes/Login.svelte';
+  import Leaderboard from './routes/Leaderboard.svelte';
   import Nav from './components/Nav.svelte';
 
   onMount(initAuth);
   const route = $derived(router.route);
   const signedIn = $derived(!!auth.session);
   const needsAdmin = $derived(route.name.startsWith('admin') && route.name !== 'admin-login');
+
+  $effect(() => {
+    if (signedIn) {
+      startData();
+      return stopData;
+    }
+  });
 </script>
 
 {#if !auth.ready}
@@ -18,9 +27,21 @@
 {:else if !signedIn}
   <Login mode="trip" />
 {:else}
-  <main>
-    <h1>Signed in{isAdmin() ? ' (admin)' : ''}</h1>
-    <button class="secondary" onclick={logout}>Sign out</button>
-  </main>
-  <Nav />
+  <div class="app" style="--team-a:{db.event?.team_a_colour ?? '#1f4e9c'};--team-b:{db.event?.team_b_colour ?? '#c8102e'}">
+    {#if db.notice}
+      <button class="notice" onclick={() => (db.notice = null)}>{db.notice} (tap to dismiss)</button>
+    {/if}
+    {#if db.error}<p class="notice error">Connection problem: {db.error}</p>{/if}
+    <main>
+      {#if !db.loaded}
+        <p class="center muted">Loading…</p>
+      {:else if route.name === 'home'}
+        <Leaderboard />
+      <!-- ROUTES: add new {:else if} branches above this line -->
+      {:else}
+        <p class="center">Page not found. <a href="#/">Back to the leaderboard</a></p>
+      {/if}
+    </main>
+    <Nav />
+  </div>
 {/if}
