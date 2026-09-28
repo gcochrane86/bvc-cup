@@ -25,7 +25,8 @@
   });
   $effect(() => {
     if (groupId) {
-      if (found) remember(groupId);
+      // A hole link from another match's summary is a quick fix, not a switch of match.
+      if (found && (startHole === null || !remembered())) remember(groupId);
       return;
     }
     if (!fresh) return;

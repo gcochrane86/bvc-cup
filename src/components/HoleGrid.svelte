@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { MatchState, Outcome } from '../lib/scoring';
 
-  // editHref: set only for the match this phone is scoring — each hole then links to its score entry.
+  // editHref: set while the match is open for scoring — each hole then links to its score entry.
   let { state, editHref = null }: { state: MatchState; editHref?: ((hole: number) => string) | null } = $props();
   const nines = [[1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 11, 12, 13, 14, 15, 16, 17, 18]];
   const winnerColour = (o: Outcome) => (o === 'A' ? 'var(--team-a)' : o === 'B' ? 'var(--team-b)' : '#8a948f');

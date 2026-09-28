@@ -7,7 +7,6 @@
   import { resultFromState, type MatchType } from '../lib/scoring';
   import MatchCard from '../components/MatchCard.svelte';
   import HoleGrid from '../components/HoleGrid.svelte';
-  import { readScoringGroup } from '../lib/scoringMemory';
   import Scorecard from '../components/Scorecard.svelte';
 
   let { groupId, matchType }: { groupId: string; matchType: MatchType } = $props();
@@ -82,7 +81,7 @@
     <button class="wide secondary" disabled={busy} onclick={unlock}>Unlock result</button>
   {/if}
   <h3>Match summary</h3>
-  <HoleGrid state={mv.state} editHref={readScoringGroup() === groupId ? (h) => `#/score/${groupId}/${h}` : null} />
+  <HoleGrid state={mv.state} editHref={mv.result ? null : (h) => `#/score/${groupId}/${h}`} />
   <h3>Scorecard</h3>
   <Scorecard def={mv.def} holes={found.round.holes} scores={found.group.scores} teamOf={view.teamOf} playingHcp={found.group.playingHcp} />
   <p class="muted small">• = shot received on that hole in this match. P = picked up.</p>

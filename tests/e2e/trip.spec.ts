@@ -77,6 +77,7 @@ test('confirming a decided match locks it and turns the points solid', async ({ 
   const groupId = page.url().split('/match/')[1].split('/')[0];
   await page.getByRole('button', { name: 'Confirm result' }).click();
   await expect(page.getByTestId('match-card')).toContainText('FINAL');
+  await expect(page.getByRole('link', { name: /^Edit hole/ })).toHaveCount(0); // its holes no longer link to scoring
 
   await page.goto('/#/');
   await expect(page.getByTestId('conf-a')).toHaveText('1');
@@ -432,9 +433,10 @@ test('back on the leaderboard, it opens on the day of the match being scored', a
   await expect(page.getByRole('tab', { name: 'Day 2' })).toHaveAttribute('aria-selected', 'true');
 });
 
-test("on the match this phone is scoring, tapping a hole opens its score entry (other matches aren't linked)", async ({ page }) => {
+test('tapping a hole on any match opens its score entry, without changing the match this phone is scoring', async ({ page }) => {
   await login(page);
   await openGroup1(page); // this phone now scores Match 1
+  const myMatch = page.url();
   await enterHole(page, 1, 4, 5);
   await enterHole(page, 2, 4, 5);
 
@@ -446,9 +448,15 @@ test("on the match this phone is scoring, tapping a hole opens its score entry (
   await expect(page.getByRole('heading', { name: 'Hole 2', exact: true })).toBeVisible();
   await expect(page.getByTestId('gross-B1')).toHaveText('5'); // the saved score is loaded, ready to fix
 
-  // Someone else's match: read-only grid.
+  // Someone else's match links too...
   await page.goto('/#/');
   await page.locator('[data-match-id$=":better_ball"]').filter({ hasText: /\bMatch 2\b/ }).click();
-  await expect(page.getByRole('heading', { name: 'Match summary' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /^Edit hole/ })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Edit hole 3 scores' }).click();
+  await expect(page).toHaveURL(/#\/score\/[0-9a-f-]{36}\/3$/);
+  expect(page.url().split('/score/')[1].split('/')[0]).not.toBe(myMatch.split('/score/')[1]);
+  await expect(page.getByRole('heading', { name: 'Hole 3', exact: true })).toBeVisible();
+
+  // ...but Scores still goes back to this phone's own match.
+  await page.getByRole('link', { name: 'Scores' }).click();
+  await expect(page).toHaveURL(myMatch);
 });
