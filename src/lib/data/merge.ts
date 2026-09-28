@@ -28,6 +28,7 @@ export function applyPending(rows: ScoreRow[], pending: PendingScore[]): ScoreRo
       client_updated_at: p.clientUpdatedAt,
     };
     const existing = out.find((r) => rowKey(r) === rowKey(row));
+    if (existing && p.ifAbsent) continue; // a par default never replaces a real score
     if (existing && Date.parse(existing.client_updated_at) >= Date.parse(p.clientUpdatedAt)) continue;
     out = p.gross === null && !p.pickedUp ? removeScoreRow(out, row) : upsertScoreRow(out, row);
   }

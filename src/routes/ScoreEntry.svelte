@@ -55,15 +55,35 @@
   const hole = $derived(found ? (pickedHole ?? firstIncompleteHole(found.group, found.round.holes)) : 1);
   const info = $derived(found?.round.holes.find((h) => h.hole === hole) ?? null);
 
-  type Draft = { gross: number; pickedUp: boolean; touched: boolean };
+  // edited: changed on this phone (always sent). hasScore: a saved score exists for this cell.
+  // Several phones may score the same hole, so an untouched row is only ever a par default.
+  type Draft = { gross: number; pickedUp: boolean; edited: boolean; hasScore: boolean };
   let draft = $state<Record<string, Draft>>({});
 
-  // Rebuild the draft only when the group or hole changes — not on every live update.
+  // Rebuild the draft when the group or hole changes.
   const draftKey = $derived(`${found?.group.group.id ?? ''}:${hole}:${info ? 'ready' : 'none'}`);
   $effect(() => {
     void draftKey;
     untrack(() => {
       draft = buildDraft();
+    });
+  });
+
+  // Live: rows not edited on this phone follow scores that others save for this hole.
+  $effect(() => {
+    if (!found || !info) return;
+    const scores = found.group.scores;
+    const h = hole;
+    untrack(() => {
+      for (const slot of SLOTS) {
+        const pid = found.group.slots[slot];
+        const d = pid ? draft[pid] : undefined;
+        const e = pid ? scores.get(scoreKey(pid, h)) : undefined;
+        if (!d || d.edited || !e) continue;
+        d.gross = e.gross ?? info.par;
+        d.pickedUp = e.pickedUp;
+        d.hasScore = true;
+      }
     });
   });
 
@@ -75,8 +95,8 @@
       if (!pid) continue;
       const e = found.group.scores.get(scoreKey(pid, hole));
       out[pid] = e
-        ? { gross: e.gross ?? info.par, pickedUp: e.pickedUp, touched: true }
-        : { gross: info.par, pickedUp: false, touched: false };
+        ? { gross: e.gross ?? info.par, pickedUp: e.pickedUp, edited: false, hasScore: true }
+        : { gross: info.par, pickedUp: false, edited: false, hasScore: false };
     }
     return out;
   }
@@ -106,7 +126,7 @@
     const d = draft[pid];
     d.gross = Math.min(15, Math.max(1, d.gross + delta));
     d.pickedUp = false;
-    d.touched = true;
+    d.edited = true;
   }
 
   const allLocked = $derived(
@@ -126,6 +146,8 @@
       const pid = found.group.slots[slot];
       if (!pid || locked(pid, saving) || !draft[pid]) continue;
       const d = draft[pid];
+      // Untouched rows that already have a score (possibly entered on another phone) are left alone.
+      if (!d.edited && d.hasScore) continue;
       await enterScore({
         roundId: found.round.round.id,
         playerId: pid,
@@ -133,6 +155,8 @@
         gross: d.pickedUp ? null : d.gross,
         pickedUp: d.pickedUp,
         clientUpdatedAt: at,
+        // An untouched row is only a par default: it must never overwrite someone's real score.
+        ifAbsent: !d.edited,
       });
     }
     pickedHole = Math.min(18, saving + 1);
@@ -204,11 +228,11 @@
         </div>
         <div class="stepper">
           <button class="secondary" aria-label="Decrease {playerName(pid)}" disabled={isLocked || draft[pid].pickedUp} onclick={() => bump(pid, -1)}>−</button>
-          <span class="val" class:untouched={!draft[pid].touched} data-testid="gross-{slot}">{draft[pid].pickedUp ? 'P' : draft[pid].gross}</span>
+          <span class="val" class:untouched={!draft[pid].edited && !draft[pid].hasScore} data-testid="gross-{slot}">{draft[pid].pickedUp ? 'P' : draft[pid].gross}</span>
           <button class="secondary" aria-label="Increase {playerName(pid)}" disabled={isLocked || draft[pid].pickedUp} onclick={() => bump(pid, 1)}>+</button>
         </div>
         <label class="pu">
-          <input type="checkbox" bind:checked={draft[pid].pickedUp} disabled={isLocked} onchange={() => (draft[pid].touched = true)} />
+          <input type="checkbox" bind:checked={draft[pid].pickedUp} disabled={isLocked} onchange={() => (draft[pid].edited = true)} />
           Picked up
         </label>
       </div>

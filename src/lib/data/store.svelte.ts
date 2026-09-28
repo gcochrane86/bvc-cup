@@ -42,6 +42,7 @@ async function send(p: PendingScore): Promise<SendResult> {
       p_gross: p.gross,
       p_picked_up: p.pickedUp,
       p_client_updated_at: p.clientUpdatedAt,
+      p_if_absent: p.ifAbsent ?? false,
     }),
   ) as Promise<SendResult>;
 }

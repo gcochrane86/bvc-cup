@@ -5,9 +5,12 @@ export interface PendingScore {
   gross: number | null;
   pickedUp: boolean;
   clientUpdatedAt: string;
+  /** A par default the scorer didn't touch: fill the cell only if nobody has entered a score yet. */
+  ifAbsent?: boolean;
 }
 
-export type SendResult = 'ok' | 'stale' | 'locked';
+/** 'exists': an ifAbsent default was skipped because a score is already there. */
+export type SendResult = 'ok' | 'stale' | 'locked' | 'exists';
 
 export interface OutboxStorage {
   getAll(): Promise<PendingScore[]>;

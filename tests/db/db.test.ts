@@ -14,11 +14,11 @@ const T1 = '2026-10-01T10:00:00Z';
 const T0 = '2026-10-01T09:00:00Z';
 const T2 = '2026-10-01T11:00:00Z';
 
-async function upsert(who: Who, player: string, hole: number, gross: number | null, pickedUp = false, at = T1) {
+async function upsert(who: Who, player: string, hole: number, gross: number | null, pickedUp = false, at = T1, ifAbsent = false) {
   return as(db, who, async () => {
     const r = await db.query<{ r: string }>(
-      `select public.upsert_score($1::uuid, $2::uuid, $3::int, $4::int, $5::boolean, $6::timestamptz) as r`,
-      [s.roundId, player, hole, gross, pickedUp, at],
+      `select public.upsert_score($1::uuid, $2::uuid, $3::int, $4::int, $5::boolean, $6::timestamptz, $7::boolean) as r`,
+      [s.roundId, player, hole, gross, pickedUp, at, ifAbsent],
     );
     return r.rows[0].r;
   });
@@ -106,6 +106,17 @@ describe('upsert_score', () => {
     await upsert('trip', s.players.a1, 1, 4, false, T1);
     expect(await upsert('trip', s.players.a1, 1, 7, false, T0)).toBe('stale');
     expect(await readScore(s.players.a1, 1)).toEqual({ gross: 4, picked_up: false });
+  });
+
+  it('an if-absent default fills an empty cell', async () => {
+    expect(await upsert('trip', s.players.a1, 1, 4, false, T1, true)).toBe('ok');
+    expect(await readScore(s.players.a1, 1)).toEqual({ gross: 4, picked_up: false });
+  });
+
+  it('an if-absent default never overwrites an existing score, even if newer', async () => {
+    await upsert('trip', s.players.a1, 1, 5, false, T1);
+    expect(await upsert('trip', s.players.a1, 1, 4, false, T2, true)).toBe('exists');
+    expect(await readScore(s.players.a1, 1)).toEqual({ gross: 5, picked_up: false });
   });
 
   it('stores a pick-up', async () => {

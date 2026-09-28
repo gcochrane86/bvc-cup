@@ -59,6 +59,14 @@ describe('outbox', () => {
     expect(storage.map.size).toBe(0);
   });
 
+  it('clears an if-absent default the server skipped because a score already exists', async () => {
+    const storage = memoryStorage();
+    const ob = createOutbox({ storage, send: async () => 'exists' });
+    await ob.enqueue({ ...p(1, '2026-10-01T10:00:00Z'), ifAbsent: true });
+    expect(await ob.flush()).toBe('done');
+    expect(storage.map.size).toBe(0);
+  });
+
   it('drops locked scores and reports them', async () => {
     const storage = memoryStorage();
     const onLocked = vi.fn();

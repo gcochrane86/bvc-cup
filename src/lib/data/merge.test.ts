@@ -34,6 +34,16 @@ describe('score merging', () => {
     expect(applyPending([row(1, 4, '2026-10-01T10:00:00Z')], [pend(1, null, '2026-10-01T10:05:00Z')])).toEqual([]);
   });
 
+  it('an if-absent default fills an empty cell locally', () => {
+    const rows = applyPending([], [{ ...pend(1, 4, '2026-10-01T10:05:00Z'), ifAbsent: true }]);
+    expect(rows.map((r) => r.gross)).toEqual([4]);
+  });
+
+  it('an if-absent default never replaces a known score, even an older one', () => {
+    const rows = applyPending([row(1, 5, '2026-10-01T10:00:00Z')], [{ ...pend(1, 4, '2026-10-01T10:05:00Z'), ifAbsent: true }]);
+    expect(rows.map((r) => r.gross)).toEqual([5]);
+  });
+
   it('applies a pending pick-up', () => {
     const rows = applyPending([], [pend(3, null, '2026-10-01T10:05:00Z', true)]);
     expect(rows).toEqual([{ round_id: 'r', player_id: 'x', hole: 3, gross: null, picked_up: true, client_updated_at: '2026-10-01T10:05:00Z' }]);

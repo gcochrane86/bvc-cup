@@ -279,3 +279,27 @@ test('the admin can choose the singles line-up and it shows on the leaderboard',
   await expect(card('Singles 2')).toContainText('Brown');
   await expect(card('Singles 2')).toContainText('Green');
 });
+
+test('two phones scoring the same hole: an untouched par default never overwrites a real score', async ({ browser }) => {
+  const me = await newPhone(browser);
+  const mate = await newPhone(browser);
+  await login(me);
+  await login(mate);
+  await openGroup1(me);
+  await openGroup1(mate); // both on hole 1, all rows showing the par default
+
+  // I put myself (A1) down for a 5 and save.
+  await me.getByTestId('row-A1').getByRole('button', { name: /^Increase/ }).click();
+  await me.getByRole('button', { name: 'Save hole 1' }).click();
+  await expect(me.getByRole('heading', { name: 'Hole 2', exact: true })).toBeVisible();
+
+  // My mate saves hole 1 on their phone without touching my row.
+  await mate.getByRole('button', { name: 'Save hole 1' }).click();
+  await expect(mate.getByRole('heading', { name: 'Hole 2', exact: true })).toBeVisible();
+
+  // My 5 must survive on both phones.
+  for (const p of [me, mate]) {
+    await p.getByRole('button', { name: 'Hole 1', exact: true }).click();
+    await expect(p.getByTestId('gross-A1')).toHaveText('5', { timeout: 20_000 });
+  }
+});
