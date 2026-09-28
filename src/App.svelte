@@ -63,8 +63,8 @@
           <Match groupId={route.groupId} matchType={route.matchType} />
         {/key}
       {:else if route.name === 'score'}
-        {#key route.groupId}
-          <ScoreEntry groupId={route.groupId} />
+        {#key `${route.groupId}:${route.hole}`}
+          <ScoreEntry groupId={route.groupId} startHole={route.hole} />
         {/key}
       {:else if route.name === 'players'}
         <Players />

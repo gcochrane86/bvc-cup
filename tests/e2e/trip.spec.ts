@@ -275,8 +275,13 @@ test('the course guide remembers the course and hole on this phone', async ({ pa
   // Dundonald shows the aerial plus pro tips and tee yardages.
   await page.getByRole('tab', { name: 'Dundonald' }).click();
   await page.getByRole('button', { name: 'Guide hole 1', exact: true }).click();
-  await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveAttribute('src', /s3jUc3RyotE\?start=3&end=37/);
+  // Nothing loads from YouTube until play is tapped.
+  await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Play hole 1 flyover' }).click();
+  await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveAttribute('src', /s3jUc3RyotE\?start=3&end=37.*autoplay=1/);
   await page.getByRole('button', { name: 'Guide hole 12', exact: true }).click();
+  await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveCount(0); // a new hole starts un-loaded
+  await page.getByRole('button', { name: 'Play hole 12 flyover' }).click();
   await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveAttribute('src', /start=371&end=401/); // 6:11 – 6:41
   await expect(page.getByTestId('guide-notes')).toContainText('shortest Par 4');
   await expect(page.getByTestId('guide-notes')).not.toContainText('Championship'); // no tee table
@@ -425,4 +430,25 @@ test('back on the leaderboard, it opens on the day of the match being scored', a
   await expect(page.getByRole('heading', { name: /^Hole \d+$/ })).toBeVisible();
   await page.getByRole('link', { name: 'Leaderboard' }).click();
   await expect(page.getByRole('tab', { name: 'Day 2' })).toHaveAttribute('aria-selected', 'true');
+});
+
+test("on the match this phone is scoring, tapping a hole opens its score entry (other matches aren't linked)", async ({ page }) => {
+  await login(page);
+  await openGroup1(page); // this phone now scores Match 1
+  await enterHole(page, 1, 4, 5);
+  await enterHole(page, 2, 4, 5);
+
+  await page.goto('/#/');
+  await group1Card(page).click();
+  await expect(page.getByText('Tap a hole to edit its scores.')).toBeVisible();
+  await page.getByRole('link', { name: 'Edit hole 2 scores' }).click();
+  await expect(page).toHaveURL(/#\/score\/[0-9a-f-]{36}\/2$/);
+  await expect(page.getByRole('heading', { name: 'Hole 2', exact: true })).toBeVisible();
+  await expect(page.getByTestId('gross-B1')).toHaveText('5'); // the saved score is loaded, ready to fix
+
+  // Someone else's match: read-only grid.
+  await page.goto('/#/');
+  await page.locator('[data-match-id$=":better_ball"]').filter({ hasText: /\bMatch 2\b/ }).click();
+  await expect(page.getByRole('heading', { name: 'Match summary' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^Edit hole/ })).toHaveCount(0);
 });

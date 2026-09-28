@@ -2,6 +2,7 @@
   import { db } from '../lib/data/store.svelte';
   import { GUIDES, guideFlyover, guideForCourse, guideNotes, guidePages, readGuideMemory, rememberGuideHole, type GuideMemory } from '../lib/guides';
   import { defaultRoundId, today } from '../lib/view';
+  import FlyoverPlayer from '../components/FlyoverPlayer.svelte';
 
   const KEY = 'golf.guide';
   function load(): GuideMemory {
@@ -77,17 +78,8 @@
 
 {#if flyover}
   {#key flyover.embed}
-    <div class="flyover" data-testid="guide-flyover">
-      <iframe
-        src={flyover.embed}
-        title="Hole {hole} flyover"
-        loading="lazy"
-        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-        referrerpolicy="strict-origin-when-cross-origin"
-        allowfullscreen
-      ></iframe>
-    </div>
-    <p class="muted small flyover-note">Hole {hole} flyover · Dundonald Links on YouTube (needs signal)</p>
+    <!-- Nothing loads from YouTube until someone taps play: keeps the Courses tab light on poor signal. -->
+    <FlyoverPlayer embed={flyover.embed} {hole} />
   {/key}
 {/if}
 
@@ -127,9 +119,6 @@
   .page:not(.pdf) { max-height: 60vh; object-fit: contain; }
   .page.pdf { aspect-ratio: 900 / 1406; background: #efe9dc; }
   .course-name { margin: -6px 0 8px; }
-  .flyover { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden; background: #000; }
-  .flyover iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  .flyover-note { margin: 4px 0 12px; }
   .notes h3 { margin-bottom: 6px; }
   .notes p { margin: 0; line-height: 1.45; }
   .nav { display: flex; justify-content: space-between; gap: 8px; }

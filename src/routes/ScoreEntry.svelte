@@ -6,7 +6,7 @@
   import { isScoreLocked, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
 
-  let { groupId }: { groupId: string | null } = $props();
+  let { groupId, startHole = null }: { groupId: string | null; startHole?: number | null } = $props();
 
   const SLOTS: Slot[] = ['A1', 'A2', 'B1', 'B2'];
 
@@ -39,7 +39,8 @@
     location.hash = '#/score';
   }
 
-  let pickedHole = $state<number | null>(null);
+  // Opened from a hole on the match summary: start there. (App keys this page by group and hole.)
+  let pickedHole = $state<number | null>(untrack(() => startHole));
   const hole = $derived(found ? (pickedHole ?? firstIncompleteHole(found.group, found.round.holes)) : 1);
   const info = $derived(found?.round.holes.find((h) => h.hole === hole) ?? null);
 
