@@ -42,6 +42,8 @@
   <Login mode="admin" />
 {:else if !signedIn}
   <Login mode="trip" />
+{:else if auth.access === 'unknown'}
+  <p class="center muted">Loading…</p>
 {:else if !approved}
   <Waiting />
 {:else}

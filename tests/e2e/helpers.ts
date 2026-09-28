@@ -24,7 +24,12 @@ export async function login(page: Page, email = 'tester@example.com', password =
   await expect(page.getByTestId('tracker').or(page.getByTestId('waiting'))).toBeVisible();
   if (await page.getByTestId('waiting').isVisible()) {
     await serviceDb().from('members').update({ status: 'approved' }).eq('email', email);
-    await page.getByRole('button', { name: 'Check again' }).click();
+    // The waiting screen re-checks by itself; only tap "Check again" if it's still showing.
+    await expect(async () => {
+      const again = page.getByRole('button', { name: 'Check again' });
+      if (await again.isVisible()) await again.click();
+      await expect(page.getByTestId('tracker')).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 30_000 });
   }
   await expect(page.getByTestId('tracker')).toBeVisible();
 }
