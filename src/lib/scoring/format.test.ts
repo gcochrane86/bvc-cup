@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatPoints, shotLabel } from './format';
+import { formatPoints, isBirdieOrBetter, shotLabel } from './format';
 
 describe('formatPoints', () => {
   it('formats whole and fractional points', () => {
@@ -24,5 +24,17 @@ describe('shotLabel', () => {
   it('shows both counts when better-ball and singles differ', () => {
     expect(shotLabel(1, 0)).toBe('BB 1 · Singles 0');
     expect(shotLabel(0, 1)).toBe('BB 0 · Singles 1');
+  });
+});
+
+describe('isBirdieOrBetter', () => {
+  it('is true for a gross birdie or better', () => {
+    expect(isBirdieOrBetter(3, 4)).toBe(true);
+    expect(isBirdieOrBetter(2, 4)).toBe(true); // eagle
+  });
+  it('is false for par or worse, and for pick-ups', () => {
+    expect(isBirdieOrBetter(4, 4)).toBe(false);
+    expect(isBirdieOrBetter(6, 4)).toBe(false);
+    expect(isBirdieOrBetter(null, 4)).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { scoreKey, strokesOnHole, type HoleInfo, type MatchDef, type ScoreIndex, type Team } from '../lib/scoring';
+  import { isBirdieOrBetter, scoreKey, strokesOnHole, type HoleInfo, type MatchDef, type ScoreIndex, type Team } from '../lib/scoring';
   import { playerShort } from '../lib/data/store.svelte';
 
   let { def, holes, scores, teamOf, playingHcp = {} }: {
@@ -9,6 +9,10 @@
   const nines = $derived([holes.slice(0, 9), holes.slice(9, 18)]);
   const players = $derived([...def.sideA, ...def.sideB]);
 
+  function birdie(pid: string, h: HoleInfo): boolean {
+    const e = scores.get(scoreKey(pid, h.hole));
+    return !!e && !e.pickedUp && isBirdieOrBetter(e.gross, h.par);
+  }
   function cell(pid: string, h: HoleInfo): string {
     const e = scores.get(scoreKey(pid, h.hole));
     if (!e) return '';
@@ -42,7 +46,7 @@
             <td class="pname" style="color:var(--team-{teamOf[pid] === 'A' ? 'a' : 'b'})">{playerShort(pid)}{#if playingHcp[pid] !== undefined} <small>({playingHcp[pid]})</small>{/if}</td>
             {#each nine as h (h.hole)}
               {@const shots = strokesOnHole(def.strokes[pid] ?? 0, h.strokeIndex)}
-              <td class:shot={shots > 0}>{cell(pid, h)}{#if shots}<sup>{'•'.repeat(shots)}</sup>{/if}</td>
+              <td class:shot={shots > 0}><span class:birdie={birdie(pid, h)}>{cell(pid, h)}</span>{#if shots}<sup>{'•'.repeat(shots)}</sup>{/if}</td>
             {/each}
             <td><strong>{total(pid, nine)}</strong></td>
           </tr>
@@ -60,5 +64,6 @@
   .pname small { font-weight: 500; color: var(--muted); }
   .pname { font-weight: 700; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   td.shot { background: var(--shot); }
+  .birdie { color: #d0021b; font-weight: 800; }
   sup { color: var(--shot-text); font-size: 0.7em; }
 </style>

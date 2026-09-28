@@ -404,3 +404,15 @@ test('the Form tab is off until the admin switches it on, then ranks players', a
   await trip.getByRole('tab', { name: 'Stableford' }).click();
   await expect(rows.nth(0).getByTestId('form-value')).toHaveText('4');
 });
+
+test('the match scorecard shows gross birdies in red', async ({ page }) => {
+  await login(page);
+  await openGroup1(page);
+  await enterHole(page, 1, 3, 5); // A players birdie the par-4 1st; B players bogey
+  await page.goto('/#/');
+  await group1Card(page).click();
+  const red = page.locator('table .birdie');
+  await expect(red).toHaveCount(2);
+  await expect(red.first()).toHaveText('3');
+  await expect(red.first()).toHaveCSS('color', 'rgb(208, 2, 27)');
+});

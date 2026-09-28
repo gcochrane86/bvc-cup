@@ -13,3 +13,8 @@ export function shotLabel(bb: number, singles: number | null): string | null {
   if (bb === 0) return null;
   return bb === 1 ? '1 shot' : `${bb} shots`;
 }
+
+/** A gross birdie or better (picked-up holes have no gross). */
+export function isBirdieOrBetter(gross: number | null, par: number): boolean {
+  return gross !== null && gross <= par - 1;
+}
