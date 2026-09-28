@@ -8,6 +8,8 @@ export interface EventRow {
   team_a_name: string; team_a_colour: string;
   team_b_name: string; team_b_colour: string;
   is_active: boolean;
+  /** Show players the Form tab (rankings) for this event. */
+  show_form: boolean;
 }
 export interface EventPlayerRow { event_id: string; player_id: string; team: Team; handicap: number }
 export interface RoundRow {

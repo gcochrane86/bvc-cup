@@ -1,11 +1,14 @@
 <script lang="ts">
   import { router } from '../lib/router.svelte';
+  import { db } from '../lib/data/store.svelte';
   import { isAdmin } from '../lib/auth.svelte';
 
   const items = $derived([
     { href: '#/', label: 'Leaderboard', active: ['home', 'match'].includes(router.route.name) },
     { href: '#/score', label: 'Scores', active: router.route.name === 'score' },
     { href: '#/guide', label: 'Courses', active: router.route.name === 'guide' },
+    // Form (rankings) only when the admin has switched it on for this event.
+    ...(db.event?.show_form ? [{ href: '#/form', label: 'Form', active: router.route.name === 'form' }] : []),
     // Players (photo uploads) is admin-only; everyone else just sees the leaderboard and scores.
     ...(isAdmin()
       ? [

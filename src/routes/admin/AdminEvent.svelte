@@ -63,6 +63,7 @@
             team_b_name: ev.team_b_name,
             team_b_colour: ev.team_b_colour,
             is_active: ev.is_active,
+            show_form: ev.show_form,
           })
           .eq('id', ev.id),
       );
@@ -141,6 +142,7 @@
       <div class="field"><label for="tbc">Colour</label><input id="tbc" type="color" bind:value={event.team_b_colour} /></div>
     </div>
     <label class="row"><input type="checkbox" bind:checked={event.is_active} /> Active event (shown on the leaderboard)</label>
+    <label class="row"><input type="checkbox" bind:checked={event.show_form} /> Show the Form tab to players (rankings by gross, net, points, birdies…)</label>
     <button onclick={saveDetails}>Save event</button>
   </section>
 

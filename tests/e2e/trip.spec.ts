@@ -370,3 +370,31 @@ test('the admin can swipe an event left to delete it', async ({ browser }) => {
   await expect(admin.getByTestId('swipe-row').filter({ hasText: 'Old Trip' })).toHaveCount(0);
   await expect(admin.getByTestId('swipe-row').filter({ hasText: 'ACTIVE' })).toHaveCount(1); // the real event is untouched
 });
+
+test('the Form tab is off until the admin switches it on, then ranks players', async ({ browser }) => {
+  const trip = await newPhone(browser);
+  await login(trip);
+  await expect(trip.locator('nav a')).toHaveText(['Leaderboard', 'Scores', 'Courses']);
+
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.getByRole('link', { name: /Events, teams/ }).click();
+  await admin.locator('a.card').first().click();
+  await admin.getByLabel(/Show the Form tab to players/).check();
+  await admin.getByRole('button', { name: 'Save event' }).click();
+  await expect(admin.getByText('Event saved')).toBeVisible();
+
+  // Group 1's A players make birdie 3s on hole 1 (par 4); B players make 4s.
+  await openGroup1(trip);
+  await enterHole(trip, 1, 3, 4);
+  await trip.goto('/#/');
+  await expect(trip.locator('nav a')).toHaveText(['Leaderboard', 'Scores', 'Courses', 'Form'], { timeout: 20_000 });
+  await trip.getByRole('link', { name: 'Form' }).click();
+  await trip.getByRole('tab', { name: 'Birdies' }).click();
+  const rows = trip.getByTestId('form-row');
+  await expect(rows.nth(0).getByTestId('form-value')).toHaveText('1');
+  await expect(rows.nth(1).getByTestId('form-value')).toHaveText('1');
+  await expect(rows.nth(2).getByTestId('form-value')).toHaveText('0');
+  await trip.getByRole('tab', { name: 'Gross' }).click();
+  await expect(rows.nth(0).getByTestId('form-value')).toHaveText('-1');
+});
