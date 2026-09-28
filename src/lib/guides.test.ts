@@ -26,14 +26,16 @@ describe('course guides', () => {
     expect(guideNotes('krtb', 3)).toBeNull();
   });
 
-  it('gives Dundonald holes a flyover clip from the official video, where timed', () => {
+  it('gives every Dundonald hole its flyover section from the official video', () => {
     expect(guideFlyover('dundonald', 1)).toEqual({
-      embed: 'https://www.youtube-nocookie.com/embed/s3jUc3RyotE?start=3&end=35&rel=0&playsinline=1',
+      embed: 'https://www.youtube-nocookie.com/embed/s3jUc3RyotE?start=3&end=37&rel=0&playsinline=1',
       start: 3,
-      end: 35,
+      end: 37,
     });
-    expect(guideFlyover('dundonald', 2)).toMatchObject({ start: 36, end: 67 });
-    expect(guideFlyover('dundonald', 3)).toBeNull();
+    expect(guideFlyover('dundonald', 2)).toMatchObject({ start: 37, end: 69 }); // 0:37 – 1:09
+    expect(guideFlyover('dundonald', 10)).toMatchObject({ start: 312, end: 351 }); // 5:12 – 5:51
+    expect(guideFlyover('dundonald', 18)).toMatchObject({ start: 597, end: 637 }); // 9:57 – end (10:37)
+    for (let h = 1; h <= 17; h++) expect(guideFlyover('dundonald', h)!.end).toBe(guideFlyover('dundonald', h + 1)!.start);
     expect(guideFlyover('krtb', 1)).toBeNull();
   });
 

@@ -243,9 +243,9 @@ test('the course guide remembers the course and hole on this phone', async ({ pa
   // Dundonald shows the aerial plus pro tips and tee yardages.
   await page.getByRole('tab', { name: 'Dundonald' }).click();
   await page.getByRole('button', { name: 'Guide hole 1', exact: true }).click();
-  await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveAttribute('src', /s3jUc3RyotE\?start=3&end=35/);
+  await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveAttribute('src', /s3jUc3RyotE\?start=3&end=37/);
   await page.getByRole('button', { name: 'Guide hole 12', exact: true }).click();
-  await expect(page.getByTestId('guide-flyover')).toHaveCount(0); // no timings for 12 yet
+  await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveAttribute('src', /start=371&end=401/); // 6:11 – 6:41
   await expect(page.getByTestId('guide-notes')).toContainText('shortest Par 4');
   await expect(page.getByTestId('guide-notes')).not.toContainText('Championship'); // no tee table
   const notesY = (await page.getByTestId('guide-notes').boundingBox())!.y;

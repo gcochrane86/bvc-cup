@@ -68,11 +68,12 @@ export function rememberGuideHole(mem: GuideMemory, slug: string, hole: number):
 
 /** Official "Dundonald Links Fly Over 1 to 18" video (Dundonald Links' YouTube channel), embedded per hole. */
 const DUNDONALD_VIDEO = 's3jUc3RyotE';
-/** [start, end] in seconds per hole; holes without timings show no clip yet. */
-const DUNDONALD_FLYOVERS: Record<number, [number, number]> = {
-  1: [3, 35],
-  2: [36, 67],
-};
+/** Where each hole's flyover starts (seconds, at the fade to black); each ends where the next begins. */
+const DUNDONALD_STARTS = [
+  3, 37, 69, 112, 138, 182, 204, 234, 276, // holes 1–9  (0:03 … 4:36)
+  312, 351, 371, 401, 433, 481, 511, 550, 597, // holes 10–18 (5:12 … 9:57)
+];
+const DUNDONALD_VIDEO_END = 637; // 10:37
 
 export interface Flyover {
   embed: string;
@@ -82,8 +83,8 @@ export interface Flyover {
 
 /** The hole's flyover as an embeddable YouTube player that plays just that section. */
 export function guideFlyover(slug: string, hole: number): Flyover | null {
-  const t = slug === 'dundonald' ? DUNDONALD_FLYOVERS[hole] : undefined;
-  if (!t) return null;
-  const [start, end] = t;
+  if (slug !== 'dundonald' || hole < 1 || hole > 18) return null;
+  const start = DUNDONALD_STARTS[hole - 1];
+  const end = DUNDONALD_STARTS[hole] ?? DUNDONALD_VIDEO_END;
   return { embed: `https://www.youtube-nocookie.com/embed/${DUNDONALD_VIDEO}?start=${start}&end=${end}&rel=0&playsinline=1`, start, end };
 }
