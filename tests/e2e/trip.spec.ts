@@ -303,3 +303,38 @@ test('two phones scoring the same hole: an untouched par default never overwrite
     await expect(p.getByTestId('gross-A1')).toHaveText('5', { timeout: 20_000 });
   }
 });
+
+test('the admin can swipe an event left to delete it', async ({ browser }) => {
+  const admin = await newPhone(browser);
+  const dialogs: string[] = [];
+  admin.on('dialog', (d) => {
+    dialogs.push(d.message());
+    void d.accept();
+  });
+  await loginAdmin(admin);
+  await admin.goto('/#/admin/events');
+  await admin.getByLabel('New event name').fill('Old Trip');
+  await admin.getByRole('button', { name: 'Create event' }).click();
+  await expect(admin).toHaveURL(/#\/admin\/events\/[0-9a-f-]{36}$/); // created and opened
+  await admin.goto('/#/admin/events');
+
+  const row = admin.getByTestId('swipe-row').filter({ hasText: 'Old Trip' });
+  const del = row.getByRole('button', { name: 'Delete Old Trip', includeHidden: true });
+  await expect(del).toHaveAttribute('aria-hidden', 'true');
+
+  // Swipe left with the pointer.
+  const box = (await row.boundingBox())!;
+  const y = box.y + box.height / 2;
+  await admin.mouse.move(box.x + box.width - 20, y);
+  await admin.mouse.down();
+  for (let i = 1; i <= 8; i++) await admin.mouse.move(box.x + box.width - 20 - i * 20, y);
+  await admin.mouse.up();
+
+  await expect(admin).toHaveURL(/#\/admin\/events$/); // the swipe didn't open the event
+  await expect(del).toHaveAttribute('aria-hidden', 'false');
+  await del.click();
+  await expect(admin.getByText('Deleted "Old Trip"')).toBeVisible();
+  expect(dialogs[0]).toMatch(/permanently deletes its rounds, pairings, scores and results/);
+  await expect(admin.getByTestId('swipe-row').filter({ hasText: 'Old Trip' })).toHaveCount(0);
+  await expect(admin.getByTestId('swipe-row').filter({ hasText: 'ACTIVE' })).toHaveCount(1); // the real event is untouched
+});
