@@ -166,6 +166,18 @@ describe('upsert_score', () => {
     expect(await readScore(s.players.a1, 1)).toEqual({ gross: 5, picked_up: false });
   });
 
+  it('a real score entered earlier but arriving late (poor signal) still replaces a par default', async () => {
+    expect(await upsert('trip', s.players.a1, 1, 4, false, T2, true)).toBe('ok'); // mate's default lands first
+    expect(await upsert('trip', s.players.a1, 1, 5, false, T1)).toBe('ok'); // my 5, typed before theirs
+    expect(await readScore(s.players.a1, 1)).toEqual({ gross: 5, picked_up: false });
+  });
+
+  it('clearing a score, entered earlier but arriving late, still removes a par default', async () => {
+    await upsert('trip', s.players.a1, 1, 4, false, T2, true);
+    expect(await upsert('trip', s.players.a1, 1, null, false, T1)).toBe('ok');
+    expect(await readScore(s.players.a1, 1)).toBeNull();
+  });
+
   it('stores a pick-up', async () => {
     expect(await upsert('trip', s.players.a1, 2, null, true)).toBe('ok');
     expect(await readScore(s.players.a1, 2)).toEqual({ gross: null, picked_up: true });
