@@ -149,10 +149,15 @@
       {#if round.singles_enabled && d.a[0] && d.a[1] && d.b[0] && d.b[1]}
         <div class="singles" data-testid="singles-{d.groupNo}">
           {#if round.singles_pairing === 'selected' && !d.locked}
+            <p class="muted small pick">Choose the singles line-up:</p>
             {#each [false, true] as crossed (crossed)}
-              <label class="choice">
+              <label class="choice" class:chosen={d.crossed === crossed}>
                 <input type="radio" name="singles-{d.groupNo}" checked={d.crossed === crossed} onchange={() => (d.crossed = crossed)} />
-                {lineup(d, crossed)}
+                <span class="lines">
+                  {#each singlesOf(d, crossed) as [a, b], i (i)}
+                    <span><strong>Singles {i + 1}:</strong> {a ? shortOf(a) : '?'} v {b ? shortOf(b) : '?'}</span>
+                  {/each}
+                </span>
               </label>
             {/each}
           {:else}
@@ -178,6 +183,13 @@
   .wide { width: 100%; }
   .singles { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
   .singles p { margin: 0; }
-  .choice { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; margin: 4px 0; }
+  .pick { margin-bottom: 6px; }
+  .choice {
+    display: flex; gap: 12px; align-items: center; font-size: 0.95rem; margin: 6px 0; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 10px; cursor: pointer; min-height: 44px;
+  }
+  .choice.chosen { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, white); }
+  .choice input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+  .lines { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .singles-mode .draw { display: block; width: 100%; margin-top: 8px; }
 </style>
