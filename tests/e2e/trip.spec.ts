@@ -278,7 +278,7 @@ test('the course guide remembers the course and hole on this phone', async ({ pa
   // Nothing loads from YouTube until play is tapped.
   await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveCount(0);
   await page.getByRole('button', { name: 'Play hole 1 flyover' }).click();
-  await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveAttribute('src', /s3jUc3RyotE\?start=3&end=37.*autoplay=1/);
+  await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveAttribute('src', /s3jUc3RyotE\?start=3&end=37.*autoplay=1&mute=1/);
   await page.getByRole('button', { name: 'Guide hole 12', exact: true }).click();
   await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveCount(0); // a new hole starts un-loaded
   await page.getByRole('button', { name: 'Play hole 12 flyover' }).click();

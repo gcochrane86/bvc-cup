@@ -1,5 +1,6 @@
 <script lang="ts">
   // Tap-to-play flyover: the YouTube player (several MB) only loads once someone taps play.
+  // It starts muted: phones only let a video start by itself when muted, so unmuted it needs a second tap.
   let { embed, hole }: { embed: string; hole: number } = $props();
   let playing = $state(false);
 </script>
@@ -7,7 +8,7 @@
 <div class="flyover" data-testid="guide-flyover">
   {#if playing}
     <iframe
-      src={`${embed}&autoplay=1`}
+      src={`${embed}&autoplay=1&mute=1`}
       title="Hole {hole} flyover"
       allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
       referrerpolicy="strict-origin-when-cross-origin"
