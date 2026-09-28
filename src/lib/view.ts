@@ -191,10 +191,13 @@ export function pairingLabel(group: GroupView, short: (playerId: string) => stri
 
 /**
  * The day the leaderboard opens on: the day of the match this phone is scoring (while it's still being
- * played), otherwise today's day (see defaultRoundId).
+ * played), otherwise the first day with a match still to confirm — Day 1 until all its matches are
+ * confirmed, then Day 2, and so on — and the last day once everything is confirmed.
  */
-export function leaderboardRoundId(view: EventView, scoringGroupId: string | null, todayIso: string): string | null {
+export function leaderboardRoundId(view: EventView, scoringGroupId: string | null): string | null {
   const id = resumeGroupId(scoringGroupId, scoringList(view));
   const found = id ? findGroup(view, id) : null;
-  return found ? found.round.round.id : defaultRoundId(view.rounds.map((r) => r.round), todayIso);
+  if (found) return found.round.round.id;
+  const days = [...view.rounds].sort((a, b) => a.round.round_no - b.round.round_no);
+  return (days.find((r) => r.completed < r.totalMatches) ?? days.at(-1))?.round.id ?? null;
 }

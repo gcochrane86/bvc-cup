@@ -213,21 +213,26 @@ describe('leaderboardRoundId', () => {
       ),
     });
 
-  it("opens on the day of the match this phone is scoring, whatever today's date", () => {
-    expect(leaderboardRoundId(buildEventView(twoDays())!, 'g1', '2026-10-02')).toBe('r1');
+  const confirmed = (group_id: string) => ({ group_id, match_type: 'better_ball' as const, winner: 'A' as const, points_a: 1, points_b: 0, result_text: '2&1', final_hole: 17, confirmed_at: 'x' });
+
+  it('opens on the day of the match this phone is scoring', () => {
+    expect(leaderboardRoundId(buildEventView(twoDays())!, 'g2')).toBe('r2');
   });
 
-  it('falls back to today when the phone is not scoring anything', () => {
-    expect(leaderboardRoundId(buildEventView(twoDays())!, null, '2026-10-02')).toBe('r2');
+  it("otherwise opens on Day 1 until all of Day 1's matches are confirmed", () => {
+    expect(leaderboardRoundId(buildEventView(twoDays())!, null)).toBe('r1');
   });
 
-  it('falls back to today once the scored match is confirmed', () => {
-    const s = twoDays();
-    const v = buildEventView({
-      ...s,
-      results: [{ group_id: 'g1', match_type: 'better_ball', winner: 'A', points_a: 1, points_b: 0, result_text: '2&1', final_hole: 17, confirmed_at: 'x' }],
-    })!;
-    expect(leaderboardRoundId(v, 'g1', '2026-10-02')).toBe('r2');
+  it('then moves on to the next day with a match still to confirm', () => {
+    expect(leaderboardRoundId(buildEventView({ ...twoDays(), results: [confirmed('g1')] })!, null)).toBe('r2');
+  });
+
+  it('falls back the same way once the scored match is confirmed', () => {
+    expect(leaderboardRoundId(buildEventView({ ...twoDays(), results: [confirmed('g1')] })!, 'g1')).toBe('r2');
+  });
+
+  it('stays on the last day once every match is confirmed', () => {
+    expect(leaderboardRoundId(buildEventView({ ...twoDays(), results: [confirmed('g1'), confirmed('g2')] })!, null)).toBe('r2');
   });
 });
 

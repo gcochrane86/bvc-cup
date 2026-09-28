@@ -1,6 +1,6 @@
 <script lang="ts">
   import { db } from '../lib/data/store.svelte';
-  import { buildEventView, leaderboardRoundId, today } from '../lib/view';
+  import { buildEventView, leaderboardRoundId } from '../lib/view';
   import { readScoringGroup } from '../lib/scoringMemory';
   import { isAdmin } from '../lib/auth.svelte';
   import TeamTracker from '../components/TeamTracker.svelte';
@@ -9,9 +9,9 @@
 
   const view = $derived(buildEventView(db));
   let chosen = $state<string | null>(null);
-  // Opens on the day of the match this phone is scoring (else today's day); tapping a tab overrides it.
+  // Opens on the day of the match this phone is scoring (else the first day not yet confirmed); tapping a tab overrides it.
   const scoringGroup = readScoringGroup();
-  const roundId = $derived(chosen ?? (view ? leaderboardRoundId(view, scoringGroup, today()) : null));
+  const roundId = $derived(chosen ?? (view ? leaderboardRoundId(view, scoringGroup) : null));
   const rv = $derived(view?.rounds.find((r) => r.round.id === roundId) ?? null);
 
   // Full tracker card at the top; once it has scrolled up out of view, the compact bar slides in.
