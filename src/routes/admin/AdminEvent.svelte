@@ -2,6 +2,7 @@
   import { db, loadAll } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow } from '../../lib/data/types';
+  import ResetScores from '../../components/ResetScores.svelte';
 
   let { eventId }: { eventId: string } = $props();
 
@@ -219,6 +220,10 @@
       <button type="submit">Add round</button>
     </form>
   </section>
+
+  {#if rounds.length}
+    <ResetScores {event} {rounds} onDone={load} />
+  {/if}
 {:else}
   <p class="center muted">Loading…</p>
 {/if}

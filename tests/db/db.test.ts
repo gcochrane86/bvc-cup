@@ -317,6 +317,34 @@ describe('reset_event_scores', () => {
   });
 });
 
+describe('reset_round_scores', () => {
+  async function secondRound() {
+    const r2 = (await db.query<{ id: string }>(
+      `insert into public.rounds(event_id, course_id, round_no, name) values ($1, $2, 2, 'Day 2') returning id`, [s.eventId, s.courseId],
+    )).rows[0].id;
+    await db.query(`insert into public.scores(round_id, player_id, hole, gross, client_updated_at) values ($1, $2, 1, 6, now())`, [r2, s.players.a1]);
+    return r2;
+  }
+  const count = async (sql: string, params: unknown[] = []) => (await db.query<{ n: number }>(sql, params)).rows[0].n;
+
+  it('clears one day only: its scores, results and frozen handicaps', async () => {
+    const r2 = await secondRound();
+    await upsert('trip', s.players.a1, 1, 4);
+    await confirm('trip', 'better_ball', 15);
+    await as(db, 'admin', () => db.query(`select public.reset_round_scores($1::uuid)`, [s.roundId]));
+    expect(await count(`select count(*)::int as n from public.scores where round_id = $1`, [s.roundId])).toBe(0);
+    expect(await count(`select count(*)::int as n from public.match_results`)).toBe(0);
+    expect(await count(`select count(*)::int as n from public.group_players where handicap is not null`)).toBe(0);
+    expect(await count(`select count(*)::int as n from public.scores where round_id = $1`, [r2])).toBe(1); // Day 2 untouched
+  });
+
+  it('refuses the trip user', async () => {
+    await upsert('trip', s.players.a1, 1, 4);
+    await expect(as(db, 'trip', () => db.query(`select public.reset_round_scores($1::uuid)`, [s.roundId]))).rejects.toThrow(/admin only/);
+    expect(await readScore(s.players.a1, 1)).toEqual({ gross: 4, picked_up: false });
+  });
+});
+
 describe('admin RPCs', () => {
   const holes = JSON.stringify(Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, stroke_index: 18 - i })));
 

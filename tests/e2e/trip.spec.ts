@@ -178,8 +178,12 @@ test('the admin can reset all scores back to the start', async ({ browser }) => 
   const admin = await newPhone(browser);
   admin.on('dialog', (d) => void (d.type() === 'prompt' ? d.accept('RESET') : d.accept()));
   await loginAdmin(admin);
-  await admin.getByRole('button', { name: 'Reset all scores' }).click();
-  await expect(admin.getByText('All scores reset.')).toBeVisible();
+  await admin.getByRole('link', { name: /Events, teams/ }).click();
+  await admin.locator('a.card').first().click();
+  const reset = admin.getByTestId('reset-scores');
+  await reset.getByLabel('Which scores?').selectOption({ label: 'Day 1' });
+  await reset.getByRole('button', { name: 'Reset Day 1' }).click();
+  await expect(reset.getByText('Scores reset for Day 1.')).toBeVisible();
 
   await trip.goto('/#/');
   await expect(group1Card(trip).getByTestId('status')).toHaveText('Not started');
