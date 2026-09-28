@@ -188,3 +188,13 @@ export function pairingLabel(group: GroupView, short: (playerId: string) => stri
       .join('/');
   return `${side(['A1', 'A2'])} vs ${side(['B1', 'B2'])}`;
 }
+
+/**
+ * The day the leaderboard opens on: the day of the match this phone is scoring (while it's still being
+ * played), otherwise today's day (see defaultRoundId).
+ */
+export function leaderboardRoundId(view: EventView, scoringGroupId: string | null, todayIso: string): string | null {
+  const id = resumeGroupId(scoringGroupId, scoringList(view));
+  const found = id ? findGroup(view, id) : null;
+  return found ? found.round.round.id : defaultRoundId(view.rounds.map((r) => r.round), todayIso);
+}

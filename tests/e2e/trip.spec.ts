@@ -416,3 +416,13 @@ test('the match scorecard shows gross birdies in red', async ({ page }) => {
   await expect(red.first()).toHaveText('3');
   await expect(red.first()).toHaveCSS('color', 'rgb(208, 2, 27)');
 });
+
+test('back on the leaderboard, it opens on the day of the match being scored', async ({ page }) => {
+  await login(page);
+  await expect(page.getByRole('tab', { name: 'Day 1' })).toHaveAttribute('aria-selected', 'true'); // today
+  await page.getByRole('link', { name: 'Scores' }).click();
+  await page.getByTestId('score-pick').filter({ hasText: /^Match 4\b/ }).click(); // a Day 2 match
+  await expect(page.getByRole('heading', { name: /^Hole \d+$/ })).toBeVisible();
+  await page.getByRole('link', { name: 'Leaderboard' }).click();
+  await expect(page.getByRole('tab', { name: 'Day 2' })).toHaveAttribute('aria-selected', 'true');
+});

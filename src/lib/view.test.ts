@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, matchLabel, matchesLabel, pairingLabel, resumeGroupId, scoringList } from './view';
+import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, leaderboardRoundId, matchLabel, matchesLabel, pairingLabel, resumeGroupId, scoringList } from './view';
 import type { RoundRow, ScoreRow, Snapshot } from './data/types';
 import type { Slot, Team } from './scoring';
 
@@ -196,6 +196,38 @@ describe('scoring list', () => {
     const v = buildEventView(snapshot({ rounds: [{ ...baseRound, singles_enabled: true }] }))!;
     expect(matchesLabel(v.rounds[0].groups[0])).toBe('Matches 1–3');
     expect(matchesLabel(buildEventView(snapshot())!.rounds[0].groups[0])).toBe('Match 1');
+  });
+});
+
+describe('leaderboardRoundId', () => {
+  // Day 1 (g1) dated 1 Oct, Day 2 (g2) dated 2 Oct.
+  const twoDays = () =>
+    snapshot({
+      rounds: [baseRound, { ...baseRound, id: 'r2', round_no: 2, name: 'Day 2', date: '2026-10-02' }],
+      groups: [
+        { id: 'g1', round_id: 'r1', group_no: 1, tee_time: null, singles_crossed: false },
+        { id: 'g2', round_id: 'r2', group_no: 1, tee_time: null, singles_crossed: false },
+      ],
+      groupPlayers: ['g1', 'g2'].flatMap((g) =>
+        (['A1', 'A2', 'B1', 'B2'] as Slot[]).map((slot) => ({ group_id: g, slot, player_id: slot.toLowerCase(), handicap: null })),
+      ),
+    });
+
+  it("opens on the day of the match this phone is scoring, whatever today's date", () => {
+    expect(leaderboardRoundId(buildEventView(twoDays())!, 'g1', '2026-10-02')).toBe('r1');
+  });
+
+  it('falls back to today when the phone is not scoring anything', () => {
+    expect(leaderboardRoundId(buildEventView(twoDays())!, null, '2026-10-02')).toBe('r2');
+  });
+
+  it('falls back to today once the scored match is confirmed', () => {
+    const s = twoDays();
+    const v = buildEventView({
+      ...s,
+      results: [{ group_id: 'g1', match_type: 'better_ball', winner: 'A', points_a: 1, points_b: 0, result_text: '2&1', final_hole: 17, confirmed_at: 'x' }],
+    })!;
+    expect(leaderboardRoundId(v, 'g1', '2026-10-02')).toBe('r2');
   });
 });
 

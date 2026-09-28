@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { readScoringGroup, rememberScoringGroup } from '../lib/scoringMemory';
   import { untrack } from 'svelte';
   import { db, enterScore, loadAll, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
   import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
@@ -14,22 +15,9 @@
   const toScore = $derived(view ? scoringList(view) : []);
 
   // This phone remembers the match it's scoring: Scores goes straight back to it until it's confirmed.
-  const REMEMBER = 'golf.scoringGroup';
-  function remembered(): string | null {
-    try {
-      return localStorage.getItem(REMEMBER);
-    } catch {
-      return null; // private mode: the list is shown each time instead
-    }
-  }
-  function remember(id: string | null) {
-    try {
-      if (id) localStorage.setItem(REMEMBER, id);
-      else localStorage.removeItem(REMEMBER);
-    } catch {
-      /* ignore */
-    }
-  }
+  const remembered = readScoringGroup;
+  const remember = rememberScoringGroup;
+
   // Decide from fresh data: a match reopened moments ago must not look confirmed and be forgotten.
   let fresh = $state(false);
   $effect(() => {
