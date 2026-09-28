@@ -12,6 +12,8 @@
   import AdminHome from './routes/admin/AdminHome.svelte';
   import AdminPlayers from './routes/admin/AdminPlayers.svelte';
   import AdminResults from './routes/admin/AdminResults.svelte';
+  import AdminAccess from './routes/admin/AdminAccess.svelte';
+  import Waiting from './routes/Waiting.svelte';
   import AdminCourses from './routes/admin/AdminCourses.svelte';
   import AdminCourse from './routes/admin/AdminCourse.svelte';
   import Players from './routes/Players.svelte';
@@ -24,8 +26,10 @@
   const signedIn = $derived(!!auth.session);
   const needsAdmin = $derived(route.name.startsWith('admin') && route.name !== 'admin-login');
 
+  // Only people the admin has approved get the app (the database enforces this too).
+  const approved = $derived(auth.access === 'approved');
   $effect(() => {
-    if (signedIn) {
+    if (signedIn && approved) {
       startData();
       return stopData;
     }
@@ -38,6 +42,8 @@
   <Login mode="admin" />
 {:else if !signedIn}
   <Login mode="trip" />
+{:else if !approved}
+  <Waiting />
 {:else}
   <div class="app" style="--team-a:{db.event?.team_a_colour ?? '#1f4e9c'};--team-b:{db.event?.team_b_colour ?? '#c8102e'}">
     {#if db.notice}
@@ -65,6 +71,8 @@
         <AdminPlayers />
       {:else if route.name === 'admin-results'}
         <AdminResults />
+      {:else if route.name === 'admin-access'}
+        <AdminAccess />
       {:else if route.name === 'admin-courses'}
         <AdminCourses />
       {:else if route.name === 'admin-course'}

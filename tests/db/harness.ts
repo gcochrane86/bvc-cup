@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 export const TRIP_ID = '11111111-1111-1111-1111-111111111111';
 export const STRANGER_ID = '33333333-3333-3333-3333-333333333333';
 export const ADMIN_ID = '22222222-2222-2222-2222-222222222222';
+export const PENDING_ID = '44444444-4444-4444-4444-444444444444';
 
 const SUPABASE_SHIM = `
   create role anon nologin;
@@ -28,8 +29,8 @@ export async function makeDb(): Promise<PGlite> {
   return db;
 }
 
-/** stranger = a self-signed-up account: authenticated, but no app_metadata role. */
-export type Who = 'anon' | 'trip' | 'admin' | 'stranger';
+/** stranger = authenticated but not on the access list. trip = an approved member. pending = on the list, not yet approved. */
+export type Who = 'anon' | 'trip' | 'admin' | 'stranger' | 'pending';
 
 /** Run fn as a Supabase API caller: the Postgres role plus JWT claims, exactly as PostgREST sets them. */
 export async function as<T>(db: PGlite, who: Who, fn: () => Promise<T>): Promise<T> {
@@ -38,6 +39,8 @@ export async function as<T>(db: PGlite, who: Who, fn: () => Promise<T>): Promise
       ? { role: 'anon' }
       : who === 'stranger'
         ? { sub: STRANGER_ID, role: 'authenticated', app_metadata: {} }
+        : who === 'pending'
+          ? { sub: PENDING_ID, role: 'authenticated', app_metadata: {} }
         : { sub: who === 'trip' ? TRIP_ID : ADMIN_ID, role: 'authenticated', app_metadata: { role: who } };
   await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify(claims)]);
   await db.exec(`set role ${who === 'anon' ? 'anon' : 'authenticated'}`);
@@ -85,5 +88,8 @@ export async function seed(db: PGlite): Promise<Seed> {
   for (const [slot, key] of [['A1', 'a1'], ['A2', 'a2'], ['B1', 'b1'], ['B2', 'b2']] as const) {
     await db.query(`insert into public.group_players(group_id, slot, player_id) values ($1, $2, $3)`, [groupId, slot, players[key]]);
   }
+  await db.query(`insert into public.members (user_id, email, status) values ($1, 'me@example.com', 'approved'), ($2, 'new@example.com', 'pending')`, [
+    TRIP_ID, PENDING_ID,
+  ]);
   return { courseId, eventId, roundId, groupId, players };
 }

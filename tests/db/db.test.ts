@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
-import { as, makeDb, seed, type Seed, type Who } from './harness';
+import { as, makeDb, PENDING_ID, seed, STRANGER_ID, TRIP_ID, type Seed, type Who } from './harness';
 
 let db: PGlite;
 let s: Seed;
@@ -83,6 +83,53 @@ describe('self-signed-up accounts (no role)', () => {
     await expect(
       as(db, 'stranger', () => db.query(`select public.set_player_photo($1::uuid, $2)`, [s.players.a1, `${s.players.a1}/1.jpg`])),
     ).rejects.toThrow(/not a trip member/);
+  });
+});
+
+describe('access list', () => {
+  const readPlayers = (who: Who) => as(db, who, async () => (await db.query(`select id from public.players`)).rows.length);
+  const setStatus = (id: string, status: string) => db.query(`update public.members set status = $2 where user_id = $1`, [id, status]);
+
+  it('lets approved members in', async () => {
+    expect(await readPlayers('trip')).toBe(4);
+  });
+
+  it('keeps pending people out of every table and write', async () => {
+    expect(await readPlayers('pending')).toBe(0);
+    await expect(upsert('pending', s.players.a1, 1, 4)).rejects.toThrow(/not a trip member/);
+  });
+
+  it('cuts removed people off immediately', async () => {
+    await setStatus(TRIP_ID, 'removed');
+    expect(await readPlayers('trip')).toBe(0);
+  });
+
+  it('no longer lets the shared trip login in on its own', async () => {
+    await db.query(`delete from public.members where user_id = $1`, [TRIP_ID]);
+    expect(await readPlayers('trip')).toBe(0); // app_metadata.role = 'trip' but not on the list
+  });
+
+  it('shows people only their own entry', async () => {
+    const r = await as(db, 'pending', () => db.query<{ email: string; status: string }>(`select email, status from public.members`));
+    expect(r.rows).toEqual([{ email: 'new@example.com', status: 'pending' }]);
+  });
+
+  it('does not let anyone approve themselves', async () => {
+    await as(db, 'pending', () => db.query(`update public.members set status = 'approved' where user_id = $1`, [PENDING_ID]));
+    expect(await readPlayers('pending')).toBe(0);
+  });
+
+  it('lets the admin see everyone, approve and remove', async () => {
+    const all = await as(db, 'admin', () => db.query(`select email from public.members order by email`));
+    expect(all.rows).toEqual([{ email: 'me@example.com' }, { email: 'new@example.com' }]);
+    await as(db, 'admin', () => db.query(`update public.members set status = 'approved' where user_id = $1`, [PENDING_ID]));
+    expect(await readPlayers('pending')).toBe(4);
+    await as(db, 'admin', () => db.query(`update public.members set status = 'removed' where user_id = $1`, [PENDING_ID]));
+    expect(await readPlayers('pending')).toBe(0);
+  });
+
+  it('rejects unknown statuses', async () => {
+    await expect(setStatus(STRANGER_ID, 'maybe').then(() => setStatus(TRIP_ID, 'maybe'))).rejects.toThrow(/check constraint/);
   });
 });
 

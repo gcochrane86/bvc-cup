@@ -5,9 +5,37 @@ test.beforeEach(() => reseed());
 
 test('wrong password is rejected', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel('Password').fill('definitely-wrong');
+  await page.getByLabel('Your email').fill('tester@example.com');
+  await page.getByLabel('Trip password').fill('definitely-wrong');
   await page.getByRole('button', { name: 'Enter' }).click();
   await expect(page.getByText('Wrong password')).toBeVisible();
+});
+
+test('a new email waits for approval, the admin approves it, and can remove it again', async ({ browser }) => {
+  const email = `new-${Date.now()}@example.com`;
+  const phone = await newPhone(browser);
+  await phone.goto('/');
+  await phone.getByLabel('Your email').fill(email);
+  await phone.getByLabel('Trip password').fill(process.env.TRIP_PASSWORD!);
+  await phone.getByRole('button', { name: 'Enter' }).click();
+  await expect(phone.getByTestId('waiting')).toContainText('Waiting for approval');
+  await expect(phone.getByTestId('waiting')).toContainText(email);
+
+  const admin = await newPhone(browser);
+  admin.on('dialog', (d) => void d.accept());
+  await loginAdmin(admin);
+  await admin.getByRole('link', { name: /Access/ }).click();
+  const row = admin.getByTestId('access-row').filter({ hasText: email });
+  await row.getByRole('button', { name: 'Approve' }).click();
+  await expect(admin.getByText(`${email} approved`)).toBeVisible();
+
+  // The waiting phone opens up on its own.
+  await expect(phone.getByTestId('tracker')).toBeVisible({ timeout: 20_000 });
+
+  await admin.getByTestId('access-row').filter({ hasText: email }).getByRole('button', { name: 'Remove' }).click();
+  await expect(admin.getByText(`${email} removed`)).toBeVisible();
+  await phone.reload();
+  await expect(phone.getByTestId('waiting')).toContainText('Access removed');
 });
 
 test('a saved hole appears live on another phone', async ({ browser }) => {

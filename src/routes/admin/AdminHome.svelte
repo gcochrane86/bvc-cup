@@ -33,6 +33,7 @@
 
 <h1>Admin</h1>
 <p class="muted">Active event: <strong>{db.event?.name ?? 'none'}</strong></p>
+<a class="card" href="#/admin/access">Access — approve or remove people →</a>
 <a class="card" href="#/admin/events">Events, teams, rounds &amp; pairings →</a>
 <a class="card" href="#/admin/results">Reopen a confirmed match →</a>
 <a class="card" href="#/admin/players">Players &amp; handicaps →</a>

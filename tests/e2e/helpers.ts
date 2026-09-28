@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import { devices, expect, type Browser, type Page } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
 
 export function reseed() {
   execSync('npm run seed -- --yes-wipe', { stdio: 'pipe' });
@@ -10,10 +11,21 @@ export async function newPhone(browser: Browser): Promise<Page> {
   return ctx.newPage();
 }
 
-export async function login(page: Page, password = process.env.TRIP_PASSWORD!) {
+/** Service-role client for test setup only (e.g. approving a tester, as the admin would in Access). */
+export const serviceDb = () =>
+  createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
+
+/** Log in with an email + the trip password; approve the tester if they land on the waiting screen. */
+export async function login(page: Page, email = 'tester@example.com', password = process.env.TRIP_PASSWORD!) {
   await page.goto('/');
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Your email').fill(email);
+  await page.getByLabel('Trip password').fill(password);
   await page.getByRole('button', { name: 'Enter' }).click();
+  await expect(page.getByTestId('tracker').or(page.getByTestId('waiting'))).toBeVisible();
+  if (await page.getByTestId('waiting').isVisible()) {
+    await serviceDb().from('members').update({ status: 'approved' }).eq('email', email);
+    await page.getByRole('button', { name: 'Check again' }).click();
+  }
   await expect(page.getByTestId('tracker')).toBeVisible();
 }
 
