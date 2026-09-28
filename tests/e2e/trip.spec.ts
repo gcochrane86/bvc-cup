@@ -397,4 +397,10 @@ test('the Form tab is off until the admin switches it on, then ranks players', a
   await expect(rows.nth(2).getByTestId('form-value')).toHaveText('0');
   await trip.getByRole('tab', { name: 'Gross' }).click();
   await expect(rows.nth(0).getByTestId('form-value')).toHaveText('-1');
+  // Stableford: gross 3 with a shot on hole 1 (SI 7, handicap 10) = net 2 = 4 points.
+  await trip.getByRole('tab', { name: 'Stableford' }).click();
+  await expect(rows.nth(0).getByTestId('form-value')).toHaveText('4');
+  // Stableford: gross 3 with a shot on hole 1 (SI 7, handicap 10) = net 2 = 4 points.
+  await trip.getByRole('tab', { name: 'Stableford' }).click();
+  await expect(rows.nth(0).getByTestId('form-value')).toHaveText('4');
 });

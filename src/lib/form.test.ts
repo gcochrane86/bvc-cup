@@ -62,6 +62,15 @@ describe('form', () => {
     expect(['a1', 'a2', 'b1', 'b2'].map((id) => row(rows, id).points)).toEqual([1, 1, 0, 0]);
   });
 
+  it('scores stableford: 2 for net par, +1 per shot better, 0 for a pick-up', () => {
+    const rows = computeForm(buildEventView(snapshot())!, 'r1');
+    // a1: hole 1 gross 3 − 1 shot = net 2 (4 pts); hole 2 net 6 (0); hole 3 picked up (0) → 4 over 3 holes
+    expect(row(rows, 'a1')).toMatchObject({ stableford: 4, pickups: 1 });
+    // b1: hole 1 gross 4 − 1 shot = net 3 (3 pts)
+    expect(row(rows, 'b1')).toMatchObject({ stableford: 3, pickups: 0 });
+    expect(rankForm(rows, 'stableford').map((r) => [r.row.playerId, r.rank])).toEqual([['a1', 1], ['b1', 2], ['a2', 3], ['b2', 3]]);
+  });
+
   it('can cover all days or one day', () => {
     const view = buildEventView(snapshot())!;
     expect(row(computeForm(view, null), 'b1')).toMatchObject({ holes: 2, birdies: 1 });

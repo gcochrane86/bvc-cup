@@ -8,6 +8,7 @@
   const METRICS: { id: FormMetric; label: string; note: string }[] = [
     { id: 'gross', label: 'Gross', note: 'Total strokes to par (pick-ups left out).' },
     { id: 'net', label: 'Net', note: 'Strokes to par after full course-handicap shots (pick-ups left out).' },
+    { id: 'stableford', label: 'Stableford', note: 'Stableford points off full course handicap: 2 for net par, 1 more per shot better, 0 for a pick-up.' },
     { id: 'points', label: 'Points', note: "Points from confirmed matches — each player gets their side's points." },
     { id: 'birdies', label: 'Birdies', note: 'Birdies or better (gross).' },
     { id: 'trebles', label: 'Trebles+', note: 'Treble bogey or worse, including pick-ups.' },
@@ -25,6 +26,7 @@
     switch (metric) {
       case 'gross': return r.holes ? toPar(r.grossToPar) : '–';
       case 'net': return r.holes ? toPar(r.netToPar) : '–';
+      case 'stableford': return String(r.stableford);
       case 'points': return formatPoints(r.points);
       case 'birdies': return String(r.birdies);
       case 'trebles': return String(r.trebles);
@@ -33,6 +35,7 @@
   function detail(r: FormRow): string {
     if (metric === 'gross') return r.holes ? `Gross ${r.gross} · ${r.holes} holes` : 'yet to play';
     if (metric === 'net') return r.holes ? `Net ${r.net} · ${r.holes} holes` : 'yet to play';
+    if (metric === 'stableford') return r.holes + r.pickups ? `${r.holes + r.pickups} holes` : 'yet to play';
     return r.holes ? `${r.holes} holes played` : '';
   }
   const colour = (r: FormRow) => (r.team === 'A' ? 'var(--team-a)' : 'var(--team-b)');

@@ -4,7 +4,7 @@
 import { scoreKey, strokesOnHole, type Team } from './scoring';
 import type { EventView } from './view';
 
-export type FormMetric = 'gross' | 'net' | 'points' | 'birdies' | 'trebles';
+export type FormMetric = 'gross' | 'net' | 'stableford' | 'points' | 'birdies' | 'trebles';
 
 export interface FormRow {
   playerId: string;
@@ -22,13 +22,17 @@ export interface FormRow {
   birdies: number;
   /** Treble bogey or worse, including pick-ups. */
   trebles: number;
+  /** Stableford points (full course handicap): 2 for net par, +1 per shot better, 0 for a pick-up. */
+  stableford: number;
+  /** Holes picked up (they score 0 stableford points and are left out of gross/net). */
+  pickups: number;
 }
 
 export function computeForm(view: EventView, roundId: string | null): FormRow[] {
   const rows = new Map<string, FormRow>(
     Object.entries(view.teamOf).map(([playerId, team]) => [
       playerId,
-      { playerId, team, holes: 0, gross: 0, grossToPar: 0, net: 0, netToPar: 0, points: 0, birdies: 0, trebles: 0 },
+      { playerId, team, holes: 0, gross: 0, grossToPar: 0, net: 0, netToPar: 0, points: 0, birdies: 0, trebles: 0, stableford: 0, pickups: 0 },
     ]),
   );
   for (const rv of view.rounds) {
@@ -43,6 +47,7 @@ export function computeForm(view: EventView, roundId: string | null): FormRow[] 
           if (!e) continue;
           if (e.pickedUp || e.gross === null) {
             r.trebles++;
+            r.pickups++;
             continue;
           }
           const net = e.gross - strokesOnHole(courseHcp, h.strokeIndex);
@@ -51,6 +56,7 @@ export function computeForm(view: EventView, roundId: string | null): FormRow[] 
           r.grossToPar += e.gross - h.par;
           r.net += net;
           r.netToPar += net - h.par;
+          r.stableford += Math.max(0, 2 + h.par - net);
           if (e.gross <= h.par - 1) r.birdies++;
           if (e.gross >= h.par + 3) r.trebles++;
         }
@@ -74,6 +80,7 @@ export function computeForm(view: EventView, roundId: string | null): FormRow[] 
 const METRICS: Record<FormMetric, { value: (r: FormRow) => number; lowestFirst: boolean; needsHoles: boolean }> = {
   gross: { value: (r) => r.grossToPar, lowestFirst: true, needsHoles: true },
   net: { value: (r) => r.netToPar, lowestFirst: true, needsHoles: true },
+  stableford: { value: (r) => r.stableford, lowestFirst: false, needsHoles: false },
   points: { value: (r) => r.points, lowestFirst: false, needsHoles: false },
   birdies: { value: (r) => r.birdies, lowestFirst: false, needsHoles: false },
   trebles: { value: (r) => r.trebles, lowestFirst: false, needsHoles: false },
