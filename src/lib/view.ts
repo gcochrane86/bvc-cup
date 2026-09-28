@@ -95,6 +95,7 @@ export function buildEventView(s: Snapshot): EventView | null {
             group.id,
             members.map((gp) => ({ slot: gp.slot, playerId: gp.player_id, handicap: playingHcp[gp.player_id] })),
             settings,
+            !!group.singles_crossed,
           );
           const matches = defs.map((def): MatchView => {
             const row = s.results.find((r) => r.group_id === group.id && r.match_type === def.type);
@@ -149,8 +150,8 @@ export function firstIncompleteHole(group: GroupView, holes: HoleInfo[]): number
 
 const LABELS: Record<MatchType, string> = {
   better_ball: 'Fourball',
-  low_singles: 'Low singles',
-  high_singles: 'High singles',
+  low_singles: 'Singles 1',
+  high_singles: 'Singles 2',
 };
 export const matchLabel = (type: MatchType) => LABELS[type];
 

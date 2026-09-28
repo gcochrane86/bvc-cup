@@ -111,8 +111,14 @@
               singles_enabled: r.singles_enabled,
               singles_points: Number(r.singles_points),
               singles_allowance_pct: Number(r.singles_allowance_pct),
+              singles_pairing: r.singles_pairing,
             })
             .eq('id', r.id),
+        ).then(() =>
+          // By handicap means the straight line-up for every group (random/chosen are set on the pairings page).
+          r.singles_pairing === 'handicap'
+            ? must(supabase.from('groups').update({ singles_crossed: false }).eq('round_id', r.id))
+            : null,
         ),
       `${r.name} saved`,
     );
@@ -175,11 +181,19 @@
           <div class="field"><label for="ra-{r.id}">Allowance %</label><input id="ra-{r.id}" type="number" min="0" max="100" bind:value={r.allowance_pct} /></div>
           <div class="field"><label for="rp-{r.id}">Fourball pts</label><input id="rp-{r.id}" type="number" step="0.5" bind:value={r.better_ball_points} /></div>
         </div>
-        <label class="row"><input type="checkbox" bind:checked={r.singles_enabled} /> Also play low &amp; high singles in each fourball</label>
+        <label class="row"><input type="checkbox" bind:checked={r.singles_enabled} /> Also play 2 singles in each fourball</label>
         {#if r.singles_enabled}
           <div class="row">
             <div class="field"><label for="rsp-{r.id}">Singles pts</label><input id="rsp-{r.id}" type="number" step="0.5" bind:value={r.singles_points} /></div>
             <div class="field"><label for="rsa-{r.id}">Singles allowance %</label><input id="rsa-{r.id}" type="number" min="0" max="100" bind:value={r.singles_allowance_pct} /></div>
+          </div>
+          <div class="field">
+            <label for="rsm-{r.id}">Singles pairings</label>
+            <select id="rsm-{r.id}" bind:value={r.singles_pairing}>
+              <option value="handicap">By handicap (low v low, high v high)</option>
+              <option value="random">Random draw</option>
+              <option value="selected">Chosen by admin</option>
+            </select>
           </div>
         {/if}
         <div class="row">

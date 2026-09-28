@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GUIDES, guideForCourse, guideNotes, guidePages, readGuideMemory, rememberGuideHole } from './guides';
+import { GUIDES, guideFlyover, guideForCourse, guideNotes, guidePages, readGuideMemory, rememberGuideHole } from './guides';
 
 describe('course guides', () => {
   it('has all three courses, in playing order', () => {
@@ -24,6 +24,17 @@ describe('course guides', () => {
     expect(n.tips).toMatch(/shortest Par 4/);
     expect(n.tees.map((t) => t.tee)).toEqual(['Championship', 'Medal', 'Middle', 'Front']);
     expect(guideNotes('krtb', 3)).toBeNull();
+  });
+
+  it('gives Dundonald holes a flyover clip from the official video, where timed', () => {
+    expect(guideFlyover('dundonald', 1)).toEqual({
+      embed: 'https://www.youtube-nocookie.com/embed/s3jUc3RyotE?start=3&end=35&rel=0&playsinline=1',
+      start: 3,
+      end: 35,
+    });
+    expect(guideFlyover('dundonald', 2)).toMatchObject({ start: 36, end: 67 });
+    expect(guideFlyover('dundonald', 3)).toBeNull();
+    expect(guideFlyover('krtb', 1)).toBeNull();
   });
 
   it('remembers the hole per course, and the course last viewed', () => {

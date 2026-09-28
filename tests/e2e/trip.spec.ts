@@ -118,9 +118,9 @@ test('the admin can reopen a confirmed match for scoring', async ({ browser }) =
   await expect(trip.getByTestId('conf-a')).toHaveText('0'); // points back to projected
 });
 
-test('non-admins only see the Leaderboard, Scores and Guide tabs', async ({ page }) => {
+test('non-admins only see the Leaderboard, Scores and Courses tabs', async ({ page }) => {
   await login(page);
-  await expect(page.locator('nav a')).toHaveText(['Leaderboard', 'Scores', 'Guide']);
+  await expect(page.locator('nav a')).toHaveText(['Leaderboard', 'Scores', 'Courses']);
 });
 
 test('the Scores tab goes back to the match this phone is scoring', async ({ page }) => {
@@ -221,7 +221,7 @@ test('after reopening, correcting an earlier hole changes the outcome and can be
 
 test('the course guide remembers the course and hole on this phone', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Guide' }).click();
+  await page.getByRole('link', { name: 'Courses' }).click();
   await page.getByRole('tab', { name: 'Robert the Bruce' }).click();
   await page.getByRole('button', { name: 'Guide hole 3', exact: true }).click();
   await expect(page.getByTestId('guide-title')).toContainText('Hole 3');
@@ -229,7 +229,7 @@ test('the course guide remembers the course and hole on this phone', async ({ pa
   await expect.poll(() => page.getByTestId('guide-layout').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(900);
 
   await page.getByRole('link', { name: 'Scores' }).click();
-  await page.getByRole('link', { name: 'Guide' }).click();
+  await page.getByRole('link', { name: 'Courses' }).click();
   await expect(page.getByTestId('guide-title')).toContainText('Hole 3');
   await expect(page.getByRole('tab', { name: 'Robert the Bruce' })).toHaveAttribute('aria-selected', 'true');
 
@@ -242,11 +242,40 @@ test('the course guide remembers the course and hole on this phone', async ({ pa
 
   // Dundonald shows the aerial plus pro tips and tee yardages.
   await page.getByRole('tab', { name: 'Dundonald' }).click();
+  await page.getByRole('button', { name: 'Guide hole 1', exact: true }).click();
+  await expect(page.getByTestId('guide-flyover').locator('iframe')).toHaveAttribute('src', /s3jUc3RyotE\?start=3&end=35/);
   await page.getByRole('button', { name: 'Guide hole 12', exact: true }).click();
+  await expect(page.getByTestId('guide-flyover')).toHaveCount(0); // no timings for 12 yet
   await expect(page.getByTestId('guide-notes')).toContainText('shortest Par 4');
   await expect(page.getByTestId('guide-notes')).not.toContainText('Championship'); // no tee table
   const notesY = (await page.getByTestId('guide-notes').boundingBox())!.y;
   const imageY = (await page.getByTestId('guide-layout').boundingBox())!.y;
   expect(notesY).toBeLessThan(imageY); // pro tips above the aerial
   await expect.poll(() => page.getByTestId('guide-layout').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+});
+
+test('the admin can choose the singles line-up and it shows on the leaderboard', async ({ browser }) => {
+  const admin = await newPhone(browser);
+  admin.on('dialog', (d) => void d.accept());
+  await loginAdmin(admin);
+  await admin.getByRole('link', { name: /Events, teams/ }).click();
+  await admin.locator('a.card').first().click();
+  const day3 = admin.locator('.round').nth(2);
+  await day3.getByLabel('Singles pairings').selectOption('selected');
+  await day3.getByRole('button', { name: 'Save round' }).click();
+  await expect(admin.getByText('Day 3 saved')).toBeVisible();
+  await day3.getByRole('link', { name: 'Pairings →' }).click();
+  // Seed group 1: Adams/Brown v Green/Hill. Swap: Adams v Hill, Brown v Green.
+  await admin.getByTestId('singles-1').getByLabel(/Singles 1: Adams v Hill/).check();
+  await admin.getByRole('button', { name: 'Save pairings' }).click();
+  await expect(admin.getByText('Pairings saved')).toBeVisible();
+
+  const trip = await newPhone(browser);
+  await login(trip);
+  await trip.getByRole('tab', { name: 'Day 3' }).click();
+  const card = (label: string) => trip.getByTestId('match-card').filter({ hasText: label }).first();
+  await expect(card('Singles 1')).toContainText('Adams');
+  await expect(card('Singles 1')).toContainText('Hill');
+  await expect(card('Singles 2')).toContainText('Brown');
+  await expect(card('Singles 2')).toContainText('Green');
 });

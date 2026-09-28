@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, matchesLabel, pairingLabel, resumeGroupId, scoringList } from './view';
+import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, matchLabel, matchesLabel, pairingLabel, resumeGroupId, scoringList } from './view';
 import type { RoundRow, ScoreRow, Snapshot } from './data/types';
 import type { Slot, Team } from './scoring';
 
 const baseRound: RoundRow = {
   id: 'r1', event_id: 'e', course_id: 'c', round_no: 1, date: '2026-10-01', name: 'Day 1',
   allowance_pct: 90, better_ball_points: 1, singles_enabled: false, singles_points: 0.5, singles_allowance_pct: 90,
+  singles_pairing: 'handicap',
 };
 
 function snapshot(over: Partial<Snapshot> = {}): Snapshot {
@@ -16,7 +17,7 @@ function snapshot(over: Partial<Snapshot> = {}): Snapshot {
     courseHoles: Array.from({ length: 18 }, (_, i) => ({ course_id: 'c', hole: i + 1, par: 4, stroke_index: i + 1 })),
     eventPlayers: ['a1', 'a2', 'b1', 'b2'].map((id) => ({ event_id: 'e', player_id: id, team: id[0].toUpperCase() as Team, handicap: 10 })),
     rounds: [baseRound],
-    groups: [{ id: 'g1', round_id: 'r1', group_no: 1, tee_time: '09:00:00' }],
+    groups: [{ id: 'g1', round_id: 'r1', group_no: 1, tee_time: '09:00:00', singles_crossed: false }],
     groupPlayers: (['A1', 'A2', 'B1', 'B2'] as Slot[]).map((slot) => ({ group_id: 'g1', slot, player_id: slot.toLowerCase(), handicap: null })),
     scores: [],
     results: [],
@@ -110,6 +111,19 @@ describe('buildEventView', () => {
   });
 });
 
+describe('singles', () => {
+  it('are labelled Singles 1 and Singles 2', () => {
+    expect([matchLabel('better_ball'), matchLabel('low_singles'), matchLabel('high_singles')]).toEqual(['Fourball', 'Singles 1', 'Singles 2']);
+  });
+
+  it('follow the group’s crossed line-up', () => {
+    const s = snapshot({ rounds: [{ ...baseRound, singles_enabled: true }] });
+    const v = buildEventView({ ...s, groups: s.groups.map((g) => ({ ...g, singles_crossed: true })) })!;
+    const [, s1, s2] = v.rounds[0].groups[0].matches;
+    expect([s1.def.sideA, s1.def.sideB, s2.def.sideA, s2.def.sideB]).toEqual([['a1'], ['b2'], ['a2'], ['b1']]);
+  });
+});
+
 describe('match numbers', () => {
   it('numbers matches across the whole event: day, then group, then fourball/low/high', () => {
     const players = Array.from({ length: 8 }, (_, i) => ({ event_id: 'e', player_id: `p${i}`, team: (i % 2 ? 'B' : 'A') as Team, handicap: 10 }));
@@ -120,9 +134,9 @@ describe('match numbers', () => {
         eventPlayers: players,
         rounds: [{ ...baseRound, id: 'r2', round_no: 2, singles_enabled: true }, baseRound],
         groups: [
-          { id: 'g2', round_id: 'r1', group_no: 2, tee_time: null },
-          { id: 'g1', round_id: 'r1', group_no: 1, tee_time: null },
-          { id: 'g3', round_id: 'r2', group_no: 1, tee_time: null },
+          { id: 'g2', round_id: 'r1', group_no: 2, tee_time: null, singles_crossed: false },
+          { id: 'g1', round_id: 'r1', group_no: 1, tee_time: null, singles_crossed: false },
+          { id: 'g3', round_id: 'r2', group_no: 1, tee_time: null, singles_crossed: false },
         ],
         groupPlayers: [...gp('g1', ['p0', 'p1', 'p2', 'p3']), ...gp('g2', ['p4', 'p5', 'p6', 'p7']), ...gp('g3', ['p0', 'p1', 'p2', 'p3'])],
       }),

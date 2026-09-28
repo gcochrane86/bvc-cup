@@ -65,3 +65,25 @@ export function readGuideMemory(raw: string | null): GuideMemory {
 export function rememberGuideHole(mem: GuideMemory, slug: string, hole: number): GuideMemory {
   return { course: slug, holes: { ...mem.holes, [slug]: hole } };
 }
+
+/** Official "Dundonald Links Fly Over 1 to 18" video (Dundonald Links' YouTube channel), embedded per hole. */
+const DUNDONALD_VIDEO = 's3jUc3RyotE';
+/** [start, end] in seconds per hole; holes without timings show no clip yet. */
+const DUNDONALD_FLYOVERS: Record<number, [number, number]> = {
+  1: [3, 35],
+  2: [36, 67],
+};
+
+export interface Flyover {
+  embed: string;
+  start: number;
+  end: number;
+}
+
+/** The hole's flyover as an embeddable YouTube player that plays just that section. */
+export function guideFlyover(slug: string, hole: number): Flyover | null {
+  const t = slug === 'dundonald' ? DUNDONALD_FLYOVERS[hole] : undefined;
+  if (!t) return null;
+  const [start, end] = t;
+  return { embed: `https://www.youtube-nocookie.com/embed/${DUNDONALD_VIDEO}?start=${start}&end=${end}&rel=0&playsinline=1`, start, end };
+}

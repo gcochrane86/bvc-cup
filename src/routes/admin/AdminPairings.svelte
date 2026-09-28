@@ -6,7 +6,8 @@
 
   let { roundId }: { roundId: string } = $props();
 
-  type Draft = { groupNo: number; teeTime: string; a: string[]; b: string[] };
+  /** crossed: singles are A1 v B2 & A2 v B1. locked: a singles result is confirmed, so the line-up can't change. */
+  type Draft = { groupNo: number; teeTime: string; a: string[]; b: string[]; crossed: boolean; locked: boolean };
   let round = $state<RoundRow | null>(null);
   let members = $state<EventPlayerRow[]>([]);
   let drafts = $state<Draft[]>([]);
@@ -18,8 +19,8 @@
     const r = (await must(supabase.from('rounds').select('*').eq('id', id).single())) as RoundRow;
     const [eps, gs] = await Promise.all([
       must(supabase.from('event_players').select('*').eq('event_id', r.event_id)) as Promise<EventPlayerRow[]>,
-      must(supabase.from('groups').select('*, group_players(*)').eq('round_id', id).order('group_no')) as Promise<
-        (GroupRow & { group_players: GroupPlayerRow[] })[]
+      must(supabase.from('groups').select('*, group_players(*), match_results(match_type)').eq('round_id', id).order('group_no')) as Promise<
+        (GroupRow & { group_players: GroupPlayerRow[]; match_results: { match_type: string }[] })[]
       >,
     ]);
     round = r;
@@ -28,7 +29,14 @@
     drafts = Array.from({ length: count }, (_, i) => {
       const g = gs.find((x) => x.group_no === i + 1);
       const at = (slot: Slot) => g?.group_players.find((p) => p.slot === slot)?.player_id ?? '';
-      return { groupNo: i + 1, teeTime: g?.tee_time?.slice(0, 5) ?? '', a: [at('A1'), at('A2')], b: [at('B1'), at('B2')] };
+      return {
+        groupNo: i + 1,
+        teeTime: g?.tee_time?.slice(0, 5) ?? '',
+        a: [at('A1'), at('A2')],
+        b: [at('B1'), at('B2')],
+        crossed: g?.singles_crossed ?? false,
+        locked: (g?.match_results ?? []).some((m) => m.match_type !== 'better_ball'),
+      };
     });
   }
   $effect(() => {
@@ -55,6 +63,19 @@
     [pair[0], pair[1]] = [pair[1], pair[0]];
   }
 
+  const shortOf = (id: string) => db.players.find((p) => p.id === id)?.short_name ?? '?';
+  /** The two singles for a draft: [[A player, B player], [A player, B player]]. */
+  const singlesOf = (d: Draft, crossed = d.crossed) => [
+    [d.a[0], crossed ? d.b[1] : d.b[0]],
+    [d.a[1], crossed ? d.b[0] : d.b[1]],
+  ];
+  const lineup = (d: Draft, crossed = d.crossed) =>
+    singlesOf(d, crossed).map(([a, b], i) => `Singles ${i + 1}: ${a ? shortOf(a) : '?'} v ${b ? shortOf(b) : '?'}`).join(' · ');
+  function drawSingles() {
+    for (const d of drafts) if (!d.locked) d.crossed = Math.random() < 0.5;
+    msg = 'Singles drawn — press Save pairings to publish them.';
+  }
+
   async function saveAll() {
     msg = null;
     errors = pairingErrors(drafts.map((d) => ({ a: d.a.map((x) => x || null), b: d.b.map((x) => x || null) })));
@@ -74,6 +95,10 @@
             ],
           }),
         );
+        if (round?.singles_enabled && !d.locked) {
+          const crossed = round.singles_pairing === 'handicap' ? false : d.crossed;
+          await must(supabase.from('groups').update({ singles_crossed: crossed }).eq('round_id', roundId).eq('group_no', d.groupNo));
+        }
       }
       await loadAll();
       msg = 'Pairings saved';
@@ -86,7 +111,17 @@
 {#if round}
   <p><a href="#/admin/events/{round.event_id}">← Event</a></p>
   <h1>{round.name} pairings</h1>
-  <p class="muted small">Pick 2 players per team for each group. The lower handicap is put first automatically; ⇅ swaps them (on singles days, player 1 plays the other team's player 1).</p>
+  <p class="muted small">Pick 2 players per team for each group. The lower handicap is put first automatically; ⇅ swaps them.</p>
+  {#if round.singles_enabled}
+    <div class="card singles-mode">
+      <strong>Singles pairings:</strong>
+      {round.singles_pairing === 'handicap' ? 'by handicap (low v low, high v high)' : round.singles_pairing === 'random' ? 'random draw' : 'chosen by admin'}
+      <span class="muted small">— change this on the event page.</span>
+      {#if round.singles_pairing === 'random'}
+        <button class="secondary draw" onclick={drawSingles}>🎲 Draw singles at random</button>
+      {/if}
+    </div>
+  {/if}
   {#each drafts as d (d.groupNo)}
     <section class="card">
       <div class="row">
@@ -111,6 +146,21 @@
           <button class="secondary" aria-label="Swap team {side.team} order" onclick={() => swap(side.pair)}>⇅</button>
         </div>
       {/each}
+      {#if round.singles_enabled && d.a[0] && d.a[1] && d.b[0] && d.b[1]}
+        <div class="singles" data-testid="singles-{d.groupNo}">
+          {#if round.singles_pairing === 'selected' && !d.locked}
+            {#each [false, true] as crossed (crossed)}
+              <label class="choice">
+                <input type="radio" name="singles-{d.groupNo}" checked={d.crossed === crossed} onchange={() => (d.crossed = crossed)} />
+                {lineup(d, crossed)}
+              </label>
+            {/each}
+          {:else}
+            <p class="small">{lineup(d, round.singles_pairing === 'handicap' && !d.locked ? false : d.crossed)}</p>
+          {/if}
+          {#if d.locked}<p class="muted small">A singles result is confirmed, so this line-up is fixed.</p>{/if}
+        </div>
+      {/if}
     </section>
   {/each}
   {#each errors as err (err)}<p class="error">{err}</p>{/each}
@@ -126,4 +176,8 @@
   .row h3 { margin: 0; flex: 1; }
   .row input { width: 120px; }
   .wide { width: 100%; }
+  .singles { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .singles p { margin: 0; }
+  .choice { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; margin: 4px 0; }
+  .singles-mode .draw { display: block; width: 100%; margin-top: 8px; }
 </style>

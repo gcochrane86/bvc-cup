@@ -146,6 +146,22 @@ describe('confirmation and locking', () => {
     expect(await upsert('trip', s.players.a2, 10, 4)).toBe('ok');
   });
 
+  it('locks the actual singles opponents when the singles are crossed', async () => {
+    await db.query(`update public.groups set singles_crossed = true where id = $1`, [s.groupId]);
+    await confirm('trip', 'low_singles', 12); // A1 v B2
+    expect(await upsert('trip', s.players.b2, 10, 4)).toBe('locked');
+    expect(await upsert('trip', s.players.a1, 10, 4)).toBe('locked');
+    expect(await upsert('trip', s.players.b1, 10, 4)).toBe('ok');
+  });
+
+  it('defaults rounds to handicap singles pairings and groups to uncrossed', async () => {
+    const r = await db.query<{ singles_pairing: string; singles_crossed: boolean }>(
+      `select r.singles_pairing, g.singles_crossed from public.rounds r join public.groups g on g.round_id = r.id where g.id = $1`, [s.groupId],
+    );
+    expect(r.rows[0]).toEqual({ singles_pairing: 'handicap', singles_crossed: false });
+    await expect(db.query(`update public.rounds set singles_pairing = 'coin'`)).rejects.toThrow(/check constraint/);
+  });
+
   it('blocks direct writes to locked scores too', async () => {
     await upsert('trip', s.players.a1, 5, 4);
     await confirm('trip', 'better_ball', 15);

@@ -51,4 +51,13 @@ describe('buildMatches', () => {
   it('returns no matches for an incomplete group', () => {
     expect(buildMatches('g1', players.slice(0, 3), settings)).toEqual([]);
   });
+
+  it('can cross the singles: A1 v B2 and A2 v B1, with strokes for those pairs', () => {
+    const ms = buildMatches('g1', players, { ...settings, singlesEnabled: true }, true);
+    expect(ms[1]).toMatchObject({ id: 'g1:low_singles', sideA: ['a1'], sideB: ['b2'] });
+    expect(ms[1].strokes).toEqual({ a1: 0, b2: 9 }); // 14-4=10 -> 9
+    expect(ms[2]).toMatchObject({ id: 'g1:high_singles', sideA: ['a2'], sideB: ['b1'] });
+    expect(ms[2].strokes).toEqual({ a2: 8, b1: 0 }); // 18-9=9 -> 8.1 -> 8
+    expect(ms[0].strokes).toEqual({ a1: 0, a2: 13, b1: 5, b2: 9 }); // fourball unchanged
+  });
 });

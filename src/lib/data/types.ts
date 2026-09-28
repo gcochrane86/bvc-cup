@@ -14,8 +14,14 @@ export interface RoundRow {
   id: string; event_id: string; course_id: string; round_no: number; date: string | null; name: string;
   allowance_pct: number; better_ball_points: number;
   singles_enabled: boolean; singles_points: number; singles_allowance_pct: number;
+  /** How singles opponents are decided: by handicap slot, random draw, or chosen by the admin. */
+  singles_pairing: 'handicap' | 'random' | 'selected';
 }
-export interface GroupRow { id: string; round_id: string; group_no: number; tee_time: string | null }
+export interface GroupRow {
+  id: string; round_id: string; group_no: number; tee_time: string | null;
+  /** Singles line-up: false = A1 v B1 & A2 v B2; true = A1 v B2 & A2 v B1. */
+  singles_crossed: boolean;
+}
 export interface GroupPlayerRow {
   group_id: string; slot: Slot; player_id: string;
   /** Frozen when a match in the group is confirmed; null = use the current event handicap. */
