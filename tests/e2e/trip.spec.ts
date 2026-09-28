@@ -191,6 +191,15 @@ test('the admin can reset all scores back to the start', async ({ browser }) => 
   await expect(trip.getByTestId('conf-a')).toHaveText('0');
 });
 
+test('on a tall screen (Home Screen app) the score bar still appears on a day with few matches', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 }); // no Safari bars: more of the page fits
+  await login(page);
+  const bar = page.getByTestId('score-bar');
+  await page.getByRole('tab', { name: 'Day 1' }).click();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(bar).toHaveAttribute('aria-hidden', 'false');
+});
+
 test('the compact score bar slides in once the full tracker scrolls away', async ({ page }) => {
   await login(page);
   const bar = page.getByTestId('score-bar');

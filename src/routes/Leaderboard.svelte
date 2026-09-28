@@ -38,28 +38,33 @@
     <TeamTracker tracker={view.tracker} event={view.event} breakdown={view.rounds.map((r) => ({ name: r.round.name, points: r.pointsAvailable }))} />
   </div>
   <ScoreBar tracker={view.tracker} event={view.event} visible={compact} />
-  <div class="tabs" role="tablist">
-    {#each view.rounds as r (r.round.id)}
-      <button role="tab" aria-selected={r.round.id === roundId} class:active={r.round.id === roundId} onclick={() => (chosen = r.round.id)}>
-        {r.round.name}
-      </button>
-    {/each}
-  </div>
-  {#if rv}
-    {@const course = db.courses.find((c) => c.id === rv.round.course_id)}
-    {#if course}<h2 class="course">{course.name}</h2>{/if}
-    <p class="muted small">{rv.completed} of {rv.totalMatches} matches completed</p>
-    {#each rv.groups as g (g.group.id)}
-      {#each g.matches as mv (mv.def.id)}
-        <MatchCard {mv} teeTime={g.group.tee_time} />
+  <!-- At least a screen tall, so the tracker can always scroll away and the bar appear — even on a
+       day with few matches on a tall screen (the Home Screen app has no Safari bars). -->
+  <div class="below">
+    <div class="tabs" role="tablist">
+      {#each view.rounds as r (r.round.id)}
+        <button role="tab" aria-selected={r.round.id === roundId} class:active={r.round.id === roundId} onclick={() => (chosen = r.round.id)}>
+          {r.round.name}
+        </button>
       {/each}
-    {:else}
-      <p class="muted">Pairings haven't been set for this round yet.</p>
-    {/each}
-  {/if}
+    </div>
+    {#if rv}
+      {@const course = db.courses.find((c) => c.id === rv.round.course_id)}
+      {#if course}<h2 class="course">{course.name}</h2>{/if}
+      <p class="muted small">{rv.completed} of {rv.totalMatches} matches completed</p>
+      {#each rv.groups as g (g.group.id)}
+        {#each g.matches as mv (mv.def.id)}
+          <MatchCard {mv} teeTime={g.group.tee_time} />
+        {/each}
+      {:else}
+        <p class="muted">Pairings haven't been set for this round yet.</p>
+      {/each}
+    {/if}
+  </div>
 {/if}
 
 <style>
+  .below { min-height: 100dvh; }
   .tabs { display: flex; gap: 8px; overflow-x: auto; margin: 4px 0 8px; }
   .tabs button { background: var(--surface); color: var(--text); border: 1px solid var(--line); flex: none; }
   .course { font-size: 1.05rem; margin: 4px 0 2px; }
