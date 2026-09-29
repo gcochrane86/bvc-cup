@@ -2,6 +2,7 @@
   import { db, loadAll } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow } from '../../lib/data/types';
+  import { autoFourball } from '../../lib/scoring';
   import ResetScores from '../../components/ResetScores.svelte';
   import ConfirmedResults from '../../components/ConfirmedResults.svelte';
 
@@ -34,13 +35,14 @@
     void load();
   });
 
+  /** fn may return a fuller message to show instead of ok. */
   async function act(fn: () => Promise<unknown>, ok: string) {
     msg = null;
     try {
-      await fn();
+      const said = await fn();
       await load();
       await loadAll();
-      msg = ok;
+      msg = typeof said === 'string' ? said : ok;
     } catch (e) {
       msg = `Error: ${(e as Error).message}`;
     }
@@ -79,24 +81,53 @@
       const removed = entries.filter(([, m]) => !m.team).map(([id]) => id);
       if (rows.length) await must(supabase.from('event_players').upsert(rows));
       if (removed.length) await must(supabase.from('event_players').delete().eq('event_id', eventId).in('player_id', removed));
+      const paired = await pairTwoVTwo(rounds);
+      return paired.length ? `Teams saved · pairings set for ${paired.join(', ')}` : 'Teams saved';
     }, 'Teams saved');
+
+  /**
+   * Two players a side means only one possible fourball, so pair it on every day (the pairing then follows any
+   * change of teams). Days whose match is confirmed are left alone. Returns the names of the days paired.
+   */
+  async function pairTwoVTwo(days: RoundRow[]): Promise<string[]> {
+    const slots = autoFourball(
+      Object.entries(members)
+        .filter(([, m]) => m.team)
+        .map(([playerId, m]) => ({ playerId, team: m.team as 'A' | 'B', handicap: Number(m.handicap) })),
+    );
+    if (!slots) return [];
+    const paired: string[] = [];
+    for (const r of days) {
+      const [g] = (await must(
+        supabase.from('groups').select('tee_time, match_results(match_type)').eq('round_id', r.id).eq('group_no', 1),
+      )) as { tee_time: string | null; match_results: unknown[] }[];
+      if (g?.match_results.length) continue;
+      await must(supabase.rpc('save_group', { p_round_id: r.id, p_group_no: 1, p_tee_time: g?.tee_time ?? null, p_slots: slots }));
+      paired.push(r.name);
+    }
+    return paired;
+  }
 
   const addRound = (e: SubmitEvent) => {
     e.preventDefault();
     const next = Math.max(0, ...rounds.map((r) => r.round_no)) + 1;
-    void act(
-      () =>
-        must(
-          supabase.from('rounds').insert({
+    void act(async () => {
+      const added = (await must(
+        supabase
+          .from('rounds')
+          .insert({
             event_id: eventId,
             round_no: next,
             name: newRound.name.trim() || `Day ${next}`,
             course_id: newRound.course_id,
             date: newRound.date || null,
-          }),
-        ),
-      'Round added',
-    ).then(() => (newRound = { name: '', course_id: '', date: '' }));
+          })
+          .select()
+          .single(),
+      )) as RoundRow;
+      const paired = await pairTwoVTwo([added]);
+      return paired.length ? `Round added · pairings set for ${added.name}` : 'Round added';
+    }, 'Round added').then(() => (newRound = { name: '', course_id: '', date: '' }));
   };
 
   const saveRound = (r: RoundRow) =>
@@ -151,7 +182,10 @@
   <section class="card">
     <h2>Teams</h2>
     <p class="muted small">Handicap indexes are set on the <a href="#/admin/players">Players</a> page.</p>
-    <p class="muted small">{event.team_a_name}: {countA} · {event.team_b_name}: {countB} (6 each for three fourballs)</p>
+    <p class="muted small">
+      {event.team_a_name}: {countA} · {event.team_b_name}: {countB}
+      {countA === 2 && countB === 2 ? '(one fourball: paired automatically)' : '(6 each for three fourballs)'}
+    </p>
     {#each db.players as p (p.id)}
       {#if members[p.id]}
         <div class="member">

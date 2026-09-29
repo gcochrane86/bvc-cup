@@ -6,6 +6,16 @@ export function orderSlots(team: Team, players: { playerId: string; handicap: nu
     .map((p, i) => ({ slot: `${team}${i + 1}` as SlotPlayer['slot'], playerId: p.playerId, handicap: p.handicap }));
 }
 
+/**
+ * A two-v-two event has only one possible fourball, so it can be paired automatically: each team's pair,
+ * lower handicap in slot 1 (as the Pairings page orders them). Null for any other line-up.
+ */
+export function autoFourball(members: { playerId: string; team: Team; handicap: number }[]): { slot: SlotPlayer['slot']; player_id: string }[] | null {
+  const team = (t: Team) => members.filter((m) => m.team === t);
+  if (team('A').length !== 2 || team('B').length !== 2 || members.length !== 4) return null;
+  return (['A', 'B'] as Team[]).flatMap((t) => orderSlots(t, team(t)).map((s) => ({ slot: s.slot, player_id: s.playerId })));
+}
+
 export interface PairingDraft {
   a: (string | null)[];
   b: (string | null)[];

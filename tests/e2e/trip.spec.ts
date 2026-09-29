@@ -593,3 +593,37 @@ test("the leaderboard shows each pair's better-ball net score off full handicaps
   // Not on a match that hasn't started.
   await expect(page.locator('[data-match-id$=":better_ball"]').filter({ hasText: /\bMatch 2\b/ }).getByTestId('net-a')).toHaveCount(0);
 });
+
+test('a two-v-two event is paired automatically when the teams are saved', async ({ browser }) => {
+  const db = serviceDb();
+  const { data: seedRound } = await db.from('rounds').select('course_id').limit(1).single();
+  await db.from('events').update({ is_active: false }).eq('is_active', true);
+  const { data: ev } = await db.from('events').insert({ name: 'Two v Two', is_active: true }).select('id').single();
+  await db.from('rounds').insert({ event_id: ev!.id, round_no: 1, name: 'Day 1', course_id: seedRound!.course_id });
+
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto(`/#/admin/events/${ev!.id}`);
+  const team = (name: string, t: string) => admin.getByLabel(`${name} team`).selectOption(t);
+  await team('Alex Adams', 'A');
+  await team('Ben Brown', 'A');
+  await team('Chris Clark', 'B');
+  await team('Dan Davies', 'B');
+  await admin.getByRole('button', { name: 'Save teams' }).click();
+  await expect(admin.getByText('Teams saved · pairings set for Day 1')).toBeVisible();
+  await admin.goto('/#/');
+  const card = admin.getByTestId('match-card');
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText('Adams');
+  await expect(card).toContainText('Davies');
+
+  // Swap a player: the pairing follows.
+  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await team('Dan Davies', '');
+  await team('Ed Evans', 'B');
+  await admin.getByRole('button', { name: 'Save teams' }).click();
+  await expect(admin.getByText('Teams saved · pairings set for Day 1')).toBeVisible();
+  await admin.goto('/#/');
+  await expect(card).toContainText('Evans');
+  await expect(card).not.toContainText('Davies');
+});
