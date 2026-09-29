@@ -20,9 +20,26 @@ function sideBest(ids: string[], hole: HoleInfo, match: MatchDef, idx: ScoreInde
   return best;
 }
 
+/** Best Stableford points on the hole for a side: 2 for net par, +1 per shot better; a pick-up scores 0. */
+function sidePoints(ids: string[], hole: HoleInfo, match: MatchDef, idx: ScoreIndex): number {
+  let best = 0;
+  for (const id of ids) {
+    const e = idx.get(scoreKey(id, hole.hole));
+    if (!e || e.pickedUp || e.gross === null) continue;
+    const net = e.gross - strokesOnHole(match.strokes[id] ?? 0, hole.strokeIndex);
+    best = Math.max(best, 2 + hole.par - net);
+  }
+  return best;
+}
+
 export function holeOutcome(match: MatchDef, hole: HoleInfo, idx: ScoreIndex): Outcome | null {
   const everyone = [...match.sideA, ...match.sideB];
   if (!everyone.every((id) => idx.has(scoreKey(id, hole.hole)))) return null;
+  if (match.stableford) {
+    const pa = sidePoints(match.sideA, hole, match, idx);
+    const pb = sidePoints(match.sideB, hole, match, idx);
+    return pa > pb ? 'A' : pb > pa ? 'B' : 'halved';
+  }
   const a = sideBest(match.sideA, hole, match, idx);
   const b = sideBest(match.sideB, hole, match, idx);
   if (a === null && b === null) return 'halved';

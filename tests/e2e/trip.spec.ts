@@ -494,3 +494,26 @@ test('tapping a hole on any match opens its score entry, without changing the ma
   await page.getByRole('link', { name: 'Scores' }).click();
   await expect(page).toHaveURL(myMatch);
 });
+
+test('a day can be played as fourball Stableford: full handicaps, best points win the hole', async ({ browser }) => {
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  const { data: ev } = await serviceDb().from('events').select('id').eq('is_active', true).single();
+  await admin.goto(`/#/admin/events/${ev!.id}`);
+  const game = admin.getByLabel('Fourball game').first();
+  await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(3);
+  await game.selectOption('stableford');
+  await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1 (Days 2 and 3 still match play)
+  await admin.getByRole('button', { name: 'Save round' }).first().click();
+  await expect(admin.getByText('Day 1 saved')).toBeVisible();
+
+  const me = await newPhone(browser);
+  await login(me);
+  await openGroup1(me);
+  // Par 4: A 7s and B 8s are 0 Stableford points either way — a halved hole (match play would give it to A).
+  await enterHole(me, 1, 7, 8);
+  await me.getByRole('button', { name: 'Hole 1', exact: true }).click();
+  await expect(me.getByTestId('row-A1')).toContainText('0 pts');
+  await me.goto('/#/');
+  await expect(group1Card(me).getByTestId('status')).toHaveText('All Square');
+});

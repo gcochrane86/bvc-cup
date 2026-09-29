@@ -232,6 +232,13 @@ describe('confirmation and locking', () => {
     await expect(db.query(`update public.rounds set singles_pairing = 'coin'`)).rejects.toThrow(/check constraint/);
   });
 
+  it('defaults rounds to match-play fourballs and only accepts match play or Stableford', async () => {
+    const r = await db.query<{ fourball_format: string }>(`select fourball_format from public.rounds where id = $1`, [s.roundId]);
+    expect(r.rows[0]).toEqual({ fourball_format: 'matchplay' });
+    await db.query(`update public.rounds set fourball_format = 'stableford' where id = $1`, [s.roundId]);
+    await expect(db.query(`update public.rounds set fourball_format = 'skins'`)).rejects.toThrow(/check constraint/);
+  });
+
   it('blocks direct writes to locked scores too', async () => {
     await upsert('trip', s.players.a1, 5, 4);
     await confirm('trip', 'better_ball', 15);

@@ -12,6 +12,8 @@ export function buildMatches(groupId: string, players: SlotPlayer[], s: RoundSet
 
   const four = [a1, a2, b1, b2];
   const lowest = Math.min(...four.map((p) => p.handicap));
+  // Stableford: everyone plays off their full course handicap. Match play: off the lowest, at the allowance.
+  const stableford = s.fourballFormat === 'stableford';
   const matches: MatchDef[] = [
     {
       id: `${groupId}:better_ball`,
@@ -21,8 +23,9 @@ export function buildMatches(groupId: string, players: SlotPlayer[], s: RoundSet
       sideB: [b1.playerId, b2.playerId],
       points: s.betterBallPoints,
       strokes: Object.fromEntries(
-        four.map((p) => [p.playerId, playingStrokes(p.handicap - lowest, s.allowancePct)]),
+        four.map((p) => [p.playerId, stableford ? p.handicap : playingStrokes(p.handicap - lowest, s.allowancePct)]),
       ),
+      ...(stableford ? { stableford: true } : {}),
     },
   ];
   if (s.singlesEnabled) {

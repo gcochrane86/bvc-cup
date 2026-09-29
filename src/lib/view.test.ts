@@ -6,7 +6,7 @@ import type { Slot, Team } from './scoring';
 const baseRound: RoundRow = {
   id: 'r1', event_id: 'e', course_id: 'c', round_no: 1, date: '2026-10-01', name: 'Day 1',
   allowance_pct: 90, better_ball_points: 1, singles_enabled: false, singles_points: 0.5, singles_allowance_pct: 90,
-  singles_pairing: 'handicap',
+  singles_pairing: 'handicap', fourball_format: 'matchplay',
 };
 
 function snapshot(over: Partial<Snapshot> = {}): Snapshot {

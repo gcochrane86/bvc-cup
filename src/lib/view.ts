@@ -47,6 +47,7 @@ export function settingsOf(r: RoundRow): RoundSettings {
     singlesEnabled: r.singles_enabled,
     singlesPoints: Number(r.singles_points),
     singlesAllowancePct: Number(r.singles_allowance_pct),
+    fourballFormat: r.fourball_format ?? 'matchplay',
   };
 }
 

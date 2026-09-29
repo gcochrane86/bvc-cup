@@ -46,6 +46,23 @@ describe('holeOutcome', () => {
   it('halves the hole when nobody has a score', () => {
     expect(holeOutcome(bb, h1, idx([['a1', 1, 'P'], ['a2', 1, 'P'], ['b1', 1, 'P'], ['b2', 1, 'P']]))).toBe('halved');
   });
+  it('in Stableford, the higher best-ball points win the hole', () => {
+    const sf = { ...bb, stableford: true, strokes: { a1: 0, a2: 18, b1: 0, b2: 0 } }; // a2 gets a shot on every hole
+    // a2: 5 − 1 = net 4 (2 pts) beats b1's gross 5 (1 pt).
+    expect(holeOutcome(sf, h1, idx([['a1', 1, 7], ['a2', 1, 5], ['b1', 1, 5], ['b2', 1, 6]]))).toBe('A');
+  });
+  it('in Stableford, both sides on 0 points halve the hole even if one net score is lower', () => {
+    const sf = { ...bb, stableford: true };
+    // Net 6 (A) v net 7 (B) on a par 4: 0 points each — halved (match play would give it to A).
+    const cells: Cell[] = [['a1', 1, 6], ['a2', 1, 8], ['b1', 1, 7], ['b2', 1, 9]];
+    expect(holeOutcome(sf, h1, idx(cells))).toBe('halved');
+    expect(holeOutcome(bb, h1, idx(cells))).toBe('A');
+  });
+  it('in Stableford, a pick-up scores 0 points', () => {
+    const sf = { ...bb, stableford: true };
+    expect(holeOutcome(sf, h1, idx([['a1', 1, 'P'], ['a2', 1, 'P'], ['b1', 1, 6], ['b2', 1, 'P']]))).toBe('halved'); // 0 v 0
+    expect(holeOutcome(sf, h1, idx([['a1', 1, 'P'], ['a2', 1, 'P'], ['b1', 1, 5], ['b2', 1, 'P']]))).toBe('B'); // 0 v 1
+  });
   it('returns null until every player has an entry', () => {
     expect(holeOutcome(bb, h1, idx([['a1', 1, 4], ['a2', 1, 4], ['b1', 1, 5]]))).toBeNull();
   });

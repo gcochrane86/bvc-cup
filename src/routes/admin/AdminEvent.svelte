@@ -114,6 +114,7 @@
               singles_points: Number(r.singles_points),
               singles_allowance_pct: Number(r.singles_allowance_pct),
               singles_pairing: r.singles_pairing,
+              fourball_format: r.fourball_format,
             })
             .eq('id', r.id),
         ).then(() =>
@@ -180,8 +181,18 @@
             {#each db.courses as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
           </select>
         </div>
+        <div class="field">
+          <label for="rf-{r.id}">Fourball game</label>
+          <select id="rf-{r.id}" bind:value={r.fourball_format}>
+            <option value="matchplay">Match play (off the lowest handicap)</option>
+            <option value="stableford">Stableford (full handicaps, best points win the hole)</option>
+          </select>
+        </div>
         <div class="row">
-          <div class="field"><label for="ra-{r.id}">Allowance %</label><input id="ra-{r.id}" type="number" min="0" max="100" bind:value={r.allowance_pct} /></div>
+          <!-- Stableford plays off full course handicaps, so the allowance doesn't apply to the fourball. -->
+          {#if r.fourball_format !== 'stableford'}
+            <div class="field"><label for="ra-{r.id}">Allowance %</label><input id="ra-{r.id}" type="number" min="0" max="100" bind:value={r.allowance_pct} /></div>
+          {/if}
           <div class="field"><label for="rp-{r.id}">Fourball pts</label><input id="rp-{r.id}" type="number" step="0.5" bind:value={r.better_ball_points} /></div>
         </div>
         <label class="row"><input type="checkbox" bind:checked={r.singles_enabled} /> Also play 2 singles in each fourball</label>

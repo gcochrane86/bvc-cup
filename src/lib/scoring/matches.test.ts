@@ -32,6 +32,20 @@ describe('buildMatches', () => {
     expect(ms[0].strokes).toEqual({ a1: 0, a2: 13, b1: 5, b2: 9 });
   });
 
+  it('in fourball Stableford, everyone gets their full course handicap and the match scores points', () => {
+    const ms = buildMatches('g1', players, { ...settings, fourballFormat: 'stableford', singlesEnabled: true });
+    expect(ms[0].strokes).toEqual({ a1: 4, a2: 18, b1: 9, b2: 14 }); // not off the low, no allowance
+    expect(ms[0].stableford).toBe(true);
+    // Singles are unchanged: off the low, singles allowance, match play.
+    expect(ms[1].strokes).toEqual({ a1: 0, b1: 5 });
+    expect(ms[1].stableford).toBeUndefined();
+  });
+
+  it('match play (the default) is unchanged', () => {
+    expect(buildMatches('g1', players, { ...settings, fourballFormat: 'matchplay' })).toEqual(buildMatches('g1', players, settings));
+    expect(buildMatches('g1', players, settings)[0].stableford).toBeUndefined();
+  });
+
   it('adds low and high singles when enabled', () => {
     const ms = buildMatches('g1', players, { ...settings, singlesEnabled: true });
     expect(ms.map((m) => m.type)).toEqual(['better_ball', 'low_singles', 'high_singles']);

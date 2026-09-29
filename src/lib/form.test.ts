@@ -7,7 +7,7 @@ import type { Slot, Team } from './scoring';
 const round = (id: string, round_no: number): RoundRow => ({
   id, event_id: 'e', course_id: 'c', round_no, date: null, name: `Day ${round_no}`,
   allowance_pct: 90, better_ball_points: 1, singles_enabled: false, singles_points: 0.5, singles_allowance_pct: 90,
-  singles_pairing: 'handicap',
+  singles_pairing: 'handicap', fourball_format: 'matchplay',
 });
 const score = (round_id: string, player_id: string, hole: number, gross: number | null): ScoreRow => ({
   round_id, player_id, hole, gross, picked_up: gross === null, client_updated_at: '2026-10-01T09:00:00Z',

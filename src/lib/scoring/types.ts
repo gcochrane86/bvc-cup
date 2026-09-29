@@ -15,6 +15,8 @@ export interface RoundSettings {
   singlesEnabled: boolean;
   singlesPoints: number;
   singlesAllowancePct: number;
+  /** The fourball game: match play off the lowest handicap (default), or Stableford off full handicaps. */
+  fourballFormat?: 'matchplay' | 'stableford';
 }
 
 export interface SlotPlayer {
@@ -40,6 +42,8 @@ export interface MatchDef {
   points: number;
   /** Total strokes received in this match, per player id. */
   strokes: Record<string, number>;
+  /** Fourball Stableford: each side's best Stableford points win the hole (pick-up = 0). */
+  stableford?: boolean;
 }
 
 export interface MatchState {
