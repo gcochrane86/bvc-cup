@@ -2,6 +2,8 @@
 // the courses, event, day and group by name/number before creating them. The event is left inactive and
 // its group empty — pick the players, teams and pairing in Admin.
 // Usage: npm run add-ballyliffen -- --env .env.local
+import { readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
 import { createClient } from '@supabase/supabase-js';
 
 const at = process.argv.indexOf('--env');
@@ -10,8 +12,14 @@ if (!envFile) {
   console.error('Usage: npm run add-ballyliffen -- --env <.env file>');
   process.exit(1);
 }
-process.loadEnvFile(envFile);
-const db = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
+// Read the project from this file only: variables already set in the shell must never redirect the
+// script to another project (e.g. dev values exported while running it with --env .env.prod).
+const env = parseEnv(readFileSync(envFile, 'utf8'));
+const url = env.VITE_SUPABASE_URL;
+const key = env.SUPABASE_SECRET_KEY;
+if (!url || !key) throw new Error(`${envFile} must set VITE_SUPABASE_URL and SUPABASE_SECRET_KEY`);
+console.log(`Writing to ${url} (from ${envFile})`);
+const db = createClient(url, key, { auth: { persistSession: false } });
 
 async function run<T>(q: PromiseLike<{ data: T; error: { message: string } | null }>): Promise<NonNullable<T>> {
   const { data, error } = await q;
@@ -32,8 +40,11 @@ const courseIds: Record<string, string> = {};
 for (const t of TEES) {
   const found = await run(db.from('courses').select('id').eq('name', t.name));
   const id: string = found[0]?.id ?? (await run(db.from('courses').insert(t).select('id').single())).id;
+  // Replace the holes rather than upsert (as Admin's save does): stroke indexes are unique per course,
+  // so updating them in place fails if a course of this name already has different ones.
+  await run(db.from('course_holes').delete().eq('course_id', id));
+  await run(db.from('course_holes').insert(PARS.map((par, i) => ({ course_id: id, hole: i + 1, par, stroke_index: SI[i] }))));
   await run(db.from('courses').update({ course_rating: t.course_rating, slope_rating: t.slope_rating }).eq('id', id));
-  await run(db.from('course_holes').upsert(PARS.map((par, i) => ({ course_id: id, hole: i + 1, par, stroke_index: SI[i] }))));
   courseIds[t.name] = id;
 }
 
