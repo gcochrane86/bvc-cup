@@ -63,6 +63,29 @@ describe('holeOutcome', () => {
     expect(holeOutcome(sf, h1, idx([['a1', 1, 'P'], ['a2', 1, 'P'], ['b1', 1, 6], ['b2', 1, 'P']]))).toBe('halved'); // 0 v 0
     expect(holeOutcome(sf, h1, idx([['a1', 1, 'P'], ['a2', 1, 'P'], ['b1', 1, 5], ['b2', 1, 'P']]))).toBe('B'); // 0 v 1
   });
+  // b1 plays a tee where hole 1 is SI 18 and par 5 (the round's hole 1 is SI 1, par 4).
+  const b1Tee = { b1: holes.map((h) => (h.hole === 1 ? { hole: 1, par: 5, strokeIndex: 18 } : h)) };
+  it("gives shots by the player's own tee stroke index", () => {
+    // b1 has 1 shot: the round's hole 1 is SI 1 (a shot), but on b1's tee it is SI 18 (no shot).
+    const siOnly = { b1: holes.map((h) => (h.hole === 1 ? { ...h, strokeIndex: 18 } : h)) };
+    const cells: Cell[] = [['a1', 1, 4], ['a2', 1, 6], ['b1', 1, 5], ['b2', 1, 6]];
+    expect(holeOutcome({ ...bb, strokes: { ...bb.strokes, b1: 1 } }, h1, idx(cells))).toBe('halved'); // round SI: net 4
+    expect(holeOutcome({ ...bb, strokes: { ...bb.strokes, b1: 1 }, teeHoles: siOnly }, h1, idx(cells))).toBe('A'); // own SI: 5
+  });
+  it("compares net scores against each player's own tee par", () => {
+    const m = { ...bb, teeHoles: b1Tee };
+    // b1 5 on a par 5 (E) beats a1 5 on a par 4 (+1).
+    expect(holeOutcome(m, h1, idx([['a1', 1, 5], ['a2', 1, 6], ['b1', 1, 5], ['b2', 1, 7]]))).toBe('B');
+  });
+  it("in Stableford, counts points against each player's own tee par", () => {
+    const m = { ...bb, stableford: true, teeHoles: b1Tee };
+    // b1 5 on a par 5 = 2 pts; a1 5 on a par 4 = 1 pt.
+    expect(holeOutcome(m, h1, idx([['a1', 1, 5], ['a2', 1, 7], ['b1', 1, 5], ['b2', 1, 7]]))).toBe('B');
+  });
+  it("falls back to the round's hole when a player's tee is missing that hole", () => {
+    const m = { ...bb, teeHoles: { b1: [] } };
+    expect(holeOutcome(m, h1, idx([['a1', 1, 4], ['a2', 1, 6], ['b1', 1, 5], ['b2', 1, 5]]))).toBe('A');
+  });
   it('returns null until every player has an entry', () => {
     expect(holeOutcome(bb, h1, idx([['a1', 1, 4], ['a2', 1, 4], ['b1', 1, 5]]))).toBeNull();
   });

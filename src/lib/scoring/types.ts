@@ -44,6 +44,8 @@ export interface MatchDef {
   strokes: Record<string, number>;
   /** Fourball Stableford: each side's best Stableford points win the hole (pick-up = 0). */
   stableford?: boolean;
+  /** Players on a tee other than the day's main tee: that tee's holes (own par and stroke index). */
+  teeHoles?: Record<string, HoleInfo[]>;
 }
 
 export interface MatchState {

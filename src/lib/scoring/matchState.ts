@@ -9,13 +9,20 @@ export function indexScores(scores: ScoreEntry[]): ScoreIndex {
   return new Map(scores.map((s) => [scoreKey(s.playerId, s.hole), s]));
 }
 
+/** The hole as this player plays it: their own tee's par and stroke index, else the round's. */
+export function playerHole(match: Pick<MatchDef, 'teeHoles'>, playerId: string, hole: HoleInfo): HoleInfo {
+  return match.teeHoles?.[playerId]?.find((h) => h.hole === hole.hole) ?? hole;
+}
+
+/** Best net score to par per side (each player's own tee par and stroke index) — lower wins. */
 function sideBest(ids: string[], hole: HoleInfo, match: MatchDef, idx: ScoreIndex): number | null {
   let best: number | null = null;
   for (const id of ids) {
     const e = idx.get(scoreKey(id, hole.hole));
     if (!e || e.pickedUp || e.gross === null) continue;
-    const net = e.gross - strokesOnHole(match.strokes[id] ?? 0, hole.strokeIndex);
-    if (best === null || net < best) best = net;
+    const h = playerHole(match, id, hole);
+    const toPar = e.gross - strokesOnHole(match.strokes[id] ?? 0, h.strokeIndex) - h.par;
+    if (best === null || toPar < best) best = toPar;
   }
   return best;
 }
@@ -26,8 +33,9 @@ function sidePoints(ids: string[], hole: HoleInfo, match: MatchDef, idx: ScoreIn
   for (const id of ids) {
     const e = idx.get(scoreKey(id, hole.hole));
     if (!e || e.pickedUp || e.gross === null) continue;
-    const net = e.gross - strokesOnHole(match.strokes[id] ?? 0, hole.strokeIndex);
-    best = Math.max(best, 2 + hole.par - net);
+    const h = playerHole(match, id, hole);
+    const net = e.gross - strokesOnHole(match.strokes[id] ?? 0, h.strokeIndex);
+    best = Math.max(best, 2 + h.par - net);
   }
   return best;
 }
