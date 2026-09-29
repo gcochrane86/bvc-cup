@@ -15,8 +15,8 @@ export interface RoundSettings {
   singlesEnabled: boolean;
   singlesPoints: number;
   singlesAllowancePct: number;
-  /** The fourball game: match play off the lowest handicap (default), or Stableford off full handicaps. */
-  fourballFormat?: 'matchplay' | 'stableford';
+  /** The fourball game: match play off the lowest handicap (default), Stableford off full handicaps, or flat (no shots). */
+  fourballFormat?: 'matchplay' | 'stableford' | 'flat';
 }
 
 export interface SlotPlayer {

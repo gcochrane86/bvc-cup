@@ -728,3 +728,30 @@ test('score entry hole buttons show who won each hole and the running score, lik
   await expect(page.getByRole('button', { name: 'Hole 2', exact: true })).toContainText('AS');
   await expect(page.getByRole('button', { name: 'Hole 3', exact: true })).toContainText('–'); // not played
 });
+
+test('a day can be played as a flat fourball: no shots, lower best gross wins the hole', async ({ browser }) => {
+  // Make Match 1's players different handicaps so shots would matter in normal match play.
+  const db = serviceDb();
+  const { data: ev } = await db.from('events').select('id').eq('is_active', true).single();
+  const { data: adams } = await db.from('players').select('id').eq('name', 'Alex Adams').single();
+  await db.from('event_players').update({ handicap: 30 }).eq('event_id', ev!.id).eq('player_id', adams!.id);
+
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await admin.getByLabel('Fourball game').first().selectOption('flat');
+  await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1
+  await admin.getByRole('button', { name: 'Save round' }).first().click();
+  await expect(admin.getByText('Day 1 saved')).toBeVisible();
+
+  const me = await newPhone(browser);
+  await login(me);
+  await openGroup1(me);
+  await expect(me.getByTestId('row-A1')).not.toContainText('shot'); // no shot chips on a flat day
+  // Adams (off 30) scores 5, everyone else 5 except B's 4: B's lower gross wins — no shots for Adams.
+  await enterHole(me, 1, 5, 4);
+  await me.goto('/#/');
+  await expect(group1Card(me).getByTestId('status')).toHaveText('1 UP');
+  await expect(group1Card(me)).toHaveAttribute('data-match-id', /better_ball/);
+  await expect(group1Card(me).getByTestId('status')).toHaveCSS('color', 'rgb(200, 16, 46)'); // team B's colour
+});

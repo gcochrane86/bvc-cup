@@ -23,8 +23,8 @@ export interface RoundRow {
   singles_enabled: boolean; singles_points: number; singles_allowance_pct: number;
   /** How singles opponents are decided: by handicap slot, random draw, or chosen by the admin. */
   singles_pairing: 'handicap' | 'random' | 'selected';
-  /** The fourball game: match play off the lowest handicap, or Stableford off full handicaps. */
-  fourball_format: 'matchplay' | 'stableford';
+  /** The fourball game: match play off the lowest handicap, Stableford off full handicaps, or flat (no shots). */
+  fourball_format: 'matchplay' | 'stableford' | 'flat';
 }
 export interface GroupRow {
   id: string; round_id: string; group_no: number; tee_time: string | null;

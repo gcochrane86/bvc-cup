@@ -279,11 +279,12 @@
           <select id="rf-{r.id}" bind:value={r.fourball_format}>
             <option value="matchplay">Match play (off the low)</option>
             <option value="stableford">Stableford (full handicaps)</option>
+            <option value="flat">Match play, flat (no shots)</option>
           </select>
         </div>
         <div class="row">
-          <!-- Stableford plays off full course handicaps, so the allowance doesn't apply to the fourball. -->
-          {#if r.fourball_format !== 'stableford'}
+          <!-- Stableford plays off full course handicaps and flat has no shots, so the allowance doesn't apply. -->
+          {#if r.fourball_format === 'matchplay'}
             <div class="field"><label for="ra-{r.id}">Allowance %</label><input id="ra-{r.id}" type="number" min="0" max="100" bind:value={r.allowance_pct} /></div>
           {/if}
           <div class="field"><label for="rp-{r.id}">Fourball pts</label><input id="rp-{r.id}" type="number" step="0.5" bind:value={r.better_ball_points} /></div>

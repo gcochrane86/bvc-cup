@@ -41,6 +41,13 @@ describe('buildMatches', () => {
     expect(ms[1].stableford).toBeUndefined();
   });
 
+  it('in a flat fourball, nobody gets a shot (gross match play); singles keep their allowance', () => {
+    const ms = buildMatches('g1', players, { ...settings, fourballFormat: 'flat', singlesEnabled: true });
+    expect(ms[0].strokes).toEqual({ a1: 0, a2: 0, b1: 0, b2: 0 });
+    expect(ms[0].stableford).toBeUndefined();
+    expect(ms[1].strokes).toEqual({ a1: 0, b1: 5 }); // singles: off the low at their allowance, as before
+  });
+
   it('match play (the default) is unchanged', () => {
     expect(buildMatches('g1', players, { ...settings, fourballFormat: 'matchplay' })).toEqual(buildMatches('g1', players, settings));
     expect(buildMatches('g1', players, settings)[0].stableford).toBeUndefined();
