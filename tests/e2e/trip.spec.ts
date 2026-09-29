@@ -227,7 +227,10 @@ test('saving the first hole moves on to hole 2 (not 3)', async ({ page }) => {
 
 test('after reopening, correcting an earlier hole changes the outcome and can be re-confirmed', async ({ browser }) => {
   const trip = await newPhone(browser);
-  trip.on('dialog', (d) => void d.accept());
+  trip.on('dialog', (d) => {
+    console.log(`[reopen test] dialog: ${d.message()}`); // shows why a confirm didn't go through, if it fails
+    void d.accept();
+  });
   await login(trip);
   await openGroup1(trip);
   for (let h = 1; h <= 10; h++) await enterHole(trip, h, 4, 5); // A wins 10 straight: 10&8
@@ -374,6 +377,65 @@ test('two phones scoring the same hole: an untouched par default never overwrite
     await p.getByRole('button', { name: 'Hole 1', exact: true }).click();
     await expect(p.getByTestId('gross-A1')).toHaveText('5', { timeout: 20_000 });
   }
+});
+
+test("a phone that missed a live update still ends up showing the other phone's real score", async ({ browser }) => {
+  const me = await newPhone(browser);
+  const mate = await newPhone(browser);
+  // The mate stays connected but its score messages are dropped (as Realtime does under its rate limit).
+  await mate.routeWebSocket(/realtime/, (ws) => {
+    const server = ws.connectToServer();
+    server.onMessage((m) => {
+      if (typeof m === 'string' && m.includes('postgres_changes')) return;
+      ws.send(m);
+    });
+  });
+  await login(me);
+  await login(mate);
+  await openGroup1(me);
+  await openGroup1(mate);
+
+  await me.getByTestId('row-A1').getByRole('button', { name: /^Increase/ }).click();
+  await me.getByRole('button', { name: 'Save hole 1' }).click();
+  await expect.poll(async () => (await serviceDb().from('scores').select('gross').eq('hole', 1)).data?.[0]?.gross).toBe(5);
+
+  // The mate saves hole 1 without touching my row: their par default is (rightly) refused by the server…
+  await mate.getByRole('button', { name: 'Save hole 1' }).click();
+  await expect(mate.getByRole('heading', { name: 'Hole 2', exact: true })).toBeVisible();
+  // …and their phone must not keep showing it: the catch-up check (every 15s) brings my 5 in.
+  await mate.getByRole('button', { name: 'Hole 1', exact: true }).click();
+  await expect(mate.getByTestId('gross-A1')).toHaveText('5', { timeout: 25_000 });
+});
+
+test("a real score typed offline and sent late still reaches a phone that missed the live update", async ({ browser }) => {
+  const me = await newPhone(browser);
+  const mate = await newPhone(browser);
+  await mate.routeWebSocket(/realtime/, (ws) => {
+    const server = ws.connectToServer();
+    server.onMessage((m) => {
+      if (typeof m === 'string' && m.includes('postgres_changes')) return; // score messages dropped
+      ws.send(m);
+    });
+  });
+  await login(me);
+  await login(mate);
+  await openGroup1(me);
+  await openGroup1(mate);
+
+  // I type a 5 with no signal: it waits in my phone's outbox.
+  await me.context().setOffline(true);
+  await me.getByTestId('row-A1').getByRole('button', { name: /^Increase/ }).click();
+  await me.getByRole('button', { name: 'Save hole 1' }).click();
+  // Later, my mate saves hole 1 untouched: their par defaults fill the empty cells.
+  await mate.getByRole('button', { name: 'Save hole 1' }).click();
+  await expect.poll(async () => (await serviceDb().from('scores').select('gross').eq('hole', 1)).data?.length).toBe(4);
+  // Signal returns: my 5 (typed earlier) replaces the default on the server…
+  await me.context().setOffline(false);
+  await me.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect.poll(async () => (await serviceDb().from('scores').select('gross').eq('hole', 1).eq('gross', 5)).data?.length, { timeout: 15_000 }).toBe(1);
+  // …and my mate's phone, which missed the live update, catches up to it.
+  await mate.getByRole('button', { name: 'Hole 1', exact: true }).click();
+  await expect(mate.getByTestId('gross-A1')).toHaveText('5', { timeout: 25_000 });
 });
 
 test('the admin can swipe an event left to delete it', async ({ browser }) => {

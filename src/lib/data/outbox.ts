@@ -28,8 +28,10 @@ export function createOutbox(opts: {
   send: (p: PendingScore) => Promise<SendResult>;
   onChange?: (pending: PendingScore[]) => void;
   onLocked?: (p: PendingScore) => void;
+  /** The server kept a different value ('exists' / 'stale'): this phone's copy of that cell is wrong. */
+  onRefused?: (p: PendingScore) => void;
 }) {
-  const { storage, send, onChange, onLocked } = opts;
+  const { storage, send, onChange, onLocked, onRefused } = opts;
   let inFlight: Promise<'done' | 'failed'> | null = null;
 
   const pending = async () => (await storage.getAll()).sort(byTime);
@@ -68,6 +70,7 @@ export function createOutbox(opts: {
           const current = await storage.get(pendingKey(p));
           if (current && current.clientUpdatedAt === p.clientUpdatedAt) await storage.remove(pendingKey(p));
           if (result === 'locked') onLocked?.(p);
+          if (result === 'exists' || result === 'stale') onRefused?.(p);
         }
       }
     } finally {

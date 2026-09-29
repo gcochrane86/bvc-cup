@@ -3,8 +3,9 @@ import { applyPending, hasPendingFor, isBehind, removeScoreRow, upsertScoreRow }
 import type { PendingScore } from './outbox';
 import type { ScoreRow } from './types';
 
-const row = (hole: number, gross: number | null, at: string): ScoreRow => ({
-  round_id: 'r', player_id: 'x', hole, gross, picked_up: gross === null, client_updated_at: at,
+/** updatedAt: the server's change time (defaults to the typing time); null = not yet sent. */
+const row = (hole: number, gross: number | null, at: string, updatedAt: string | null = at): ScoreRow => ({
+  round_id: 'r', player_id: 'x', hole, gross, picked_up: gross === null, client_updated_at: at, updated_at: updatedAt ?? undefined,
 });
 const pend = (hole: number, gross: number | null, at: string, pickedUp = false): PendingScore => ({
   roundId: 'r', playerId: 'x', hole, gross, pickedUp, clientUpdatedAt: at,
@@ -70,6 +71,17 @@ describe('isBehind', () => {
   });
   it('is behind when a result was confirmed or unlocked', () => {
     expect(isBehind(rows, 1, { scores: 2, latest: '2026-10-01T10:05:00.000Z', results: 0 })).toBe(true);
+  });
+  it("compares the server's change time, not the phones' typing times", () => {
+    // This phone's own default was typed at 10:30, but the server last changed a score at 10:20 (a late real score
+    // typed at 10:10 on a phone with no signal). The server change must still be noticed.
+    const local = [row(1, 4, '2026-10-01T10:30:00Z', '2026-10-01T10:15:00Z'), row(2, 5, '2026-10-01T10:05:00Z')];
+    expect(isBehind(local, 1, { scores: 2, latest: '2026-10-01T10:20:00Z', results: 1 })).toBe(true);
+    expect(isBehind(local, 1, { scores: 2, latest: '2026-10-01T10:15:00Z', results: 1 })).toBe(false);
+  });
+  it("ignores this phone's unsent rows (no server time) when finding its latest", () => {
+    const local = [row(1, 4, '2026-10-01T10:30:00Z', null), row(2, 5, '2026-10-01T10:05:00Z')];
+    expect(isBehind(local, 1, { scores: 2, latest: '2026-10-01T10:20:00Z', results: 1 })).toBe(true);
   });
   it('is up to date with no scores anywhere', () => {
     expect(isBehind([], 0, { scores: 0, latest: null, results: 0 })).toBe(false);

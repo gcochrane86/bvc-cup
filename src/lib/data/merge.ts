@@ -42,7 +42,7 @@ export function hasPendingFor(pending: PendingScore[], roundId: string, playerId
 /** The server's view of the active event, as returned by the cheap catch-up check. */
 export interface RemoteVersion {
   scores: number;
-  /** Newest client_updated_at among the server's scores. */
+  /** Newest server change time (updated_at) among the server's scores. */
   latest: string | null;
   results: number;
 }
@@ -51,6 +51,8 @@ export interface RemoteVersion {
 export function isBehind(rows: ScoreRow[], results: number, remote: RemoteVersion): boolean {
   if (rows.length !== remote.scores || results !== remote.results) return true;
   if (remote.latest === null) return false;
-  const localLatest = Math.max(-Infinity, ...rows.map((r) => Date.parse(r.client_updated_at)));
+  // The server's own change time, not the phones' typing times: a real score typed earlier on a phone with
+  // no signal can reach the server after this phone's own (later-typed) entries.
+  const localLatest = Math.max(-Infinity, ...rows.filter((r) => r.updated_at).map((r) => Date.parse(r.updated_at!)));
   return Date.parse(remote.latest) > localLatest;
 }

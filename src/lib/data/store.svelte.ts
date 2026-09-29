@@ -57,6 +57,10 @@ const outbox = createOutbox({
     db.notice = `Hole ${p.hole} is locked because its match was confirmed, so that change wasn't saved.`;
     void loadAll();
   },
+  // This phone already shows its own value for that cell, but the server kept another phone's score.
+  // Reload so it shows the real one: the catch-up check can't tell, as the count of scores matches and
+  // this phone's own (newer) timestamp makes it look up to date.
+  onRefused: () => void loadAll(),
 });
 
 let retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -175,13 +179,13 @@ async function checkForMissed() {
   if (!roundIds.length) return;
   try {
     const [s, r] = await Promise.all([
-      supabase.from('scores').select('client_updated_at', { count: 'exact' }).in('round_id', roundIds)
-        .order('client_updated_at', { ascending: false }).limit(1),
+      supabase.from('scores').select('updated_at', { count: 'exact' }).in('round_id', roundIds)
+        .order('updated_at', { ascending: false }).limit(1),
       supabase.from('match_results').select('group_id', { count: 'exact', head: true })
         .in('group_id', groupIds.length ? groupIds : ['00000000-0000-0000-0000-000000000000']),
     ]);
     if (s.error || r.error) return; // offline; the online/visibility handlers catch up later
-    const remote = { scores: s.count ?? 0, latest: s.data?.[0]?.client_updated_at ?? null, results: r.count ?? 0 };
+    const remote = { scores: s.count ?? 0, latest: s.data?.[0]?.updated_at ?? null, results: r.count ?? 0 };
     if (isBehind(db.scores, db.results.length, remote)) void loadAll();
   } catch {
     /* offline — ignore */

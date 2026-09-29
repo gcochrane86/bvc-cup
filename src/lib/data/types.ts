@@ -34,6 +34,8 @@ export interface GroupPlayerRow {
 export interface ScoreRow {
   round_id: string; player_id: string; hole: number;
   gross: number | null; picked_up: boolean; client_updated_at: string;
+  /** Set by the server on every write; absent on this phone's not-yet-sent rows. */
+  updated_at?: string;
 }
 export interface MatchResultRow {
   group_id: string; match_type: MatchType; winner: Outcome;

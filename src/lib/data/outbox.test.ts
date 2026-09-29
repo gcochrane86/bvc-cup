@@ -77,6 +77,19 @@ describe('outbox', () => {
     expect(storage.map.size).toBe(0);
   });
 
+  it("reports saves the server refused (a default where a score exists, or an out-of-date edit) so the phone can reload", async () => {
+    const storage = memoryStorage();
+    const onRefused = vi.fn();
+    const results: SendResult[] = ['ok', 'exists', 'stale'];
+    const ob = createOutbox({ storage, send: async () => results.shift()!, onRefused });
+    await ob.enqueue(p(1, '2026-10-01T10:00:01Z'));
+    await ob.enqueue(p(2, '2026-10-01T10:00:02Z'));
+    await ob.enqueue(p(3, '2026-10-01T10:00:03Z'));
+    expect(await ob.flush()).toBe('done');
+    expect(onRefused.mock.calls.map(([x]) => x.hole)).toEqual([2, 3]);
+    expect(storage.map.size).toBe(0);
+  });
+
   it('refuses overlapping flushes', async () => {
     const storage = memoryStorage();
     let release!: () => void;
