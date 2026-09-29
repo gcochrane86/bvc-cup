@@ -42,7 +42,8 @@ $$;
 create trigger round_tees_locked before insert or update or delete on public.round_tees
   for each row execute function public.round_tee_locked();
 
--- save_course gains the tee name (default null, so calls without it — e.g. the app before this release — still work).
+-- save_course gains the tee name. It defaults to null, so calls without it (the app before this release)
+-- still work — and they keep the course's tee name rather than clearing it.
 drop function public.save_course(uuid, text, jsonb, int, numeric);
 create function public.save_course(
   p_course_id uuid, p_name text, p_holes jsonb, p_slope_rating int, p_course_rating numeric, p_tee text default null
@@ -60,7 +61,9 @@ begin
     values (p_name, nullif(trim(p_tee), ''), p_slope_rating, p_course_rating) returning id into v_id;
   else
     update public.courses
-    set name = p_name, tee = nullif(trim(p_tee), ''), slope_rating = p_slope_rating, course_rating = p_course_rating
+    -- No p_tee (the app before tees): keep the tee name. '' clears it.
+    set name = p_name, tee = case when p_tee is null then tee else nullif(trim(p_tee), '') end,
+        slope_rating = p_slope_rating, course_rating = p_course_rating
     where id = p_course_id;
     v_id := p_course_id;
   end if;

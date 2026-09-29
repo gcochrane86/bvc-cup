@@ -97,7 +97,9 @@ export function buildEventView(s: Snapshot): EventView | null {
           const teeHoles: Record<string, HoleInfo[]> = {};
           for (const gp of members) {
             const row = s.roundTees.find((t) => t.round_id === round.id && t.player_id === gp.player_id);
-            const tee = row && row.course_id !== round.course_id ? s.courses.find((c) => c.id === row.course_id) : undefined;
+            const found = row && row.course_id !== round.course_id ? s.courses.find((c) => c.id === row.course_id) : undefined;
+            // Only another tee of the day's course counts (a tee left over from a previous course is ignored).
+            const tee = found && found.name === course?.name ? found : undefined;
             if (tee) teeOf[gp.player_id] = tee;
             teeHoles[gp.player_id] = tee ? holesOf(tee.id) : holes;
           }

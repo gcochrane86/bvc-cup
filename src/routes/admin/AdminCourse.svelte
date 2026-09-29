@@ -47,7 +47,7 @@
           p_holes: clean.map((h) => ({ hole: h.hole, par: h.par, stroke_index: h.strokeIndex })),
           p_slope_rating: s,
           p_course_rating: r,
-          p_tee: tee.trim() || null,
+          p_tee: tee.trim(), // '' clears the tee name (null would keep it)
         }),
       );
       await loadAll();

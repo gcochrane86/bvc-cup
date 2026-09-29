@@ -674,3 +674,27 @@ test('a day has a course and tees, and a player can play off a different tee', a
   await expect(admin.getByText('Day 1 saved')).toBeVisible();
   await expect.poll(async () => (await db.from('round_tees').select('player_id').eq('round_id', round!.id)).data?.length).toBe(0);
 });
+
+test("an untouched score defaults to the par of the player's own tee", async ({ browser }) => {
+  const db = serviceDb();
+  // A second tee of the seed course where hole 1 is a par 5; Alex Adams (A1 in Match 1) plays it on Day 1.
+  const { data: round } = await db.from('rounds').select('id, course_id').eq('round_no', 1).single();
+  const { data: main } = await db.from('courses').select('*').eq('id', round!.course_id).single();
+  await db.from('courses').update({ tee: 'Blue' }).eq('id', main!.id);
+  const { data: holes } = await db.from('course_holes').select('*').eq('course_id', main!.id);
+  const { data: red } = await db.from('courses').insert({ name: main!.name, tee: 'Red' }).select('id').single();
+  await db.from('course_holes').insert(holes!.map((h) => ({ ...h, course_id: red!.id, par: h.hole === 1 ? 5 : h.par })));
+  const { data: adams } = await db.from('players').select('id').eq('name', 'Alex Adams').single();
+  await db.from('round_tees').insert({ round_id: round!.id, player_id: adams!.id, course_id: red!.id });
+
+  const me = await newPhone(browser);
+  await login(me);
+  await openGroup1(me);
+  await me.getByRole('button', { name: 'Hole 1', exact: true }).click();
+  await expect(me.getByTestId('gross-A1')).toHaveText('5'); // Red par 5
+  await expect(me.getByTestId('gross-B1')).toHaveText('4'); // main tee par 4
+  await me.getByRole('button', { name: 'Save hole 1' }).click();
+  await expect
+    .poll(async () => (await db.from('scores').select('gross').eq('player_id', adams!.id).eq('hole', 1)).data?.[0]?.gross)
+    .toBe(5);
+});

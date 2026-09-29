@@ -272,6 +272,13 @@ describe('tees', () => {
     expect(g.teeOf).toEqual({});
     expect(g.matches[0].def.teeHoles).toBeUndefined();
   });
+  it("ignores a player's tee from a different course (left over after the day's course changed)", () => {
+    const s = withTee();
+    const v = buildEventView({ ...s, courses: s.courses.map((c) => (c.id === 'c2' ? { ...c, name: 'Old Links' } : c)) })!;
+    const g = v.rounds[0].groups[0];
+    expect(g.teeOf).toEqual({});
+    expect(g.playingHcp.a1).toBe(10);
+  });
   it('ignores a tee row for a player who is not in the group', () => {
     const s = withTee();
     const v = buildEventView({ ...s, roundTees: [...s.roundTees, { round_id: 'r1', player_id: 'nobody', course_id: 'c2' }] })!;

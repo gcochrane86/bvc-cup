@@ -449,6 +449,17 @@ describe('tees', () => {
     await expect(setTee('admin', s.players.a1, white)).rejects.toThrow(/confirmed/);
   });
 
+  it('keeps a tee name when save_course is called without one (the app before tees), and clears it with an empty string', async () => {
+    const holes = JSON.stringify(Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, stroke_index: i + 1 })));
+    const id = await as(db, 'admin', async () =>
+      (await db.query<{ id: string }>(`select public.save_course(null, 'Links', $1::jsonb, 125, 71.3, 'Gold') as id`, [holes])).rows[0].id,
+    );
+    await as(db, 'admin', () => db.query(`select public.save_course($1, 'Links', $2::jsonb, 126, 71.3)`, [id, holes]));
+    expect((await db.query(`select tee from public.courses where id = $1`, [id])).rows[0]).toEqual({ tee: 'Gold' });
+    await as(db, 'admin', () => db.query(`select public.save_course($1, 'Links', $2::jsonb, 126, 71.3, '')`, [id, holes]));
+    expect((await db.query(`select tee from public.courses where id = $1`, [id])).rows[0]).toEqual({ tee: null });
+  });
+
   it('saves a tee name through save_course, and can re-save the same tee', async () => {
     const holes = JSON.stringify(Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, stroke_index: i + 1 })));
     const id = await as(db, 'admin', async () =>

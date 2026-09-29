@@ -69,13 +69,19 @@
         const pid = found.group.slots[slot];
         const d = pid ? draft[pid] : undefined;
         const e = pid ? scores.get(scoreKey(pid, h)) : undefined;
-        if (!d || d.edited || !e) continue;
-        d.gross = e.gross ?? info.par;
+        if (!pid || !d || d.edited || !e) continue;
+        d.gross = e.gross ?? ownPar(pid);
         d.pickedUp = e.pickedUp;
         d.hasScore = true;
       }
     });
   });
+
+  /** This hole's par on the player's own tee. */
+  function ownPar(pid: string): number {
+    if (!found || !info) return 4;
+    return playerHole({ teeHoles: found.group.teeHoles }, pid, info).par;
+  }
 
   function buildDraft(): Record<string, Draft> {
     const out: Record<string, Draft> = {};
@@ -84,9 +90,10 @@
       const pid = found.group.slots[slot];
       if (!pid) continue;
       const e = found.group.scores.get(scoreKey(pid, hole));
+      // Untouched rows start at par for the player's own tee (a par 5 on their tee is a par 5 here too).
       out[pid] = e
-        ? { gross: e.gross ?? info.par, pickedUp: e.pickedUp, edited: false, hasScore: true }
-        : { gross: info.par, pickedUp: false, edited: false, hasScore: false };
+        ? { gross: e.gross ?? ownPar(pid), pickedUp: e.pickedUp, edited: false, hasScore: true }
+        : { gross: ownPar(pid), pickedUp: false, edited: false, hasScore: false };
     }
     return out;
   }
