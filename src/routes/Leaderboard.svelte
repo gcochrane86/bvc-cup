@@ -7,6 +7,7 @@
   import TeamTracker from '../components/TeamTracker.svelte';
   import ScoreBar from '../components/ScoreBar.svelte';
   import MatchCard from '../components/MatchCard.svelte';
+  import DayTabs from '../components/DayTabs.svelte';
 
   const view = $derived(buildEventView(db));
   let chosen = $state<string | null>(null);
@@ -42,13 +43,7 @@
   <!-- At least a screen tall, so the tracker can always scroll away and the bar appear — even on a
        day with few matches on a tall screen (the Home Screen app has no Safari bars). -->
   <div class="below">
-    <div class="tabs" role="tablist">
-      {#each view.rounds as r (r.round.id)}
-        <button role="tab" aria-selected={r.round.id === roundId} class:active={r.round.id === roundId} onclick={() => (chosen = r.round.id)}>
-          {r.round.name}
-        </button>
-      {/each}
-    </div>
+    <DayTabs days={view.rounds.map((r) => ({ id: r.round.id, name: r.round.name }))} selected={roundId} onPick={(id) => (chosen = id)} />
     {#if rv}
       {@const course = db.courses.find((c) => c.id === rv.round.course_id)}
       {#if course}<h2 class="course">{courseLabel(course)}</h2>{/if}
@@ -66,9 +61,6 @@
 
 <style>
   .below { min-height: 100dvh; }
-  .tabs { display: flex; gap: 8px; overflow-x: auto; margin: 4px 0 8px; }
-  .tabs button { background: var(--surface); color: var(--text); border: 1px solid var(--line); flex: none; }
   .course { font-size: 1.05rem; margin: 4px 0 2px; }
   .course + p { margin-top: 0; }
-  .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 </style>

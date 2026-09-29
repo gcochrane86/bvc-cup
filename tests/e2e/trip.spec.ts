@@ -780,3 +780,34 @@ test("with the Leaderboard hidden, players get a Scorecard tab with every match'
   await me.reload();
   await expect(me.locator('nav a', { hasText: 'Scorecard' })).toHaveCount(0);
 });
+
+test('with many days, the leaderboard opens scrolled to the latest day; earlier days scroll into view', async ({ page }) => {
+  const db = serviceDb();
+  const { data: ev } = await db.from('events').select('id').eq('is_active', true).single();
+  const { data: r1 } = await db.from('rounds').select('course_id').eq('round_no', 1).single();
+  const { data: g1 } = await db.from('groups').select('id, group_players(slot, player_id)').eq('group_no', 1).limit(1).single();
+  // Ten more outings (Days 4–13); the latest has a match this phone will score.
+  const { data: added } = await db
+    .from('rounds')
+    .insert(Array.from({ length: 10 }, (_, i) => ({ event_id: ev!.id, round_no: i + 4, name: `Day ${i + 4}`, course_id: r1!.course_id })))
+    .select('id, round_no');
+  const latest = added!.find((r) => r.round_no === 13)!;
+  const { data: g } = await db.from('groups').insert({ round_id: latest.id, group_no: 1 }).select('id').single();
+  await db.from('group_players').insert(g1!.group_players.map((gp) => ({ group_id: g!.id, slot: gp.slot, player_id: gp.player_id })));
+
+  await login(page);
+  await page.goto('/#/score');
+  await page.getByTestId('score-pick').last().click(); // the Day 13 match
+  await expect(page.getByRole('heading', { name: /^Hole \d+$/ })).toBeVisible();
+  await page.getByRole('link', { name: 'Leaderboard' }).click();
+  const day13 = page.getByRole('tab', { name: 'Day 13' });
+  await expect(day13).toHaveAttribute('aria-selected', 'true');
+  await expect(day13).toBeInViewport();
+  await expect(page.getByRole('tab', { name: 'Day 1', exact: true })).not.toBeInViewport();
+  await expect(page.getByTestId('breakdown')).toHaveText(/^13 days · \d+/);
+
+  // Scroll back to an earlier day and pick it.
+  await page.getByRole('tab', { name: 'Day 1', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Day 1', exact: true })).toBeInViewport();
+  await expect(page.getByRole('tab', { name: 'Day 1', exact: true })).toHaveAttribute('aria-selected', 'true');
+});

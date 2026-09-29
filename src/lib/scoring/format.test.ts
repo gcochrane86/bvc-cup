@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatPoints, isBirdieOrBetter, shotLabel } from './format';
+import { breakdownText, formatPoints, isBirdieOrBetter, shotLabel } from './format';
 
 describe('formatPoints', () => {
   it('formats whole and fractional points', () => {
@@ -36,5 +36,16 @@ describe('isBirdieOrBetter', () => {
     expect(isBirdieOrBetter(4, 4)).toBe(false);
     expect(isBirdieOrBetter(6, 4)).toBe(false);
     expect(isBirdieOrBetter(null, 4)).toBe(false);
+  });
+});
+
+describe('breakdownText', () => {
+  const days = (n: number) => Array.from({ length: n }, (_, i) => ({ name: `Day ${i + 1}`, points: i === 0 ? 3.5 : 1 }));
+  it('lists each day while there are only a few', () => {
+    expect(breakdownText(days(3))).toBe('Day 1: 3½ · Day 2: 1 · Day 3: 1');
+    expect(breakdownText(days(5))).toBe('Day 1: 3½ · Day 2: 1 · Day 3: 1 · Day 4: 1 · Day 5: 1');
+  });
+  it('sums up a long season in one line', () => {
+    expect(breakdownText(days(12))).toBe('12 days · 14½ points');
   });
 });

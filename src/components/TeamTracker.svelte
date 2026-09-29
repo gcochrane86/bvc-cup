@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatPoints, type Tracker } from '../lib/scoring';
+  import { breakdownText, formatPoints, type Tracker } from '../lib/scoring';
   import type { EventRow } from '../lib/data/types';
 
   let { tracker, event, breakdown = [] }: {
@@ -31,7 +31,7 @@
   <p class="towin muted small">{formatPoints(tracker.toWin)} to win · {formatPoints(tracker.total)} points available</p>
   {#if breakdown.length}
     <p class="breakdown muted small" data-testid="breakdown">
-      {breakdown.map((b) => `${b.name}: ${formatPoints(b.points)}`).join(' · ')}
+      {breakdownText(breakdown)}
     </p>
   {/if}
 </section>

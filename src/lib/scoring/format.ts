@@ -18,3 +18,9 @@ export function shotLabel(bb: number, singles: number | null): string | null {
 export function isBirdieOrBetter(gross: number | null, par: number): boolean {
   return gross !== null && gross <= par - 1;
 }
+
+/** The points-by-day line under the team tracker: each day while there are a few, a one-line total for a long season. */
+export function breakdownText(days: { name: string; points: number }[]): string {
+  if (days.length <= 5) return days.map((d) => `${d.name}: ${formatPoints(d.points)}`).join(' · ');
+  return `${days.length} days · ${formatPoints(days.reduce((sum, d) => sum + d.points, 0))} points`;
+}
