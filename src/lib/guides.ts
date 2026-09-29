@@ -1,5 +1,6 @@
 // Hole-by-hole course guides. Turnberry: pages rendered from the course-guide PDFs by
 // scripts/make-guides.ts. Dundonald: aerials + pro tips from their website (scripts/make-dundonald-guide.ts).
+// Glashedy: hole and green pages rendered from the yardage book by scripts/make-guides.ts.
 import dundonald from './guides/dundonald.json';
 
 export interface Guide {
@@ -9,22 +10,47 @@ export interface Guide {
   short: string;
   /** Matches the course name used in Admin → Courses. */
   match: RegExp;
+  /** aerial: one photo + notes; turnberry: layout + approach pages; yardage: hole page + green page. */
+  kind: 'aerial' | 'turnberry' | 'yardage';
+  /** Where the pages come from (shown under the hole). */
+  credit: string;
 }
 
+const TURNBERRY = 'From the Trump Turnberry course guide. Yardages are to the front of the green.';
+
 export const GUIDES: Guide[] = [
-  { slug: 'dundonald', name: 'Dundonald Links', short: 'Dundonald', match: /dundonald/i },
-  { slug: 'krtb', name: 'King Robert the Bruce', short: 'Robert the Bruce', match: /robert\s+the\s+bruce/i },
-  { slug: 'ailsa', name: 'The Championship Ailsa', short: 'Ailsa', match: /ailsa/i },
+  { slug: 'dundonald', name: 'Dundonald Links', short: 'Dundonald', match: /dundonald/i, kind: 'aerial', credit: 'From the Dundonald Links hole-by-hole guide.' },
+  { slug: 'krtb', name: 'King Robert the Bruce', short: 'Robert the Bruce', match: /robert\s+the\s+bruce/i, kind: 'turnberry', credit: TURNBERRY },
+  { slug: 'ailsa', name: 'The Championship Ailsa', short: 'Ailsa', match: /ailsa/i, kind: 'turnberry', credit: TURNBERRY },
+  { slug: 'glashedy', name: 'Glashedy Links', short: 'Glashedy', match: /glashedy/i, kind: 'yardage', credit: 'From the Glashedy Links yardage book (Gold tees).' },
 ];
 
 export function guideForCourse(courseName: string): Guide | null {
   return GUIDES.find((g) => g.match.test(courseName)) ?? null;
 }
 
-/** Images for a hole: Turnberry's layout (with yardages) and approach pages; Dundonald's aerial. */
+/** The guides for the active event's courses, in day order, each once; every guide if none match. */
+export function eventGuides(rounds: { round_no: number; course_id: string }[], courses: { id: string; name: string }[]): Guide[] {
+  const out: Guide[] = [];
+  for (const r of [...rounds].sort((a, b) => a.round_no - b.round_no)) {
+    const course = courses.find((c) => c.id === r.course_id);
+    const g = course ? guideForCourse(course.name) : null;
+    if (g && !out.includes(g)) out.push(g);
+  }
+  return out.length ? out : GUIDES;
+}
+
+/** The course the Courses tab opens on: the remembered one if this event has it, else the first. */
+export function initialGuide(list: Guide[], remembered: string | null): Guide {
+  return list.find((g) => g.slug === remembered) ?? list[0];
+}
+
+/** Images for a hole: Turnberry's layout (with yardages) and approach pages; Dundonald's aerial;
+ *  Glashedy's hole map (with yardages) and green. */
 export function guidePages(slug: string, hole: number): string[] {
   const n = String(hole).padStart(2, '0');
   if (slug === 'dundonald') return [`guides/dundonald/hole-${n}.webp`];
+  if (slug === 'glashedy') return [`guides/glashedy/hole-${n}-layout.webp`, `guides/glashedy/hole-${n}-green.webp`];
   return [`guides/${slug}/hole-${n}-layout.webp`, `guides/${slug}/hole-${n}-approach.webp`];
 }
 

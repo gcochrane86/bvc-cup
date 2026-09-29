@@ -1,9 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { GUIDES, guideFlyover, guideForCourse, guideNotes, guidePages, readGuideMemory, rememberGuideHole } from './guides';
+import { GUIDES, eventGuides, guideFlyover, guideForCourse, guideNotes, guidePages, initialGuide, readGuideMemory, rememberGuideHole } from './guides';
 
 describe('course guides', () => {
-  it('has all three courses, in playing order', () => {
-    expect(GUIDES.map((g) => g.slug)).toEqual(['dundonald', 'krtb', 'ailsa']);
+  it('has every guide: the three trip courses in playing order, then Glashedy', () => {
+    expect(GUIDES.map((g) => g.slug)).toEqual(['dundonald', 'krtb', 'ailsa', 'glashedy']);
+  });
+
+  it('matches every Glashedy tee to the Glashedy guide', () => {
+    for (const tee of ['Black', 'Gold', 'White']) expect(guideForCourse(`Glashedy Links (${tee})`)?.slug).toBe('glashedy');
+  });
+
+  it('gives Glashedy its hole page then its green page', () => {
+    expect(guidePages('glashedy', 7)).toEqual(['guides/glashedy/hole-07-layout.webp', 'guides/glashedy/hole-07-green.webp']);
+    expect(guideNotes('glashedy', 7)).toBeNull();
+    expect(guideFlyover('glashedy', 7)).toBeNull();
   });
 
   it('matches a course name to its guide', () => {
@@ -52,5 +62,42 @@ describe('course guides', () => {
   it('ignores corrupt or out-of-range memory', () => {
     expect(readGuideMemory('not json')).toEqual({ course: null, holes: {} });
     expect(readGuideMemory(JSON.stringify({ course: 'nope', holes: { krtb: 40, ailsa: 2 } }))).toEqual({ course: null, holes: { ailsa: 2 } });
+  });
+});
+
+describe('eventGuides', () => {
+  const courses = [
+    { id: 'd', name: 'Dundonald Links' },
+    { id: 'k', name: 'King Robert the Bruce' },
+    { id: 'a', name: 'The Championship Ailsa' },
+    { id: 'gg', name: 'Glashedy Links (Gold)' },
+    { id: 'gw', name: 'Glashedy Links (White)' },
+    { id: 's', name: 'Seed Links' },
+  ];
+  const r = (round_no: number, course_id: string) => ({ round_no, course_id });
+
+  it('lists only the courses the event plays, in day order (BvC: unchanged)', () => {
+    expect(eventGuides([r(2, 'k'), r(1, 'd'), r(3, 'a')], courses).map((g) => g.short)).toEqual(['Dundonald', 'Robert the Bruce', 'Ailsa']);
+  });
+
+  it('shows just Glashedy for Ballyliffen, whichever tees the day uses', () => {
+    expect(eventGuides([r(1, 'gg')], courses).map((g) => g.slug)).toEqual(['glashedy']);
+    expect(eventGuides([r(1, 'gw')], courses).map((g) => g.slug)).toEqual(['glashedy']);
+  });
+
+  it('lists a guide once when two days use it', () => {
+    expect(eventGuides([r(1, 'gg'), r(2, 'gw')], courses).map((g) => g.slug)).toEqual(['glashedy']);
+  });
+
+  it('falls back to every guide when the event has none (e.g. mid-setup)', () => {
+    expect(eventGuides([r(1, 's')], courses)).toEqual(GUIDES);
+    expect(eventGuides([], courses)).toEqual(GUIDES);
+  });
+
+  it('opens the remembered course only if the event has it', () => {
+    const bvc = eventGuides([r(1, 'd'), r(2, 'k'), r(3, 'a')], courses);
+    expect(initialGuide(bvc, 'ailsa').slug).toBe('ailsa');
+    expect(initialGuide(eventGuides([r(1, 'gg')], courses), 'ailsa').slug).toBe('glashedy');
+    expect(initialGuide(bvc, null).slug).toBe('dundonald');
   });
 });
