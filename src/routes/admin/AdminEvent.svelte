@@ -184,8 +184,8 @@
         <div class="field">
           <label for="rf-{r.id}">Fourball game</label>
           <select id="rf-{r.id}" bind:value={r.fourball_format}>
-            <option value="matchplay">Match play (off the lowest handicap)</option>
-            <option value="stableford">Stableford (full handicaps, best points win the hole)</option>
+            <option value="matchplay">Match play (off the low)</option>
+            <option value="stableford">Stableford (full handicaps)</option>
           </select>
         </div>
         <div class="row">
