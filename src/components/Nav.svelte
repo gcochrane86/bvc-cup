@@ -8,6 +8,10 @@
     // Leaderboard unless the admin has hidden it for this event (the admin always sees it).
     ...(leaderboardShown() ? [{ href: '#/', label: 'Leaderboard', active: ['home', 'match'].includes(router.route.name) }] : []),
     { href: '#/score', label: 'Scores', active: router.route.name === 'score' },
+    // With the Leaderboard hidden for this event, a Scorecard tab takes its place (scores, no standings).
+    ...(db.event && db.event.show_leaderboard === false
+      ? [{ href: '#/scorecards', label: 'Scorecard', active: router.route.name === 'scorecards' }]
+      : []),
     { href: '#/guide', label: 'Courses', active: router.route.name === 'guide' },
     // Form (rankings) only when the admin has switched it on for this event.
     ...(db.event?.show_form ? [{ href: '#/form', label: 'Form', active: router.route.name === 'form' }] : []),

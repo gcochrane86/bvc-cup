@@ -13,6 +13,7 @@ describe('parseRoute', () => {
     ['#/players', { name: 'players' }],
     ['#/guide', { name: 'guide' }],
     ['#/form', { name: 'form' }],
+    ['#/scorecards', { name: 'scorecards' }],
     ['#/admin', { name: 'admin' }],
     ['#/admin/login', { name: 'admin-login' }],
     ['#/admin/players', { name: 'admin-players' }],

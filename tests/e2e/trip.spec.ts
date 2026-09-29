@@ -711,7 +711,7 @@ test('the admin can hide the Leaderboard tab from players; they land on Scores',
 
   const trip = await newPhone(browser);
   await login(trip, 'tester@example.com', process.env.TRIP_PASSWORD!, { expectLeaderboard: false });
-  await expect(trip.locator('nav a')).toHaveText(['Scores', 'Courses']);
+  await expect(trip.locator('nav a')).toHaveText(['Scores', 'Scorecard', 'Courses']); // Scorecard replaces the Leaderboard
   await expect(trip).toHaveURL(/#\/score$/);
   await trip.goto('/#/');
   await expect(trip).toHaveURL(/#\/score$/); // old links to the leaderboard go to Scores
@@ -754,4 +754,29 @@ test('a day can be played as a flat fourball: no shots, lower best gross wins th
   await expect(group1Card(me).getByTestId('status')).toHaveText('1 UP');
   await expect(group1Card(me)).toHaveAttribute('data-match-id', /better_ball/);
   await expect(group1Card(me).getByTestId('status')).toHaveCSS('color', 'rgb(200, 16, 46)'); // team B's colour
+});
+
+test("with the Leaderboard hidden, players get a Scorecard tab with every match's scorecard (no standings)", async ({ browser }) => {
+  const db = serviceDb();
+  const { data: ev } = await db.from('events').select('id').eq('is_active', true).single();
+  const me = await newPhone(browser);
+  await login(me);
+  await expect(me.locator('nav a', { hasText: 'Scorecard' })).toHaveCount(0); // not while the Leaderboard is shown
+  await openGroup1(me);
+  await enterHole(me, 1, 3, 5); // A players birdie the par-4 1st
+
+  await db.from('events').update({ show_leaderboard: false }).eq('id', ev!.id);
+  await me.reload();
+  await expect(me.locator('nav a')).toHaveText(['Scores', 'Scorecard', 'Courses']);
+  await me.getByRole('link', { name: 'Scorecard' }).click();
+  await expect(me.getByRole('tab', { name: 'Day 1' })).toHaveAttribute('aria-selected', 'true');
+  const card = me.getByTestId('scorecard-group').filter({ hasText: /^Match 1\b/ });
+  await expect(card.locator('table .birdie').first()).toHaveText('3');
+  await expect(me.getByTestId('scorecard-group')).toHaveCount(3); // every Day 1 match
+  await expect(me.getByText('1 UP')).toHaveCount(0); // no standings
+  await expect(me.getByTestId('tracker')).toHaveCount(0);
+
+  await db.from('events').update({ show_leaderboard: true }).eq('id', ev!.id);
+  await me.reload();
+  await expect(me.locator('nav a', { hasText: 'Scorecard' })).toHaveCount(0);
 });
