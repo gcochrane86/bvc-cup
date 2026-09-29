@@ -136,6 +136,7 @@ test('the admin can reopen a confirmed match for scoring', async ({ browser }) =
   admin.on('dialog', (d) => void d.accept());
   await loginAdmin(admin);
   await admin.goto(`/#/admin/events/${await activeEventId()}`); // Reopen lives on the event's admin page
+  await admin.getByText('More options').click();
   await admin.getByTestId('reopen-row').filter({ hasText: /^Match 1\b/ }).getByRole('button', { name: 'Reopen' }).click();
   await expect(admin.getByText('Match 1 reopened')).toBeVisible();
 
@@ -184,6 +185,8 @@ test('the admin can reset all scores back to the start', async ({ browser }) => 
   await admin.getByRole('link', { name: /Events, teams/ }).click();
   await admin.locator('a.card').first().click();
   const reset = admin.getByTestId('reset-scores');
+  await expect(reset).toBeHidden(); // tucked away under More options until opened
+  await admin.getByText('More options').click();
   await reset.getByLabel('Which scores?').selectOption({ label: 'Day 1' });
   await reset.getByRole('button', { name: 'Reset Day 1' }).click();
   await expect(reset.getByText('Scores reset for Day 1.')).toBeVisible();
@@ -247,6 +250,7 @@ test('after reopening, correcting an earlier hole changes the outcome and can be
   admin.on('dialog', (d) => void d.accept());
   await loginAdmin(admin);
   await admin.goto(`/#/admin/events/${await activeEventId()}`); // Reopen lives on the event's admin page
+  await admin.getByText('More options').click();
   await admin.getByTestId('reopen-row').filter({ hasText: /^Match 1\b/ }).getByRole('button', { name: 'Reopen' }).click();
   await expect(admin.getByText('Match 1 reopened')).toBeVisible();
 
@@ -484,8 +488,9 @@ test('the Form tab is off until the admin switches it on, then ranks players', a
   await loginAdmin(admin);
   await admin.getByRole('link', { name: /Events, teams/ }).click();
   await admin.locator('a.card').first().click();
+  await admin.getByText('More options').click();
   await admin.getByLabel(/Show the Form tab to players/).check();
-  await admin.getByRole('button', { name: 'Save event' }).click();
+  await admin.getByRole('button', { name: 'Save Form tab setting' }).click();
   await expect(admin.getByText('Event saved')).toBeVisible();
 
   // Group 1's A players make birdie 3s on hole 1 (par 4); B players make 4s.

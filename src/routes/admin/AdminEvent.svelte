@@ -175,7 +175,6 @@
       <div class="field"><label for="tbc">Colour</label><input id="tbc" type="color" bind:value={event.team_b_colour} /></div>
     </div>
     <label class="row"><input type="checkbox" bind:checked={event.is_active} /> Active event (shown on the leaderboard)</label>
-    <label class="row"><input type="checkbox" bind:checked={event.show_form} /> Show the Form tab to players (rankings by gross, net, points, birdies…)</label>
     <button onclick={saveDetails}>Save event</button>
   </section>
 
@@ -269,10 +268,19 @@
     </form>
   </section>
 
-  {#if rounds.length}
+  <!-- Occasional settings, kept out of the way of setting up the event. -->
+  <details class="more">
+    <summary>More options</summary>
+    <section class="card">
+      <h2>Form tab</h2>
+      <label class="row"><input type="checkbox" bind:checked={event.show_form} /> Show the Form tab to players (rankings by gross, net, points, birdies…)</label>
+      <button onclick={saveDetails}>Save Form tab setting</button>
+    </section>
     {#key event.id}<ConfirmedResults {event} />{/key}
-    <ResetScores {event} {rounds} onDone={load} />
-  {/if}
+    {#if rounds.length}
+      <ResetScores {event} {rounds} onDone={load} />
+    {/if}
+  </details>
 {:else}
   <p class="center muted">Loading…</p>
 {/if}
@@ -284,5 +292,6 @@
   .hcp { text-align: center; color: var(--muted); }
   .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .round { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+  .more summary { cursor: pointer; font-weight: 700; padding: 12px 0; color: var(--muted); }
   input[type='color'] { padding: 4px; }
 </style>
