@@ -2,9 +2,11 @@
   import { router } from '../lib/router.svelte';
   import { db } from '../lib/data/store.svelte';
   import { isAdmin } from '../lib/auth.svelte';
+  import { leaderboardShown } from '../lib/data/store.svelte';
 
   const items = $derived([
-    { href: '#/', label: 'Leaderboard', active: ['home', 'match'].includes(router.route.name) },
+    // Leaderboard unless the admin has hidden it for this event (the admin always sees it).
+    ...(leaderboardShown() ? [{ href: '#/', label: 'Leaderboard', active: ['home', 'match'].includes(router.route.name) }] : []),
     { href: '#/score', label: 'Scores', active: router.route.name === 'score' },
     { href: '#/guide', label: 'Courses', active: router.route.name === 'guide' },
     // Form (rankings) only when the admin has switched it on for this event.

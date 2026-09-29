@@ -13,6 +13,8 @@ export interface EventRow {
   is_active: boolean;
   /** Show players the Form tab (rankings) for this event. */
   show_form: boolean;
+  /** Show players the Leaderboard tab (off: they land on Scores; the admin still sees it). */
+  show_leaderboard: boolean;
 }
 export interface EventPlayerRow { event_id: string; player_id: string; team: Team; handicap: number }
 export interface RoundRow {

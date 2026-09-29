@@ -1,6 +1,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createStore, del, get, set, values } from 'idb-keyval';
 import { must, supabase } from '../supabase';
+import { isAdmin } from '../auth.svelte';
 import { applyPending, isBehind, removeScoreRow, upsertScoreRow } from './merge';
 import { freshOnly } from './fresh';
 import { planPhotoUrls, PHOTO_URL_TTL_S, type SignedPhoto } from './photoUrls';
@@ -172,6 +173,9 @@ export function photoUrl(playerId: string): string | null {
   return path ? (db.photoUrls[path] ?? null) : null;
 }
 export const playerName = (id: string) => db.players.find((p) => p.id === id)?.name ?? '?';
+/** Players see the Leaderboard (and match pages) unless the admin hid it for this event; the admin always does. */
+export const leaderboardShown = () => db.event?.show_leaderboard !== false || isAdmin();
+
 export const playerShort = (id: string) => db.players.find((p) => p.id === id)?.short_name ?? '?';
 
 // ---- catch-up check ----

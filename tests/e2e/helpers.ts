@@ -16,22 +16,29 @@ export const serviceDb = () =>
   createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
 
 /** Log in with an email + the trip password; approve the tester if they land on the waiting screen. */
-export async function login(page: Page, email = 'tester@example.com', password = process.env.TRIP_PASSWORD!) {
+/** expectLeaderboard: false when the event hides the Leaderboard tab (players then land on Scores). */
+export async function login(
+  page: Page,
+  email = 'tester@example.com',
+  password = process.env.TRIP_PASSWORD!,
+  { expectLeaderboard = true }: { expectLeaderboard?: boolean } = {},
+) {
+  const landed = () => (expectLeaderboard ? page.getByTestId('tracker') : page.locator('nav'));
   await page.goto('/');
   await page.getByLabel('Your email').fill(email);
   await page.getByLabel('Trip password').fill(password);
   await page.getByRole('button', { name: 'Enter' }).click();
-  await expect(page.getByTestId('tracker').or(page.getByTestId('waiting'))).toBeVisible();
+  await expect(landed().or(page.getByTestId('waiting'))).toBeVisible();
   if (await page.getByTestId('waiting').isVisible()) {
     await serviceDb().from('members').update({ status: 'approved' }).eq('email', email);
     // The waiting screen re-checks by itself; only tap "Check again" if it's still showing.
     await expect(async () => {
       const again = page.getByRole('button', { name: 'Check again' });
       if (await again.isVisible()) await again.click();
-      await expect(page.getByTestId('tracker')).toBeVisible({ timeout: 2_000 });
+      await expect(landed()).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 30_000 });
   }
-  await expect(page.getByTestId('tracker')).toBeVisible();
+  await expect(landed()).toBeVisible();
 }
 
 export async function openGroup1(page: Page) {

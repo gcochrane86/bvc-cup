@@ -490,7 +490,7 @@ test('the Form tab is off until the admin switches it on, then ranks players', a
   await admin.locator('a.card').first().click();
   await admin.getByText('More options').click();
   await admin.getByLabel(/Show the Form tab to players/).check();
-  await admin.getByRole('button', { name: 'Save Form tab setting' }).click();
+  await admin.getByRole('button', { name: 'Save tab settings' }).click();
   await expect(admin.getByText('Event saved')).toBeVisible();
 
   // Group 1's A players make birdie 3s on hole 1 (par 4); B players make 4s.
@@ -697,4 +697,23 @@ test("an untouched score defaults to the par of the player's own tee", async ({ 
   await expect
     .poll(async () => (await db.from('scores').select('gross').eq('player_id', adams!.id).eq('hole', 1)).data?.[0]?.gross)
     .toBe(5);
+});
+
+test('the admin can hide the Leaderboard tab from players; they land on Scores', async ({ browser }) => {
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto(`/#/admin/events/${await activeEventId()}`);
+  await admin.getByText('More options').click();
+  await admin.getByLabel(/Show the Leaderboard tab to players/).uncheck();
+  await admin.getByRole('button', { name: 'Save tab settings' }).click();
+  await expect(admin.getByText('Event saved')).toBeVisible();
+  await expect(admin.locator('nav a', { hasText: 'Leaderboard' })).toHaveCount(1); // the admin still sees it
+
+  const trip = await newPhone(browser);
+  await login(trip, 'tester@example.com', process.env.TRIP_PASSWORD!, { expectLeaderboard: false });
+  await expect(trip.locator('nav a')).toHaveText(['Scores', 'Courses']);
+  await expect(trip).toHaveURL(/#\/score$/);
+  await trip.goto('/#/');
+  await expect(trip).toHaveURL(/#\/score$/); // old links to the leaderboard go to Scores
+  await expect(trip.getByTestId('tracker')).toHaveCount(0);
 });

@@ -97,6 +97,7 @@
             team_b_colour: ev.team_b_colour,
             is_active: ev.is_active,
             show_form: ev.show_form,
+            show_leaderboard: ev.show_leaderboard,
           })
           .eq('id', ev.id),
       );
@@ -330,9 +331,10 @@
   <details class="more">
     <summary>More options</summary>
     <section class="card">
-      <h2>Form tab</h2>
+      <h2>Tabs for players</h2>
+      <label class="row"><input type="checkbox" bind:checked={event.show_leaderboard} /> Show the Leaderboard tab to players (off: they go straight to Scores)</label>
       <label class="row"><input type="checkbox" bind:checked={event.show_form} /> Show the Form tab to players (rankings by gross, net, points, birdies…)</label>
-      <button onclick={saveDetails}>Save Form tab setting</button>
+      <button onclick={saveDetails}>Save tab settings</button>
     </section>
     {#key event.id}<ConfirmedResults {event} />{/key}
     {#if rounds.length}

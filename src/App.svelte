@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { auth, initAuth, isAdmin } from './lib/auth.svelte';
   import { router } from './lib/router.svelte';
-  import { db, startData, stopData } from './lib/data/store.svelte';
+  import { db, leaderboardShown, startData, stopData } from './lib/data/store.svelte';
   import Login from './routes/Login.svelte';
   import Leaderboard from './routes/Leaderboard.svelte';
   import Guide from './routes/Guide.svelte';
@@ -28,6 +28,11 @@
 
   // Only people the admin has approved get the app (the database enforces this too).
   const approved = $derived(auth.access === 'approved');
+
+  // With the Leaderboard hidden for this event, players (not the admin) go to Scores instead.
+  $effect(() => {
+    if (db.loaded && !leaderboardShown() && (route.name === 'home' || route.name === 'match')) location.replace('#/score');
+  });
   $effect(() => {
     if (signedIn && approved) {
       startData();
