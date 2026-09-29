@@ -2,7 +2,21 @@
   import type { MatchState, Outcome } from '../lib/scoring';
 
   // editHref: set while the match is open for scoring — each hole then links to its score entry.
-  let { state, editHref = null }: { state: MatchState; editHref?: ((hole: number) => string) | null } = $props();
+  // onPick (score entry): each hole is a button that picks it; selected is highlighted, and holeClass adds
+  // the entry state ('partial' = some scores in, 'locked' = confirmed).
+  let {
+    state,
+    editHref = null,
+    onPick = null,
+    selected = null,
+    holeClass = () => '',
+  }: {
+    state: MatchState;
+    editHref?: ((hole: number) => string) | null;
+    onPick?: ((hole: number) => void) | null;
+    selected?: number | null;
+    holeClass?: (hole: number) => string;
+  } = $props();
   const nines = [[1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 11, 12, 13, 14, 15, 16, 17, 18]];
   const winnerColour = (o: Outcome) => (o === 'A' ? 'var(--team-a)' : o === 'B' ? 'var(--team-b)' : '#8a948f');
   const chip = (lead: number | null) => (lead === null ? '–' : lead === 0 ? 'AS' : `${Math.abs(lead)}UP`);
@@ -15,12 +29,14 @@
         {@const o = state.holeWinners[h - 1]}
         {@const lead = state.running[h - 1]}
         <svelte:element
-          this={editHref ? 'a' : 'div'}
-          class="cell"
-          class:current={!state.decided && h === state.thru + 1}
-          class:link={!!editHref}
-          href={editHref ? editHref(h) : undefined}
-          aria-label={editHref ? `Edit hole ${h} scores` : undefined}
+          this={onPick ? 'button' : editHref ? 'a' : 'div'}
+          class="cell {onPick ? holeClass(h) : ''}"
+          class:current={onPick ? h === selected : !state.decided && h === state.thru + 1}
+          class:link={!!editHref || !!onPick}
+          href={editHref && !onPick ? editHref(h) : undefined}
+          aria-label={onPick ? `Hole ${h}` : editHref ? `Edit hole ${h} scores` : undefined}
+          onclick={onPick ? () => onPick(h) : undefined}
+          role={onPick ? 'button' : undefined}
         >
           <span class="num" style={o ? `background:${winnerColour(o)};color:#fff;border-color:transparent` : ''}>{h}</span>
           <span class="chip" style={lead ? `background:${lead > 0 ? 'var(--team-a)' : 'var(--team-b)'};color:#fff` : ''}>{chip(lead)}</span>
@@ -28,7 +44,7 @@
       {/each}
     </div>
   {/each}
-  {#if editHref}<p class="muted small hint">Tap a hole to edit its scores.</p>{/if}
+  {#if editHref && !onPick}<p class="muted small hint">Tap a hole to edit its scores.</p>{/if}
 </div>
 
 <style>
@@ -38,6 +54,9 @@
   .hint { margin: 10px 0 0; text-align: center; }
   .cell.link { color: inherit; text-decoration: none; cursor: pointer; }
   .cell.link:active { background: var(--line); }
+  button.cell { background: none; border: 0; min-height: 0; width: 100%; font: inherit; color: inherit; }
+  .cell.partial .num { border-color: #f0a030; }
+  .cell.locked { opacity: 0.55; }
   .cell.current { background: var(--text); }
   .cell.current .num { color: #fff; border-color: #fff; }
   .num {

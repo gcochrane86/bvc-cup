@@ -717,3 +717,14 @@ test('the admin can hide the Leaderboard tab from players; they land on Scores',
   await expect(trip).toHaveURL(/#\/score$/); // old links to the leaderboard go to Scores
   await expect(trip.getByTestId('tracker')).toHaveCount(0);
 });
+
+test('score entry hole buttons show who won each hole and the running score, like the match summary', async ({ page }) => {
+  await login(page);
+  await openGroup1(page);
+  await enterHole(page, 1, 4, 5); // A wins hole 1
+  const hole1 = page.getByRole('button', { name: 'Hole 1', exact: true });
+  await expect(hole1).toContainText('1UP');
+  await enterHole(page, 2, 5, 4); // B wins hole 2 → all square
+  await expect(page.getByRole('button', { name: 'Hole 2', exact: true })).toContainText('AS');
+  await expect(page.getByRole('button', { name: 'Hole 3', exact: true })).toContainText('–'); // not played
+});

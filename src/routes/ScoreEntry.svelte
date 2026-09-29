@@ -5,6 +5,7 @@
   import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
   import { isScoreLocked, playerHole, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
+  import HoleGrid from '../components/HoleGrid.svelte';
 
   let { groupId, startHole = null }: { groupId: string | null; startHole?: number | null } = $props();
 
@@ -198,13 +199,11 @@
     {/if}
   </header>
 
-  <div class="strip">
-    {#each found.round.holes as h (h.hole)}
-      <button class="hole {holeState(h.hole)}" class:current={h.hole === hole} aria-label="Hole {h.hole}" onclick={() => (pickedHole = h.hole)}>
-        {h.hole}
-      </button>
-    {/each}
-  </div>
+  <!-- Like the match summary: who won each hole and the running score (the fourball's), tap to pick a hole. -->
+  {@const summary = found.group.matches.find((m) => m.def.type === 'better_ball') ?? found.group.matches[0]}
+  {#if summary}
+    <HoleGrid state={summary.state} onPick={(h) => (pickedHole = h)} selected={hole} holeClass={holeState} />
+  {/if}
 
   <div class="statuses">
     {#each found.group.matches as m (m.def.id)}
@@ -258,12 +257,6 @@
   .head h1 { margin-bottom: 2px; }
   .head p { margin: 0 0 10px; }
   .pending { background: #fff4e5; color: #6b3d00; font-weight: 700; font-size: 0.8rem; padding: 6px 10px; border-radius: 999px; white-space: nowrap; }
-  .strip { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin-bottom: 12px; }
-  .hole { min-height: 36px; padding: 0; border-radius: 8px; background: var(--surface); color: var(--text); border: 1px solid var(--line); font-size: 0.85rem; }
-  .hole.done { background: #e7efe9; }
-  .hole.partial { background: #fff4e5; }
-  .hole.locked { background: #eee; color: var(--muted); }
-  .hole.current { background: var(--accent); color: #fff; border-color: var(--accent); }
   .statuses { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
   .statuses span { display: flex; flex-direction: column; }
   .prow { display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: 'av who step' 'av pu step'; gap: 4px 10px; align-items: center; border: 2px solid transparent; }
