@@ -1,4 +1,4 @@
-import { scoreKey, type ScoreIndex } from './matchState';
+import { playerHole, scoreKey, type ScoreIndex } from './matchState';
 import { strokesOnHole } from './strokes';
 import type { HoleInfo } from './types';
 
@@ -12,9 +12,16 @@ export interface PairNet {
 /**
  * A pair's better-ball net score to par, off each player's full course handicap. Only holes where both
  * players have an entry count; a pick-up leaves it to the partner, and both picking up counts as net
- * double bogey (a Stableford 0). Null before the pair has played a hole.
+ * double bogey (a Stableford 0). Players on another tee use that tee's par and stroke index. Null before
+ * the pair has played a hole.
  */
-export function pairNet(ids: string[], holes: HoleInfo[], idx: ScoreIndex, courseHcp: Record<string, number>): PairNet | null {
+export function pairNet(
+  ids: string[],
+  holes: HoleInfo[],
+  idx: ScoreIndex,
+  courseHcp: Record<string, number>,
+  teeHoles?: Record<string, HoleInfo[]>,
+): PairNet | null {
   let toPar = 0;
   let thru = 0;
   for (const h of holes) {
@@ -23,8 +30,11 @@ export function pairNet(ids: string[], holes: HoleInfo[], idx: ScoreIndex, cours
     const nets = ids
       .map((id, i) => ({ id, e: entries[i]! }))
       .filter(({ e }) => !e.pickedUp && e.gross !== null)
-      .map(({ id, e }) => e.gross! - strokesOnHole(courseHcp[id] ?? 0, h.strokeIndex));
-    toPar += nets.length ? Math.min(...nets) - h.par : 2;
+      .map(({ id, e }) => {
+        const own = playerHole({ teeHoles }, id, h);
+        return e.gross! - strokesOnHole(courseHcp[id] ?? 0, own.strokeIndex) - own.par;
+      });
+    toPar += nets.length ? Math.min(...nets) : 2;
     thru++;
   }
   return thru ? { toPar, thru } : null;
