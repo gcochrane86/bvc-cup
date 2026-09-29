@@ -19,7 +19,8 @@ describe('parseRoute', () => {
     ['#/admin/results', { name: 'not-found' }], // Reopen moved to each event's admin page
     ['#/admin/access', { name: 'admin-access' }],
     ['#/admin/courses', { name: 'admin-courses' }],
-    ['#/admin/courses/new', { name: 'admin-course', courseId: 'new' }],
+    ['#/admin/courses/new', { name: 'admin-course', courseId: 'new', copyFrom: null }],
+    ['#/admin/courses/new/c1', { name: 'admin-course', courseId: 'new', copyFrom: 'c1' }],
     ['#/admin/events', { name: 'admin-events' }],
     ['#/admin/events/e1', { name: 'admin-event', eventId: 'e1' }],
     ['#/admin/pairings/r1', { name: 'admin-pairings', roundId: 'r1' }],

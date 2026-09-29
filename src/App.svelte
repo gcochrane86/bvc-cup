@@ -76,8 +76,8 @@
       {:else if route.name === 'admin-courses'}
         <AdminCourses />
       {:else if route.name === 'admin-course'}
-        {#key route.courseId}
-          <AdminCourse courseId={route.courseId} />
+        {#key `${route.courseId}:${route.copyFrom}`}
+          <AdminCourse courseId={route.courseId} copyFrom={route.copyFrom} />
         {/key}
       {:else if route.name === 'admin-events'}
         <AdminEvents />

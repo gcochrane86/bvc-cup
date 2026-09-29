@@ -1,6 +1,7 @@
 <script lang="ts">
   import { db } from '../lib/data/store.svelte';
   import { buildEventView, leaderboardRoundId } from '../lib/view';
+  import { courseLabel } from '../lib/courses';
   import { readScoringGroup } from '../lib/scoringMemory';
   import { isAdmin } from '../lib/auth.svelte';
   import TeamTracker from '../components/TeamTracker.svelte';
@@ -50,7 +51,7 @@
     </div>
     {#if rv}
       {@const course = db.courses.find((c) => c.id === rv.round.course_id)}
-      {#if course}<h2 class="course">{course.name}</h2>{/if}
+      {#if course}<h2 class="course">{courseLabel(course)}</h2>{/if}
       <p class="muted small">{rv.completed} of {rv.totalMatches} matches completed</p>
       {#each rv.groups as g (g.group.id)}
         {#each g.matches as mv (mv.def.id)}

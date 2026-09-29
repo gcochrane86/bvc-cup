@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isBirdieOrBetter, scoreKey, strokesOnHole, type HoleInfo, type MatchDef, type ScoreIndex, type Team } from '../lib/scoring';
+  import { isBirdieOrBetter, playerHole, scoreKey, strokesOnHole, type HoleInfo, type MatchDef, type ScoreIndex, type Team } from '../lib/scoring';
   import { playerShort } from '../lib/data/store.svelte';
 
   let { def, holes, scores, teamOf, playingHcp = {} }: {
@@ -11,7 +11,7 @@
 
   function birdie(pid: string, h: HoleInfo): boolean {
     const e = scores.get(scoreKey(pid, h.hole));
-    return !!e && !e.pickedUp && isBirdieOrBetter(e.gross, h.par);
+    return !!e && !e.pickedUp && isBirdieOrBetter(e.gross, playerHole(def, pid, h).par); // own tee's par
   }
   function cell(pid: string, h: HoleInfo): string {
     const e = scores.get(scoreKey(pid, h.hole));
@@ -45,7 +45,7 @@
           <tr>
             <td class="pname" style="color:var(--team-{teamOf[pid] === 'A' ? 'a' : 'b'})">{playerShort(pid)}{#if playingHcp[pid] !== undefined} <small>({playingHcp[pid]})</small>{/if}</td>
             {#each nine as h (h.hole)}
-              {@const shots = strokesOnHole(def.strokes[pid] ?? 0, h.strokeIndex)}
+              {@const shots = strokesOnHole(def.strokes[pid] ?? 0, playerHole(def, pid, h).strokeIndex)}
               <td class:shot={shots > 0}><span class:birdie={birdie(pid, h)}>{cell(pid, h)}</span>{#if shots}<sup>{'•'.repeat(shots)}</sup>{/if}</td>
             {/each}
             <td><strong>{total(pid, nine)}</strong></td>

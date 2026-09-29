@@ -30,22 +30,24 @@ async function run<T>(q: PromiseLike<{ data: T; error: { message: string } | nul
 // Official Glashedy scorecard (Oct 2025) and the club's WHS course handicap tables (from 16 Sep 2025).
 const PARS = [4, 4, 4, 5, 3, 4, 3, 4, 4, 4, 4, 4, 5, 3, 4, 4, 5, 4];
 const SI = [10, 2, 8, 18, 16, 14, 12, 6, 4, 17, 7, 3, 11, 15, 1, 5, 9, 13];
+// Glashedy Links with three tees (a tee is a course record named by `tee`).
+const NAME = 'Glashedy Links';
 const TEES = [
-  { name: 'Glashedy Links (Black)', course_rating: 77.4, slope_rating: 136 },
-  { name: 'Glashedy Links (Gold)', course_rating: 73.6, slope_rating: 127 },
-  { name: 'Glashedy Links (White)', course_rating: 71.3, slope_rating: 123 },
+  { tee: 'Black', course_rating: 77.4, slope_rating: 136 },
+  { tee: 'Gold', course_rating: 73.6, slope_rating: 127 },
+  { tee: 'White', course_rating: 71.3, slope_rating: 123 },
 ];
 
 const courseIds: Record<string, string> = {};
 for (const t of TEES) {
-  const found = await run(db.from('courses').select('id').eq('name', t.name));
-  const id: string = found[0]?.id ?? (await run(db.from('courses').insert(t).select('id').single())).id;
+  const found = await run(db.from('courses').select('id').eq('name', NAME).eq('tee', t.tee));
+  const id: string = found[0]?.id ?? (await run(db.from('courses').insert({ name: NAME, ...t }).select('id').single())).id;
   // Replace the holes rather than upsert (as Admin's save does): stroke indexes are unique per course,
   // so updating them in place fails if a course of this name already has different ones.
   await run(db.from('course_holes').delete().eq('course_id', id));
   await run(db.from('course_holes').insert(PARS.map((par, i) => ({ course_id: id, hole: i + 1, par, stroke_index: SI[i] }))));
   await run(db.from('courses').update({ course_rating: t.course_rating, slope_rating: t.slope_rating }).eq('id', id));
-  courseIds[t.name] = id;
+  courseIds[t.tee] = id;
 }
 
 const event =
@@ -56,7 +58,7 @@ const round =
   (await run(
     db
       .from('rounds')
-      .insert({ event_id: event.id, round_no: 1, name: 'Day 1', course_id: courseIds['Glashedy Links (Gold)'], singles_enabled: false })
+      .insert({ event_id: event.id, round_no: 1, name: 'Day 1', course_id: courseIds.Gold, singles_enabled: false })
       .select('id')
       .single(),
   ));

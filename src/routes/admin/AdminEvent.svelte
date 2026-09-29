@@ -1,7 +1,8 @@
 <script lang="ts">
   import { db, loadAll } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
-  import type { EventPlayerRow, EventRow, RoundRow } from '../../lib/data/types';
+  import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
+  import { courseGroups, courseLabel, teesOf } from '../../lib/courses';
   import { autoFourball } from '../../lib/scoring';
   import ResetScores from '../../components/ResetScores.svelte';
   import ConfirmedResults from '../../components/ConfirmedResults.svelte';
@@ -14,6 +15,24 @@
   let rounds = $state<RoundRow[]>([]);
   let msg = $state<string | null>(null);
   let newRound = $state({ name: '', course_id: '', date: '' });
+  let roundTees = $state<RoundTeeRow[]>([]);
+  /** `${roundId}:${playerId}` for players whose match that day is confirmed (their tee is locked). */
+  let locked = $state<Set<string>>(new Set());
+
+  const courseName = (id: string) => db.courses.find((c) => c.id === id)?.name ?? '';
+  const teeOfPlayer = (roundId: string, pid: string) => roundTees.find((t) => t.round_id === roundId && t.player_id === pid)?.course_id ?? '';
+  const lockedIn = (roundId: string, pid: string) => locked.has(`${roundId}:${pid}`);
+  const setPlayerTee = (r: RoundRow, pid: string, courseId: string) => {
+    const name = db.players.find((p) => p.id === pid)?.name ?? 'Player';
+    const tee = db.courses.find((c) => c.id === (courseId || r.course_id))?.tee ?? 'main';
+    return act(
+      () =>
+        courseId
+          ? must(supabase.from('round_tees').upsert({ round_id: r.id, player_id: pid, course_id: courseId }))
+          : must(supabase.from('round_tees').delete().eq('round_id', r.id).eq('player_id', pid)),
+      `${name} plays the ${tee} tees on ${r.name}`,
+    );
+  };
 
   async function load() {
     const id = eventId;
@@ -24,6 +43,17 @@
     ]);
     event = ev;
     rounds = rs;
+    const ids = rs.map((r) => r.id);
+    if (ids.length) {
+      const [tees, gs] = await Promise.all([
+        must(supabase.from('round_tees').select('*').in('round_id', ids)) as Promise<RoundTeeRow[]>,
+        must(supabase.from('groups').select('round_id, group_players(player_id), match_results(match_type)').in('round_id', ids)) as Promise<
+          { round_id: string; group_players: { player_id: string }[]; match_results: unknown[] }[]
+        >,
+      ]);
+      roundTees = tees;
+      locked = new Set(gs.filter((g) => g.match_results.length).flatMap((g) => g.group_players.map((gp) => `${g.round_id}:${gp.player_id}`)));
+    }
     members = Object.fromEntries(
       db.players.map((p) => {
         const m = eps.find((x) => x.player_id === p.id);
@@ -149,12 +179,13 @@
               fourball_format: r.fourball_format,
             })
             .eq('id', r.id),
-        ).then(() =>
+        ).then(async () => {
+          // A different course: players' tees from the old course no longer apply.
+          const tees = teesOf(db.courses, courseName(r.course_id)).map((t) => t.id);
+          await must(supabase.from('round_tees').delete().eq('round_id', r.id).not('course_id', 'in', `(${tees.join(',')})`));
           // By handicap means the straight line-up for every group (random/chosen are set on the pairings page).
-          r.singles_pairing === 'handicap'
-            ? must(supabase.from('groups').update({ singles_crossed: false }).eq('round_id', r.id))
-            : null,
-        ),
+          if (r.singles_pairing === 'handicap') await must(supabase.from('groups').update({ singles_crossed: false }).eq('round_id', r.id));
+        }),
       `${r.name} saved`,
     );
 </script>
@@ -211,10 +242,37 @@
         </div>
         <div class="field">
           <label for="rc-{r.id}">Course</label>
-          <select id="rc-{r.id}" bind:value={r.course_id}>
-            {#each db.courses as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
+          <select id="rc-{r.id}" value={courseName(r.course_id)} onchange={(e) => (r.course_id = teesOf(db.courses, (e.currentTarget as HTMLSelectElement).value)[0].id)}>
+            {#each courseGroups(db.courses) as g (g.name)}<option value={g.name}>{g.name}</option>{/each}
           </select>
         </div>
+        {#if teesOf(db.courses, courseName(r.course_id)).some((t) => t.tee)}
+          <div class="field">
+            <label for="rt-{r.id}">Tees</label>
+            <select id="rt-{r.id}" bind:value={r.course_id}>
+              {#each teesOf(db.courses, courseName(r.course_id)) as t (t.id)}<option value={t.id}>{t.tee ?? 'Main'} tees</option>{/each}
+            </select>
+          </div>
+          <details class="player-tees">
+            <summary>Players on different tees</summary>
+            <p class="muted small">Everyone plays the tees above unless picked here. Save the round first if you changed its course or tees.</p>
+            {#each Object.entries(members).filter(([, m]) => m.team) as [pid] (pid)}
+              {@const p = db.players.find((x) => x.id === pid)}
+              <div class="member">
+                <span class="pname">{p?.name}</span>
+                <select
+                  aria-label="{p?.name} tee on {r.name}"
+                  value={teeOfPlayer(r.id, pid)}
+                  disabled={lockedIn(r.id, pid)}
+                  onchange={(e) => setPlayerTee(r, pid, (e.currentTarget as HTMLSelectElement).value)}
+                >
+                  <option value="">Main tee</option>
+                  {#each teesOf(db.courses, courseName(r.course_id)).filter((t) => t.id !== r.course_id) as t (t.id)}<option value={t.id}>{t.tee} tees</option>{/each}
+                </select>
+              </div>
+            {/each}
+          </details>
+        {/if}
         <div class="field">
           <label for="rf-{r.id}">Fourball game</label>
           <select id="rf-{r.id}" bind:value={r.fourball_format}>
@@ -261,7 +319,7 @@
         <label for="nrc">Course</label>
         <select id="nrc" bind:value={newRound.course_id} required>
           <option value="" disabled>Choose a course</option>
-          {#each db.courses as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
+          {#each courseGroups(db.courses).flatMap((g) => g.tees) as c (c.id)}<option value={c.id}>{courseLabel(c)}</option>{/each}
         </select>
       </div>
       <button type="submit">Add round</button>
@@ -292,6 +350,7 @@
   .hcp { text-align: center; color: var(--muted); }
   .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .round { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+  .player-tees summary { cursor: pointer; font-weight: 600; margin: 4px 0 8px; }
   .more summary { cursor: pointer; font-weight: 700; padding: 12px 0; color: var(--muted); }
   input[type='color'] { padding: 4px; }
 </style>

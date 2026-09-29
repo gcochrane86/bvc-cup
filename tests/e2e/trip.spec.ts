@@ -632,3 +632,45 @@ test('a two-v-two event is paired automatically when the teams are saved', async
   await expect(card).toContainText('Evans');
   await expect(card).not.toContainText('Davies');
 });
+
+test('a day has a course and tees, and a player can play off a different tee', async ({ browser }) => {
+  const db = serviceDb();
+  // The seed course (par 72) gets a name for its tee, and a second, shorter tee rated 5 lower.
+  const { data: round } = await db.from('rounds').select('id, course_id').eq('round_no', 1).single();
+  const { data: main } = await db.from('courses').select('*').eq('id', round!.course_id).single();
+  await db.from('courses').update({ tee: 'Blue', slope_rating: 113, course_rating: 72 }).eq('id', main!.id);
+  const { data: holes } = await db.from('course_holes').select('*').eq('course_id', main!.id);
+  const { data: red } = await db.from('courses').insert({ name: main!.name, tee: 'Red', slope_rating: 113, course_rating: 67 }).select('id').single();
+  await db.from('course_holes').insert(holes!.map((h) => ({ ...h, course_id: red!.id })));
+
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  const { data: ev } = await db.from('events').select('id').eq('is_active', true).single();
+  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await expect(admin.getByLabel('Tees').first()).toHaveValue(main!.id);
+  await admin.getByText('Players on different tees').first().click();
+  await admin.getByLabel('Alex Adams tee on Day 1').selectOption(red!.id);
+  await expect(admin.getByText('Alex Adams plays the Red tees on Day 1')).toBeVisible();
+
+  await admin.goto('/#/');
+  await expect(admin.getByRole('heading', { name: `${main!.name} · Blue tees` })).toBeVisible();
+
+  const me = await newPhone(browser);
+  await login(me);
+  await openGroup1(me);
+  const adams = me.getByTestId('row-A1');
+  await expect(adams).toContainText('Adams');
+  await expect(adams).toContainText('Red tees');
+  // Blue: 10 × 113/113 + (72 − 72) = 10. Red: 10 + (67 − 72) = 5.
+  await expect(adams).toContainText('(5)');
+
+  // Moving Day 1 to another course drops tees from the old one.
+  const { data: other } = await db.from('courses').insert({ name: 'Other Links' }).select('id').single();
+  await db.from('course_holes').insert(holes!.map((h) => ({ ...h, course_id: other!.id })));
+  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await admin.reload(); // pick up the course the test just added
+  await admin.getByLabel('Course').first().selectOption('Other Links');
+  await admin.getByRole('button', { name: 'Save round' }).first().click();
+  await expect(admin.getByText('Day 1 saved')).toBeVisible();
+  await expect.poll(async () => (await db.from('round_tees').select('player_id').eq('round_id', round!.id)).data?.length).toBe(0);
+});

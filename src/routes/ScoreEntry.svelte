@@ -3,7 +3,7 @@
   import { untrack } from 'svelte';
   import { db, enterScore, loadAll, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
   import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
-  import { isScoreLocked, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
+  import { isScoreLocked, playerHole, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
 
   let { groupId, startHole = null }: { groupId: string | null; startHole?: number | null } = $props();
@@ -97,16 +97,18 @@
     const singles = found.group.matches.find(
       (m) => m.def.type !== 'better_ball' && [...m.def.sideA, ...m.def.sideB].includes(pid),
     );
-    const bb = bbMatch ? strokesOnHole(bbMatch.def.strokes[pid] ?? 0, info.strokeIndex) : 0;
-    const sg = singles ? strokesOnHole(singles.def.strokes[pid] ?? 0, info.strokeIndex) : null;
+    const own = playerHole({ teeHoles: found.group.teeHoles }, pid, info); // the player's own tee
+    const bb = bbMatch ? strokesOnHole(bbMatch.def.strokes[pid] ?? 0, own.strokeIndex) : 0;
+    const sg = singles ? strokesOnHole(singles.def.strokes[pid] ?? 0, own.strokeIndex) : null;
     return { bb, label: shotLabel(bb, sg), stableford: !!bbMatch?.def.stableford };
   }
 
   /** Fourball Stableford points for the score being entered (a pick-up scores 0). */
   function points(pid: string, bb: number): number {
     const d = draft[pid];
-    if (!info || d.pickedUp) return 0;
-    return Math.max(0, 2 + info.par - (d.gross - bb));
+    if (!info || !found || d.pickedUp) return 0;
+    const par = playerHole({ teeHoles: found.group.teeHoles }, pid, info).par; // own tee's par
+    return Math.max(0, 2 + par - (d.gross - bb));
   }
 
   const locked = (pid: string, h: number) => (found ? isScoreLocked(pid, h, found.group.matches) : false);
@@ -221,6 +223,7 @@
           <div class="chips">
             {#if sh.label}<span class="chip shotchip">{sh.label}</span>{/if}
             {#if sh.stableford}<span class="chip pts">{points(pid, sh.bb)} pts</span>{/if}
+            {#if found.group.teeOf[pid]}<span class="chip tee">{found.group.teeOf[pid].tee ?? 'Other'} tees</span>{/if}
             {#if isLocked}<span class="chip lock">Locked</span>{/if}
           </div>
         </div>
@@ -265,6 +268,7 @@
   .chip { font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
   .shotchip { background: var(--shot-text); color: #fff; }
   .pts { background: var(--accent); color: #fff; }
+  .tee { background: var(--line); color: var(--text); }
   .lock { background: #ddd; color: #333; }
   .stepper { grid-area: step; display: flex; align-items: center; gap: 6px; }
   .stepper button { width: 48px; height: 48px; padding: 0; font-size: 1.5rem; }
