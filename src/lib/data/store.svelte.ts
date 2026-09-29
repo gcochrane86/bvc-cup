@@ -7,12 +7,12 @@ import { planPhotoUrls, PHOTO_URL_TTL_S, type SignedPhoto } from './photoUrls';
 import { createOutbox, pendingKey, type OutboxStorage, type PendingScore, type SendResult } from './outbox';
 import type {
   CourseHoleRow, CourseRow, EventPlayerRow, EventRow, GroupPlayerRow, GroupRow,
-  MatchResultRow, PlayerRow, RoundRow, ScoreRow, Snapshot,
+  MatchResultRow, PlayerRow, RoundRow, RoundTeeRow, ScoreRow, Snapshot,
 } from './types';
 
 const empty = (): Snapshot => ({
   event: null, players: [], courses: [], courseHoles: [], eventPlayers: [],
-  rounds: [], groups: [], groupPlayers: [], scores: [], results: [],
+  rounds: [], groups: [], groupPlayers: [], scores: [], results: [], roundTees: [],
 });
 
 export const db = $state({
@@ -97,7 +97,7 @@ export const loadAll = freshOnly(async () => {
   }
 });
 
-/** An event's rounds, groups, players, scores and results (for the active event, or one opened in Admin). */
+/** An event's rounds, groups, players, tees, scores and results (for the active event, or one opened in Admin). */
 export async function fetchEventData(eventId: string) {
   const [eventPlayers, rounds] = await Promise.all([
     must(supabase.from('event_players').select('*').eq('event_id', eventId)) as Promise<EventPlayerRow[]>,
@@ -107,12 +107,14 @@ export async function fetchEventData(eventId: string) {
   let groupPlayers: GroupPlayerRow[] = [];
   let scores: ScoreRow[] = [];
   let results: MatchResultRow[] = [];
+  let roundTees: RoundTeeRow[] = [];
   const roundIds = rounds.map((r) => r.id);
   if (roundIds.length) {
     // 3 rounds x 12 players x 18 holes = 648 score rows, under the API's 1000-row default.
-    [groups, scores] = await Promise.all([
+    [groups, scores, roundTees] = await Promise.all([
       must(supabase.from('groups').select('*').in('round_id', roundIds)) as Promise<GroupRow[]>,
       must(supabase.from('scores').select('*').in('round_id', roundIds)) as Promise<ScoreRow[]>,
+      must(supabase.from('round_tees').select('*').in('round_id', roundIds)) as Promise<RoundTeeRow[]>,
     ]);
     const groupIds = groups.map((g) => g.id);
     if (groupIds.length) {
@@ -122,7 +124,7 @@ export async function fetchEventData(eventId: string) {
       ]);
     }
   }
-  return { eventPlayers, rounds, groups, groupPlayers, scores, results };
+  return { eventPlayers, rounds, groups, groupPlayers, scores, results, roundTees };
 }
 
 async function doLoad() {
@@ -134,12 +136,12 @@ async function doLoad() {
       must(supabase.from('course_holes').select('*')) as Promise<CourseHoleRow[]>,
     ]);
     const event = events[0] ?? null;
-    const { eventPlayers, rounds, groups, groupPlayers, scores, results } = event
+    const { eventPlayers, rounds, groups, groupPlayers, scores, results, roundTees } = event
       ? await fetchEventData(event.id)
-      : { eventPlayers: [], rounds: [], groups: [], groupPlayers: [], scores: [], results: [] };
+      : { eventPlayers: [], rounds: [], groups: [], groupPlayers: [], scores: [], results: [], roundTees: [] };
     const pending = await outbox.pending();
     Object.assign(db, {
-      event, players, courses, courseHoles, eventPlayers, rounds, groups, groupPlayers, results,
+      event, players, courses, courseHoles, eventPlayers, rounds, groups, groupPlayers, results, roundTees,
       scores: applyPending(scores, pending),
       pending,
       loaded: true,
@@ -197,7 +199,7 @@ async function checkForMissed() {
 }
 
 // ---- realtime ----
-const SETUP_TABLES = ['players', 'courses', 'course_holes', 'events', 'event_players', 'rounds', 'groups', 'group_players'];
+const SETUP_TABLES = ['players', 'courses', 'course_holes', 'events', 'event_players', 'rounds', 'groups', 'group_players', 'round_tees'];
 let channel: RealtimeChannel | null = null;
 let reloadTimer: ReturnType<typeof setTimeout> | undefined;
 let pollTimer: ReturnType<typeof setInterval> | undefined;

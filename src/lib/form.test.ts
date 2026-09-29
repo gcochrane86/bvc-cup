@@ -18,7 +18,7 @@ function snapshot(over: Partial<Snapshot> = {}): Snapshot {
   return {
     event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: true },
     players: [],
-    courses: [{ id: 'c', name: 'Links', slope_rating: null, course_rating: null }],
+    courses: [{ id: 'c', name: 'Links', tee: null, slope_rating: null, course_rating: null }],
     courseHoles: Array.from({ length: 18 }, (_, i) => ({ course_id: 'c', hole: i + 1, par: 4, stroke_index: i + 1 })),
     eventPlayers: ['a1', 'a2', 'b1', 'b2'].map((id) => ({ event_id: 'e', player_id: id, team: id[0].toUpperCase() as Team, handicap: 10 })),
     rounds: [round('r1', 1), round('r2', 2)],
@@ -39,6 +39,7 @@ function snapshot(over: Partial<Snapshot> = {}): Snapshot {
     results: [
       { group_id: 'g1', match_type: 'better_ball', winner: 'A', points_a: 1, points_b: 0, result_text: '2&1', final_hole: 17, confirmed_at: 'x' },
     ],
+    roundTees: [],
     ...over,
   };
 }
@@ -69,6 +70,19 @@ describe('form', () => {
     // b1: hole 1 gross 4 − 1 shot = net 3 (3 pts)
     expect(row(rows, 'b1')).toMatchObject({ stableford: 3, pickups: 0 });
     expect(rankForm(rows, 'stableford').map((r) => [r.row.playerId, r.rank])).toEqual([['a1', 1], ['b1', 2], ['a2', 3], ['b2', 3]]);
+  });
+
+  it("scores a player on another tee against that tee's par", () => {
+    const s = snapshot();
+    const c2Holes = s.courseHoles.map((h) => ({ ...h, course_id: 'c2', ...(h.hole === 1 ? { par: 5 } : {}) }));
+    const view = buildEventView({
+      ...s,
+      courses: [...s.courses, { id: 'c2', name: 'Links', tee: 'Red', slope_rating: null, course_rating: null }],
+      courseHoles: [...s.courseHoles, ...c2Holes],
+      roundTees: [{ round_id: 'r1', player_id: 'b1', course_id: 'c2' }],
+    })!;
+    // b1's 4 on hole 1 is now on a par 5: gross −1, a birdie.
+    expect(row(computeForm(view, 'r1'), 'b1')).toMatchObject({ grossToPar: -1, birdies: 1 });
   });
 
   it('can cover all days or one day', () => {

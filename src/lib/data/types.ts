@@ -1,7 +1,10 @@
 import type { MatchType, Outcome, Slot, Team } from '../scoring';
 
 export interface PlayerRow { id: string; name: string; short_name: string; default_handicap: number; photo_path: string | null }
-export interface CourseRow { id: string; name: string; slope_rating: number | null; course_rating: number | null }
+/** A course record is one tee of a course: records sharing a name are that course's tees (tee null = one unnamed tee). */
+export interface CourseRow { id: string; name: string; tee: string | null; slope_rating: number | null; course_rating: number | null }
+/** A player on a tee other than the day's main tee (rounds.course_id). */
+export interface RoundTeeRow { round_id: string; player_id: string; course_id: string }
 export interface CourseHoleRow { course_id: string; hole: number; par: number; stroke_index: number }
 export interface EventRow {
   id: string; name: string;
@@ -54,4 +57,5 @@ export interface Snapshot {
   groupPlayers: GroupPlayerRow[];
   scores: ScoreRow[];
   results: MatchResultRow[];
+  roundTees: RoundTeeRow[];
 }

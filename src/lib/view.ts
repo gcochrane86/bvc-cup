@@ -20,7 +20,7 @@ import {
   type Team,
   type Tracker,
 } from './scoring';
-import type { EventRow, GroupRow, RoundRow, Snapshot } from './data/types';
+import type { CourseRow, EventRow, GroupRow, RoundRow, Snapshot } from './data/types';
 
 export interface MatchView {
   def: MatchDef; state: MatchState; result: ConfirmedResult | null;
@@ -31,8 +31,12 @@ export interface MatchView {
 }
 export interface GroupView {
   group: GroupRow; slots: Partial<Record<Slot, string>>; matches: MatchView[]; scores: ScoreIndex;
-  /** Each player's course handicap for this round (index converted with the course's slope/rating). */
+  /** Each player's course handicap for this round (index converted with their own tee's slope/rating/par). */
   playingHcp: Record<string, number>;
+  /** Each player's holes as they play them: their own tee's par and stroke index. */
+  teeHoles: Record<string, HoleInfo[]>;
+  /** Players on a tee other than the day's main tee, and that tee. */
+  teeOf: Record<string, CourseRow>;
 }
 export interface RoundView {
   round: RoundRow; settings: RoundSettings; holes: HoleInfo[]; groups: GroupView[]; completed: number; totalMatches: number;
@@ -70,14 +74,13 @@ export function buildEventView(s: Snapshot): EventView | null {
       const settings = settingsOf(round);
       const pointsAvailable = roundPointsAvailable(settings, groupCount);
       total += pointsAvailable;
-      const holes = s.courseHoles
-        .filter((h) => h.course_id === round.course_id)
-        .map((h) => ({ hole: h.hole, par: h.par, strokeIndex: h.stroke_index }))
-        .sort((a, b) => a.hole - b.hole);
+      const holesOf = (courseId: string): HoleInfo[] =>
+        s.courseHoles
+          .filter((h) => h.course_id === courseId)
+          .map((h) => ({ hole: h.hole, par: h.par, strokeIndex: h.stroke_index }))
+          .sort((a, b) => a.hole - b.hole);
+      const holes = holesOf(round.course_id);
       const course = s.courses.find((c) => c.id === round.course_id);
-      const par = holes.reduce((sum, h) => sum + h.par, 0);
-      const slope = course?.slope_rating ?? null;
-      const rating = course?.course_rating != null ? Number(course.course_rating) : null;
       const scores = indexScores(
         s.scores
           .filter((x) => x.round_id === round.id)
@@ -89,19 +92,32 @@ export function buildEventView(s: Snapshot): EventView | null {
         .map((group): GroupView => {
           const members = s.groupPlayers.filter((gp) => gp.group_id === group.id);
           const slots = Object.fromEntries(members.map((gp) => [gp.slot, gp.player_id])) as Partial<Record<Slot, string>>;
+          // Players on another tee play that tee's holes and get a course handicap off its slope/rating/par.
+          const teeOf: Record<string, CourseRow> = {};
+          const teeHoles: Record<string, HoleInfo[]> = {};
+          for (const gp of members) {
+            const row = s.roundTees.find((t) => t.round_id === round.id && t.player_id === gp.player_id);
+            const tee = row && row.course_id !== round.course_id ? s.courses.find((c) => c.id === row.course_id) : undefined;
+            if (tee) teeOf[gp.player_id] = tee;
+            teeHoles[gp.player_id] = tee ? holesOf(tee.id) : holes;
+          }
           const playingHcp = Object.fromEntries(
             members.map((gp) => {
               // A confirmed group plays off the index it was played with; others use the current one.
               const index = gp.handicap !== null && gp.handicap !== undefined ? Number(gp.handicap) : (handicapOf[gp.player_id] ?? 0);
-              return [gp.player_id, courseHandicap(index, slope, rating, par)];
+              const c = teeOf[gp.player_id] ?? course;
+              const par = teeHoles[gp.player_id].reduce((sum, h) => sum + h.par, 0);
+              const rating = c?.course_rating != null ? Number(c.course_rating) : null;
+              return [gp.player_id, courseHandicap(index, c?.slope_rating ?? null, rating, par)];
             }),
           );
+          const onOtherTees = Object.keys(teeOf).length > 0;
           const defs = buildMatches(
             group.id,
             members.map((gp) => ({ slot: gp.slot, playerId: gp.player_id, handicap: playingHcp[gp.player_id] })),
             settings,
             !!group.singles_crossed,
-          );
+          ).map((def) => (onOtherTees ? { ...def, teeHoles } : def));
           const matches = defs.map((def): MatchView => {
             const row = s.results.find((r) => r.group_id === group.id && r.match_type === def.type);
             const result: ConfirmedResult | null = row
@@ -117,12 +133,12 @@ export function buildEventView(s: Snapshot): EventView | null {
               : null;
             const net =
               def.type === 'better_ball'
-                ? { a: pairNet(def.sideA, holes, scores, playingHcp), b: pairNet(def.sideB, holes, scores, playingHcp) }
+                ? { a: pairNet(def.sideA, holes, scores, playingHcp, teeHoles), b: pairNet(def.sideB, holes, scores, playingHcp, teeHoles) }
                 : undefined;
             return { def, state: computeMatchState(def, holes, scores), result, number: ++matchNo, net };
           });
           everyMatch.push(...matches);
-          return { group, slots, matches, scores, playingHcp };
+          return { group, slots, matches, scores, playingHcp, teeHoles, teeOf };
         });
       const ms = groups.flatMap((g) => g.matches);
       return { round, settings, holes, groups, completed: ms.filter((m) => m.result).length, totalMatches: ms.length, pointsAvailable };

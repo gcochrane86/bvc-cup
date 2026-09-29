@@ -50,15 +50,16 @@ export function computeForm(view: EventView, roundId: string | null): FormRow[] 
             r.pickups++;
             continue;
           }
-          const net = e.gross - strokesOnHole(courseHcp, h.strokeIndex);
+          const own = g.teeHoles[pid]?.find((x) => x.hole === h.hole) ?? h; // the player's own tee
+          const net = e.gross - strokesOnHole(courseHcp, own.strokeIndex);
           r.holes++;
           r.gross += e.gross;
-          r.grossToPar += e.gross - h.par;
+          r.grossToPar += e.gross - own.par;
           r.net += net;
-          r.netToPar += net - h.par;
-          r.stableford += Math.max(0, 2 + h.par - net);
-          if (e.gross <= h.par - 1) r.birdies++;
-          if (e.gross >= h.par + 3) r.trebles++;
+          r.netToPar += net - own.par;
+          r.stableford += Math.max(0, 2 + own.par - net);
+          if (e.gross <= own.par - 1) r.birdies++;
+          if (e.gross >= own.par + 3) r.trebles++;
         }
       }
       for (const m of g.matches) {

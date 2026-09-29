@@ -13,7 +13,7 @@ function snapshot(over: Partial<Snapshot> = {}): Snapshot {
   return {
     event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: false },
     players: [],
-    courses: [{ id: 'c', name: 'Links', slope_rating: null, course_rating: null }],
+    courses: [{ id: 'c', name: 'Links', tee: null, slope_rating: null, course_rating: null }],
     courseHoles: Array.from({ length: 18 }, (_, i) => ({ course_id: 'c', hole: i + 1, par: 4, stroke_index: i + 1 })),
     eventPlayers: ['a1', 'a2', 'b1', 'b2'].map((id) => ({ event_id: 'e', player_id: id, team: id[0].toUpperCase() as Team, handicap: 10 })),
     rounds: [baseRound],
@@ -21,6 +21,7 @@ function snapshot(over: Partial<Snapshot> = {}): Snapshot {
     groupPlayers: (['A1', 'A2', 'B1', 'B2'] as Slot[]).map((slot) => ({ group_id: 'g1', slot, player_id: slot.toLowerCase(), handicap: null })),
     scores: [],
     results: [],
+    roundTees: [],
     ...over,
   };
 }
@@ -92,7 +93,7 @@ describe('buildEventView', () => {
     const idx: Record<string, number> = { a1: 4, a2: 18, b1: 9, b2: 14 };
     const v = buildEventView({
       ...s,
-      courses: [{ id: 'c', name: 'Links', slope_rating: 125, course_rating: 71.3 }],
+      courses: [{ id: 'c', name: 'Links', tee: null, slope_rating: 125, course_rating: 71.3 }],
       eventPlayers: s.eventPlayers.map((ep) => ({ ...ep, handicap: idx[ep.player_id] })),
     })!;
     const g = v.rounds[0].groups[0];
@@ -243,4 +244,37 @@ describe('defaultRoundId', () => {
   it('picks the next round before the trip', () => expect(defaultRoundId(rounds, '2026-09-27')).toBe('d1'));
   it('picks the last round after the trip', () => expect(defaultRoundId(rounds, '2026-11-01')).toBe('d3'));
   it('is null with no rounds', () => expect(defaultRoundId([], '2026-10-01')).toBeNull());
+});
+
+describe('tees', () => {
+  // c2: a second tee of the same course — slope 113, rating 74, par 5 on hole 1 (SI 18), par 73 in all.
+  const withTee = () => {
+    const s = snapshot();
+    const c2Holes = s.courseHoles.map((h) => ({ ...h, course_id: 'c2', ...(h.hole === 1 ? { par: 5, stroke_index: 18 } : {}) }));
+    c2Holes.find((h) => h.hole === 18)!.stroke_index = 1; // hole 1 took SI 18
+    return {
+      ...s,
+      courses: [...s.courses, { id: 'c2', name: 'Links', tee: 'White', slope_rating: 113, course_rating: 74 }],
+      courseHoles: [...s.courseHoles, ...c2Holes],
+      roundTees: [{ round_id: 'r1', player_id: 'a1', course_id: 'c2' }],
+    };
+  };
+  it("gives a player on another tee that tee's holes, and a course handicap off it", () => {
+    const g = buildEventView(withTee())!.rounds[0].groups[0];
+    expect(g.teeOf.a1.id).toBe('c2');
+    expect(g.teeHoles.a1.find((h) => h.hole === 1)).toMatchObject({ par: 5, strokeIndex: 18 });
+    // index 10 × 113/113 + (74 − 73) = 11; everyone else plays the main tee off 10
+    expect(g.playingHcp).toEqual({ a1: 11, a2: 10, b1: 10, b2: 10 });
+    expect(g.matches[0].def.teeHoles?.a1).toBe(g.teeHoles.a1);
+  });
+  it('with nobody on another tee, matches carry no tee holes (results as before)', () => {
+    const g = buildEventView(snapshot())!.rounds[0].groups[0];
+    expect(g.teeOf).toEqual({});
+    expect(g.matches[0].def.teeHoles).toBeUndefined();
+  });
+  it('ignores a tee row for a player who is not in the group', () => {
+    const s = withTee();
+    const v = buildEventView({ ...s, roundTees: [...s.roundTees, { round_id: 'r1', player_id: 'nobody', course_id: 'c2' }] })!;
+    expect(Object.keys(v.rounds[0].groups[0].teeOf)).toEqual(['a1']);
+  });
 });
