@@ -517,3 +517,15 @@ test('a day can be played as fourball Stableford: full handicaps, best points wi
   await me.goto('/#/');
   await expect(group1Card(me).getByTestId('status')).toHaveText('All Square');
 });
+
+test("the leaderboard shows each pair's better-ball net score off full handicaps", async ({ page }) => {
+  await login(page);
+  await openGroup1(page); // everyone off 10: a shot on holes 1 (SI 7) and 2 (SI 3), both par 4
+  await enterHole(page, 1, 4, 5); // A net 3 (−1), B net 4 (E)
+  await enterHole(page, 2, 4, 4); // both net 3 (−1)
+  await page.goto('/#/');
+  await expect(group1Card(page).getByTestId('net-a')).toHaveText('−2 net · thru 2');
+  await expect(group1Card(page).getByTestId('net-b')).toHaveText('−1 net · thru 2');
+  // Not on a match that hasn't started.
+  await expect(page.locator('[data-match-id$=":better_ball"]').filter({ hasText: /\bMatch 2\b/ }).getByTestId('net-a')).toHaveCount(0);
+});

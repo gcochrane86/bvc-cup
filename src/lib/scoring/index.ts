@@ -7,3 +7,4 @@ export * from './locks';
 export * from './pairings';
 export * from './courses';
 export * from './format';
+export * from './pairNet';

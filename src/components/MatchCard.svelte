@@ -2,6 +2,7 @@
   import Avatar from './Avatar.svelte';
   import { photoUrl, playerShort } from '../lib/data/store.svelte';
   import { matchLabel, type MatchView } from '../lib/view';
+  import { formatToPar, type PairNet } from '../lib/scoring';
 
   let { mv, teeTime = null, link = true }: { mv: MatchView; teeTime?: string | null; link?: boolean } = $props();
 
@@ -12,6 +13,7 @@
   const sub = $derived(
     mv.result ? '' : s.decided ? 'Awaiting confirmation' : s.started ? `THRU ${s.thru}${s.dormie ? ' · DORMIE' : ''}` : teeTime ? `Tee ${teeTime.slice(0, 5)}` : '',
   );
+  const netText = (n: PairNet) => `${formatToPar(n.toPar)} net · thru ${n.thru}`;
   const badge = $derived(mv.result ? 'FINAL' : s.decided ? 'CONFIRM' : s.started && s.lead !== 0 ? 'LEADS' : null);
 </script>
 
@@ -37,6 +39,7 @@
         {#each mv.def.sideA as id (id)}<Avatar name={playerShort(id)} url={photoUrl(id)} colour="var(--team-a)" size={44} />{/each}
       </div>
       {#each mv.def.sideA as id (id)}<div class="name">{playerShort(id)}</div>{/each}
+      {#if mv.net?.a}<div class="net" data-testid="net-a">{netText(mv.net.a)}</div>{/if}
     </div>
     <div class="status" style="color:{colour}">
       <strong data-testid="status">{status}</strong>
@@ -47,6 +50,7 @@
         {#each mv.def.sideB as id (id)}<Avatar name={playerShort(id)} url={photoUrl(id)} colour="var(--team-b)" size={44} />{/each}
       </div>
       {#each mv.def.sideB as id (id)}<div class="name">{playerShort(id)}</div>{/each}
+      {#if mv.net?.b}<div class="net" data-testid="net-b">{netText(mv.net.b)}</div>{/if}
     </div>
   </div>
 </svelte:element>
@@ -65,6 +69,7 @@
   .right .faces { justify-content: flex-end; }
   .faces :global(.avatar + .avatar) { margin-left: -12px; }
   .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .net { font-size: 0.75rem; font-weight: 600; color: var(--muted); margin-top: 2px; white-space: nowrap; }
   .status { text-align: center; display: flex; flex-direction: column; min-width: 92px; }
   .status strong { font-size: 1.4rem; font-weight: 800; }
   .status small { font-size: 0.75rem; font-weight: 600; }

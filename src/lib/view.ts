@@ -5,6 +5,7 @@ import {
   pointsStep,
   courseHandicap,
   indexScores,
+  pairNet,
   roundPointsAvailable,
   scoreKey,
   type ConfirmedResult,
@@ -12,6 +13,7 @@ import {
   type MatchDef,
   type MatchState,
   type MatchType,
+  type PairNet,
   type RoundSettings,
   type ScoreIndex,
   type Slot,
@@ -24,6 +26,8 @@ export interface MatchView {
   def: MatchDef; state: MatchState; result: ConfirmedResult | null;
   /** Event-wide match number: day by day, group by group, fourball then low then high singles. */
   number: number;
+  /** Fourball only: each pair's better-ball net score to par, off full course handicaps. */
+  net?: { a: PairNet | null; b: PairNet | null };
 }
 export interface GroupView {
   group: GroupRow; slots: Partial<Record<Slot, string>>; matches: MatchView[]; scores: ScoreIndex;
@@ -111,7 +115,11 @@ export function buildEventView(s: Snapshot): EventView | null {
                   finalHole: row.final_hole,
                 }
               : null;
-            return { def, state: computeMatchState(def, holes, scores), result, number: ++matchNo };
+            const net =
+              def.type === 'better_ball'
+                ? { a: pairNet(def.sideA, holes, scores, playingHcp), b: pairNet(def.sideB, holes, scores, playingHcp) }
+                : undefined;
+            return { def, state: computeMatchState(def, holes, scores), result, number: ++matchNo, net };
           });
           everyMatch.push(...matches);
           return { group, slots, matches, scores, playingHcp };
