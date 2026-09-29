@@ -22,7 +22,7 @@ export const GUIDES: Guide[] = [
   { slug: 'dundonald', name: 'Dundonald Links', short: 'Dundonald', match: /dundonald/i, kind: 'aerial', credit: 'From the Dundonald Links hole-by-hole guide.' },
   { slug: 'krtb', name: 'King Robert the Bruce', short: 'Robert the Bruce', match: /robert\s+the\s+bruce/i, kind: 'turnberry', credit: TURNBERRY },
   { slug: 'ailsa', name: 'The Championship Ailsa', short: 'Ailsa', match: /ailsa/i, kind: 'turnberry', credit: TURNBERRY },
-  { slug: 'glashedy', name: 'Glashedy Links', short: 'Glashedy', match: /glashedy/i, kind: 'yardage', credit: 'From the Glashedy Links yardage book (Gold tees).' },
+  { slug: 'glashedy', name: 'Glashedy Links', short: 'Glashedy', match: /glashedy/i, kind: 'yardage', credit: 'From the Glashedy Links yardage book.' },
 ];
 
 export function guideForCourse(courseName: string): Guide | null {
