@@ -421,3 +421,41 @@ describe('admin RPCs', () => {
     expect(r.rows[0].photo_path).toBe(`${s.players.a1}/123.jpg`);
   });
 });
+
+describe('tees', () => {
+  const newTee = async (tee: string) =>
+    (await db.query<{ id: string }>(`insert into public.courses (name, tee) select name, $1 from public.courses where id = $2 returning id`, [tee, s.courseId])).rows[0].id;
+  const setTee = (who: Who, player: string, course: string) =>
+    as(db, who, () => db.query(`insert into public.round_tees (round_id, player_id, course_id) values ($1, $2, $3)`, [s.roundId, player, course]));
+
+  it('lets a course have named tees, but not the same tee twice', async () => {
+    await newTee('White');
+    await expect(newTee('White')).rejects.toThrow(/duplicate key/);
+  });
+
+  it('only the admin sets per-player tees; members can read them', async () => {
+    const white = await newTee('White');
+    await expect(setTee('trip', s.players.a1, white)).rejects.toThrow(/row-level security/);
+    await setTee('admin', s.players.a1, white);
+    const r = await as(db, 'trip', () => db.query(`select player_id from public.round_tees`));
+    expect(r.rows).toHaveLength(1);
+    const none = await as(db, 'pending', () => db.query(`select player_id from public.round_tees`));
+    expect(none.rows).toHaveLength(0);
+  });
+
+  it("refuses to change a tee once that player's match is confirmed", async () => {
+    const white = await newTee('White');
+    await confirm('trip', 'better_ball', 16);
+    await expect(setTee('admin', s.players.a1, white)).rejects.toThrow(/confirmed/);
+  });
+
+  it('saves a tee name through save_course, and can re-save the same tee', async () => {
+    const holes = JSON.stringify(Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, stroke_index: i + 1 })));
+    const id = await as(db, 'admin', async () =>
+      (await db.query<{ id: string }>(`select public.save_course(null, 'Links', $1::jsonb, 125, 71.3, 'Gold') as id`, [holes])).rows[0].id,
+    );
+    await as(db, 'admin', () => db.query(`select public.save_course($1, 'Links', $2::jsonb, 126, 71.3, 'Gold')`, [id, holes]));
+    const r = await db.query(`select name, tee, slope_rating from public.courses where id = $1`, [id]);
+    expect(r.rows[0]).toEqual({ name: 'Links', tee: 'Gold', slope_rating: 126 });
+  });
+});
