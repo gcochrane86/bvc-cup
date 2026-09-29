@@ -3,6 +3,7 @@
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow } from '../../lib/data/types';
   import ResetScores from '../../components/ResetScores.svelte';
+  import ConfirmedResults from '../../components/ConfirmedResults.svelte';
 
   let { eventId }: { eventId: string } = $props();
 
@@ -235,6 +236,7 @@
   </section>
 
   {#if rounds.length}
+    {#key event.id}<ConfirmedResults {event} />{/key}
     <ResetScores {event} {rounds} onDone={load} />
   {/if}
 {:else}

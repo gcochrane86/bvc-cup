@@ -10,7 +10,6 @@ export type Route =
   | { name: 'admin-login' }
   | { name: 'admin' }
   | { name: 'admin-players' }
-  | { name: 'admin-results' }
   | { name: 'admin-access' }
   | { name: 'admin-courses' }
   | { name: 'admin-course'; courseId: string }
@@ -36,7 +35,6 @@ export function parseRoute(hash: string): Route {
     if (p.length === 1) return { name: 'admin' };
     if (p.length === 2 && b === 'login') return { name: 'admin-login' };
     if (p.length === 2 && b === 'players') return { name: 'admin-players' };
-    if (p.length === 2 && b === 'results') return { name: 'admin-results' };
     if (p.length === 2 && b === 'access') return { name: 'admin-access' };
     if (p.length === 2 && b === 'courses') return { name: 'admin-courses' };
     if (p.length === 3 && b === 'courses') return { name: 'admin-course', courseId: c };

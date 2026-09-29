@@ -12,7 +12,6 @@
   import AdminPairings from './routes/admin/AdminPairings.svelte';
   import AdminHome from './routes/admin/AdminHome.svelte';
   import AdminPlayers from './routes/admin/AdminPlayers.svelte';
-  import AdminResults from './routes/admin/AdminResults.svelte';
   import AdminAccess from './routes/admin/AdminAccess.svelte';
   import Waiting from './routes/Waiting.svelte';
   import AdminCourses from './routes/admin/AdminCourses.svelte';
@@ -72,8 +71,6 @@
         <AdminHome />
       {:else if route.name === 'admin-players'}
         <AdminPlayers />
-      {:else if route.name === 'admin-results'}
-        <AdminResults />
       {:else if route.name === 'admin-access'}
         <AdminAccess />
       {:else if route.name === 'admin-courses'}

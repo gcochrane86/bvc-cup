@@ -3,6 +3,8 @@ import { enterHole, group1Card, login, loginAdmin, newPhone, openGroup1, reseed,
 
 test.beforeEach(() => reseed());
 
+const activeEventId = async () => (await serviceDb().from('events').select('id').eq('is_active', true).single()).data!.id as string;
+
 test('wrong password is rejected', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Your email').fill('tester@example.com');
@@ -133,7 +135,7 @@ test('the admin can reopen a confirmed match for scoring', async ({ browser }) =
   const admin = await newPhone(browser);
   admin.on('dialog', (d) => void d.accept());
   await loginAdmin(admin);
-  await admin.goto('/#/admin/results');
+  await admin.goto(`/#/admin/events/${await activeEventId()}`); // Reopen lives on the event's admin page
   await admin.getByTestId('reopen-row').filter({ hasText: /^Match 1\b/ }).getByRole('button', { name: 'Reopen' }).click();
   await expect(admin.getByText('Match 1 reopened')).toBeVisible();
 
@@ -244,7 +246,7 @@ test('after reopening, correcting an earlier hole changes the outcome and can be
   const admin = await newPhone(browser);
   admin.on('dialog', (d) => void d.accept());
   await loginAdmin(admin);
-  await admin.goto('/#/admin/results');
+  await admin.goto(`/#/admin/events/${await activeEventId()}`); // Reopen lives on the event's admin page
   await admin.getByTestId('reopen-row').filter({ hasText: /^Match 1\b/ }).getByRole('button', { name: 'Reopen' }).click();
   await expect(admin.getByText('Match 1 reopened')).toBeVisible();
 

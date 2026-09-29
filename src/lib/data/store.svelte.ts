@@ -97,6 +97,34 @@ export const loadAll = freshOnly(async () => {
   }
 });
 
+/** An event's rounds, groups, players, scores and results (for the active event, or one opened in Admin). */
+export async function fetchEventData(eventId: string) {
+  const [eventPlayers, rounds] = await Promise.all([
+    must(supabase.from('event_players').select('*').eq('event_id', eventId)) as Promise<EventPlayerRow[]>,
+    must(supabase.from('rounds').select('*').eq('event_id', eventId)) as Promise<RoundRow[]>,
+  ]);
+  let groups: GroupRow[] = [];
+  let groupPlayers: GroupPlayerRow[] = [];
+  let scores: ScoreRow[] = [];
+  let results: MatchResultRow[] = [];
+  const roundIds = rounds.map((r) => r.id);
+  if (roundIds.length) {
+    // 3 rounds x 12 players x 18 holes = 648 score rows, under the API's 1000-row default.
+    [groups, scores] = await Promise.all([
+      must(supabase.from('groups').select('*').in('round_id', roundIds)) as Promise<GroupRow[]>,
+      must(supabase.from('scores').select('*').in('round_id', roundIds)) as Promise<ScoreRow[]>,
+    ]);
+    const groupIds = groups.map((g) => g.id);
+    if (groupIds.length) {
+      [groupPlayers, results] = await Promise.all([
+        must(supabase.from('group_players').select('*').in('group_id', groupIds)) as Promise<GroupPlayerRow[]>,
+        must(supabase.from('match_results').select('*').in('group_id', groupIds)) as Promise<MatchResultRow[]>,
+      ]);
+    }
+  }
+  return { eventPlayers, rounds, groups, groupPlayers, scores, results };
+}
+
 async function doLoad() {
   try {
     const [events, players, courses, courseHoles] = await Promise.all([
@@ -106,33 +134,9 @@ async function doLoad() {
       must(supabase.from('course_holes').select('*')) as Promise<CourseHoleRow[]>,
     ]);
     const event = events[0] ?? null;
-    let eventPlayers: EventPlayerRow[] = [];
-    let rounds: RoundRow[] = [];
-    let groups: GroupRow[] = [];
-    let groupPlayers: GroupPlayerRow[] = [];
-    let scores: ScoreRow[] = [];
-    let results: MatchResultRow[] = [];
-    if (event) {
-      [eventPlayers, rounds] = await Promise.all([
-        must(supabase.from('event_players').select('*').eq('event_id', event.id)) as Promise<EventPlayerRow[]>,
-        must(supabase.from('rounds').select('*').eq('event_id', event.id)) as Promise<RoundRow[]>,
-      ]);
-      const roundIds = rounds.map((r) => r.id);
-      if (roundIds.length) {
-        // 3 rounds x 12 players x 18 holes = 648 score rows, under the API's 1000-row default.
-        [groups, scores] = await Promise.all([
-          must(supabase.from('groups').select('*').in('round_id', roundIds)) as Promise<GroupRow[]>,
-          must(supabase.from('scores').select('*').in('round_id', roundIds)) as Promise<ScoreRow[]>,
-        ]);
-        const groupIds = groups.map((g) => g.id);
-        if (groupIds.length) {
-          [groupPlayers, results] = await Promise.all([
-            must(supabase.from('group_players').select('*').in('group_id', groupIds)) as Promise<GroupPlayerRow[]>,
-            must(supabase.from('match_results').select('*').in('group_id', groupIds)) as Promise<MatchResultRow[]>,
-          ]);
-        }
-      }
-    }
+    const { eventPlayers, rounds, groups, groupPlayers, scores, results } = event
+      ? await fetchEventData(event.id)
+      : { eventPlayers: [], rounds: [], groups: [], groupPlayers: [], scores: [], results: [] };
     const pending = await outbox.pending();
     Object.assign(db, {
       event, players, courses, courseHoles, eventPlayers, rounds, groups, groupPlayers, results,
