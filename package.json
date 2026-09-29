@@ -13,7 +13,8 @@
     "users": "node --env-file=.env.local --import tsx scripts/create-users.ts",
     "seed": "node --env-file=.env.local --import tsx scripts/seed.ts",
     "icons": "node --import tsx scripts/make-icons.ts",
-    "copy-to-prod": "node --import tsx scripts/copy-to-prod.ts"
+    "copy-to-prod": "node --import tsx scripts/copy-to-prod.ts",
+    "add-ballyliffen": "node --import tsx scripts/add-ballyliffen.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",
