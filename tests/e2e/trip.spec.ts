@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { enterHole, group1Card, login, loginAdmin, newPhone, openGroup1, reseed } from './helpers';
+import { enterHole, group1Card, login, loginAdmin, newPhone, openGroup1, reseed, serviceDb } from './helpers';
 
 test.beforeEach(() => reseed());
 
@@ -299,6 +299,31 @@ test('the course guide remembers the course and hole on this phone', async ({ pa
   const imageY = (await page.getByTestId('guide-layout').boundingBox())!.y;
   expect(notesY).toBeLessThan(imageY); // pro tips above the aerial
   await expect.poll(() => page.getByTestId('guide-layout').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+});
+
+test('the Courses tab shows only the courses this event plays', async ({ page }) => {
+  // Point the seeded days at the real trip courses, as on BvC.
+  const db = serviceDb();
+  const make = async (name: string) => (await db.from('courses').insert({ name }).select().single()).data!.id as string;
+  const [d, k, a, g] = [await make('Dundonald Links'), await make('King Robert the Bruce'), await make('The Championship Ailsa'), await make('Glashedy Links (Gold)')];
+  const { data: rounds } = await db.from('rounds').select('id, round_no').order('round_no');
+  for (const [i, id] of [d, k, a].entries()) await db.from('rounds').update({ course_id: id }).eq('id', rounds![i].id);
+
+  await login(page);
+  await page.getByRole('link', { name: 'Courses' }).click();
+  await expect(page.getByRole('tab')).toHaveText(['Dundonald', 'Robert the Bruce', 'Ailsa']);
+
+  // A one-day event at Glashedy: just Glashedy, even if this phone last looked at Ailsa.
+  await page.getByRole('tab', { name: 'Ailsa' }).click();
+  await db.from('rounds').delete().in('id', [rounds![1].id, rounds![2].id]);
+  await db.from('rounds').update({ course_id: g }).eq('id', rounds![0].id);
+  await page.goto('/#/');
+  await page.reload();
+  await page.getByRole('link', { name: 'Courses' }).click();
+  await expect(page.getByRole('tab')).toHaveText(['Glashedy']);
+  await expect(page.getByTestId('guide-layout')).toHaveAttribute('src', 'guides/glashedy/hole-01-layout.webp');
+  await expect.poll(() => page.getByTestId('guide-layout').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(900);
+  await expect(page.getByText('Glashedy Links yardage book')).toBeVisible();
 });
 
 test('the admin can choose the singles line-up and it shows on the leaderboard', async ({ browser }) => {

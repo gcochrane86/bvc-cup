@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { db } from '../lib/data/store.svelte';
-  import { GUIDES, guideFlyover, guideForCourse, guideNotes, guidePages, readGuideMemory, rememberGuideHole, type GuideMemory } from '../lib/guides';
-  import { defaultRoundId, today } from '../lib/view';
+  import { eventGuides, guideFlyover, guideNotes, guidePages, initialGuide, readGuideMemory, rememberGuideHole, type GuideMemory } from '../lib/guides';
   import FlyoverPlayer from '../components/FlyoverPlayer.svelte';
 
   const KEY = 'golf.guide';
@@ -14,26 +14,30 @@
   }
   let mem = $state(load());
 
-  // No memory yet: open today's course if it has a guide, else the first guide.
-  function initialCourse(): string {
-    if (mem.course) return mem.course;
-    const rid = defaultRoundId(db.rounds, today());
-    const round = db.rounds.find((r) => r.id === rid);
-    const course = db.courses.find((c) => c.id === round?.course_id);
-    return (course && guideForCourse(course.name)?.slug) ?? GUIDES[0].slug;
-  }
-  let slug = $state(initialCourse());
-  const hole = $derived(mem.holes[slug] ?? 1);
-  const guide = $derived(GUIDES.find((g) => g.slug === slug)!);
-  const pages = $derived(guidePages(slug, hole));
-  const notes = $derived(guideNotes(slug, hole));
-  const flyover = $derived(guideFlyover(slug, hole));
+  // Only the active event's courses (BvC: Dundonald, Robert the Bruce, Ailsa — as before). Opens on the
+  // course this phone last looked at, if this event has it, else the event's first course.
+  const list = $derived(eventGuides(db.rounds, db.courses));
+  let slug = $state(untrack(() => initialGuide(eventGuides(db.rounds, db.courses), mem.course).slug));
+  const guide = $derived(list.find((g) => g.slug === slug) ?? list[0]);
+  const hole = $derived(mem.holes[guide.slug] ?? 1);
+  const pages = $derived(guidePages(guide.slug, hole));
+  const notes = $derived(guideNotes(guide.slug, hole));
+  const flyover = $derived(guideFlyover(guide.slug, hole));
 
-  // Par and stroke index from the course set up in admin (if it's in this event's data).
+  // Par and stroke index from admin: the course this event's day uses (so Black/White tees still match),
+  // else any course with the guide's name.
   const info = $derived.by(() => {
-    const course = db.courses.find((c) => guide.match.test(c.name));
+    const course =
+      db.rounds.map((r) => db.courses.find((c) => c.id === r.course_id)).find((c) => c && guide.match.test(c.name)) ??
+      db.courses.find((c) => guide.match.test(c.name));
     return course ? db.courseHoles.find((h) => h.course_id === course.id && h.hole === hole) : undefined;
   });
+  const alt = (i: number) =>
+    guide.kind === 'turnberry'
+      ? i === 0 ? `Hole ${hole} layout with yardages` : `Hole ${hole} approach and description`
+      : guide.kind === 'yardage'
+        ? i === 0 ? `Hole ${hole} map with yardages` : `Hole ${hole} green`
+        : `Hole ${hole} aerial view`;
 
   function go(nextSlug: string, nextHole: number) {
     slug = nextSlug;
@@ -50,8 +54,8 @@
 <h1>Courses</h1>
 
 <div class="courses" role="tablist">
-  {#each GUIDES as g (g.slug)}
-    <button role="tab" aria-selected={g.slug === slug} class:active={g.slug === slug} onclick={() => go(g.slug, mem.holes[g.slug] ?? 1)}>
+  {#each list as g (g.slug)}
+    <button role="tab" aria-selected={g.slug === guide.slug} class:active={g.slug === guide.slug} onclick={() => go(g.slug, mem.holes[g.slug] ?? 1)}>
       {g.short}
     </button>
   {/each}
@@ -59,7 +63,7 @@
 
 <div class="strip">
   {#each Array.from({ length: 18 }, (_, i) => i + 1) as h (h)}
-    <button class="hole" class:current={h === hole} aria-label="Guide hole {h}" onclick={() => go(slug, h)}>{h}</button>
+    <button class="hole" class:current={h === hole} aria-label="Guide hole {h}" onclick={() => go(guide.slug, h)}>{h}</button>
   {/each}
 </div>
 
@@ -87,9 +91,10 @@
   {#each pages as src, i (src)}
     <img
       class="page"
-      class:pdf={pages.length > 1}
+      class:pdf={guide.kind === 'turnberry'}
+      class:yardage={guide.kind === 'yardage'}
       {src}
-      alt={pages.length > 1 ? (i === 0 ? `Hole ${hole} layout with yardages` : `Hole ${hole} approach and description`) : `Hole ${hole} aerial view`}
+      alt={alt(i)}
       loading={i === 0 ? 'eager' : 'lazy'}
       data-testid={i === 0 ? 'guide-layout' : undefined}
     />
@@ -98,13 +103,10 @@
 
 
 <div class="nav">
-  <button class="secondary" disabled={hole === 1} onclick={() => go(slug, hole - 1)}>← Hole {hole - 1}</button>
-  <button class="secondary" disabled={hole === 18} onclick={() => go(slug, hole + 1)}>Hole {hole + 1} →</button>
+  <button class="secondary" disabled={hole === 1} onclick={() => go(guide.slug, hole - 1)}>← Hole {hole - 1}</button>
+  <button class="secondary" disabled={hole === 18} onclick={() => go(guide.slug, hole + 1)}>Hole {hole + 1} →</button>
 </div>
-<p class="muted small">
-  {#if slug === 'dundonald'}From the Dundonald Links hole-by-hole guide.{:else}From the Trump Turnberry course guide. Yardages are to the front of the green.{/if}
-  Pinch to zoom.
-</p>
+<p class="muted small">{guide.credit} Pinch to zoom.</p>
 
 <style>
   .courses { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -116,7 +118,7 @@
   .title { font-size: 1.2rem; margin: 0 0 10px; }
   .title span { font-size: 0.95rem; font-weight: 500; }
   .page { display: block; width: 100%; height: auto; border-radius: var(--radius); margin-bottom: 12px; background: #fff; }
-  .page:not(.pdf) { max-height: 60vh; object-fit: contain; }
+  .page:not(.pdf):not(.yardage) { max-height: 60vh; object-fit: contain; }
   .page.pdf { aspect-ratio: 900 / 1406; background: #efe9dc; }
   .course-name { margin: -6px 0 8px; }
   .notes h3 { margin-bottom: 6px; }
