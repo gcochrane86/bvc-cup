@@ -1,4 +1,4 @@
-import { playingStrokes } from './strokes';
+import { playingStrokes, roundHalfUp } from './strokes';
 import type { MatchDef, MatchType, RoundSettings, SlotPlayer } from './types';
 
 /** crossed: singles are A1 v B2 and A2 v B1 instead of A1 v B1 and A2 v B2 (random or chosen pairings). */
@@ -11,6 +11,7 @@ export function buildMatches(groupId: string, players: SlotPlayer[], s: RoundSet
   if (!a1 || !a2 || !b1 || !b2) return [];
 
   const four = [a1, a2, b1, b2];
+  if (s.fourballFormat === 'scramble') return [scramble(groupId, [a1, a2], [b1, b2], s)];
   const lowest = Math.min(...four.map((p) => p.handicap));
   // Stableford: everyone plays off their full course handicap. Flat: no shots. Match play: off the lowest, at the allowance.
   const stableford = s.fourballFormat === 'stableford';
@@ -34,6 +35,28 @@ export function buildMatches(groupId: string, players: SlotPlayer[], s: RoundSet
     matches.push(singles(groupId, 'low_singles', a1, bFirst, s), singles(groupId, 'high_singles', a2, bSecond, s));
   }
   return matches;
+}
+
+/** Two-man scramble team handicap: 35% of each player's course handicap, added and rounded. */
+export const scrambleHandicap = (a: number, b: number) => roundHalfUp(0.35 * a + 0.35 * b);
+
+/** 2-man scramble: one ball per team. The better team plays off 0; the other gets the difference. No singles. */
+function scramble(groupId: string, sideA: SlotPlayer[], sideB: SlotPlayer[], s: RoundSettings): MatchDef {
+  const ta = scrambleHandicap(sideA[0].handicap, sideA[1].handicap);
+  const tb = scrambleHandicap(sideB[0].handicap, sideB[1].handicap);
+  const low = Math.min(ta, tb);
+  const team = (side: SlotPlayer[], t: number) => side.map((p) => [p.playerId, t] as const);
+  return {
+    id: `${groupId}:better_ball`,
+    groupId,
+    type: 'better_ball',
+    sideA: sideA.map((p) => p.playerId),
+    sideB: sideB.map((p) => p.playerId),
+    points: s.betterBallPoints,
+    strokes: Object.fromEntries([...team(sideA, ta - low), ...team(sideB, tb - low)]),
+    scramble: true,
+    teamHandicap: Object.fromEntries([...team(sideA, ta), ...team(sideB, tb)]),
+  };
 }
 
 function singles(groupId: string, type: MatchType, a: SlotPlayer, b: SlotPlayer, s: RoundSettings): MatchDef {

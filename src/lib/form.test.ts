@@ -144,3 +144,21 @@ describe('pair form', () => {
     expect(ranked.map((r) => [r.row.key, r.rank])).toEqual([['b1+b2', 1], ['a1+a2', 2]]);
   });
 });
+
+describe('form on scramble days', () => {
+  // Everyone off 10 (team handicap 7): hole 9 is SI 9 — a shot off full handicaps, none off the team's 7.
+  const scrambleSnap = () =>
+    snapshot({
+      rounds: [{ ...round('r1', 1), fourball_format: 'scramble' }, round('r2', 2)],
+      scores: ['a1', 'a2', 'b1', 'b2'].map((p) => score('r1', p, 9, 4)),
+      results: [],
+    });
+  it("leaves scramble days out of individual rankings (team scores are not anyone's own)", () => {
+    const rows = computeForm(buildEventView(scrambleSnap())!, null);
+    expect(rows.every((r) => r.holes === 0)).toBe(true);
+  });
+  it("counts scramble days for pairs, off the team's handicap", () => {
+    const rows = computePairForm(buildEventView(scrambleSnap())!, null);
+    expect(rows.find((r) => r.key === 'a1+a2')).toMatchObject({ holes: 1, grossToPar: 0, netToPar: 0, stableford: 2 });
+  });
+});

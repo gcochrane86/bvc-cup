@@ -24,7 +24,7 @@ export interface RoundRow {
   /** How singles opponents are decided: by handicap slot, random draw, or chosen by the admin. */
   singles_pairing: 'handicap' | 'random' | 'selected';
   /** The fourball game: match play off the lowest handicap, Stableford off full handicaps, or flat (no shots). */
-  fourball_format: 'matchplay' | 'stableford' | 'flat';
+  fourball_format: 'matchplay' | 'stableford' | 'flat' | 'scramble';
 }
 export interface GroupRow {
   id: string; round_id: string; group_no: number; tee_time: string | null;

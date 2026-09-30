@@ -849,3 +849,36 @@ test('with only one match to score, Scores opens it straight away', async ({ pag
   await expect(page.getByRole('heading', { name: /^Hole \d+$/ })).toBeVisible();
   await expect(page.getByRole('link', { name: '← All matches' })).toHaveCount(0); // nothing else to pick
 });
+
+test('a day can be a 2-man scramble: one score per team, saved for both players', async ({ browser }) => {
+  const db = serviceDb();
+  const { data: ev } = await db.from('events').select('id').eq('is_active', true).single();
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await admin.getByLabel('Fourball game').first().selectOption('scramble');
+  await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1
+  await admin.getByRole('button', { name: 'Save round' }).first().click();
+  await expect(admin.getByText('Day 1 saved')).toBeVisible();
+
+  const me = await newPhone(browser);
+  await login(me);
+  await openGroup1(me);
+  await expect(me.locator('[data-testid^="row-"]')).toHaveCount(2); // one row per team
+  const teamA = me.getByTestId('row-A1');
+  const teamB = me.getByTestId('row-B1');
+  await expect(teamA).toContainText('Adams & Brown');
+  await teamB.getByRole('button', { name: /^Increase/ }).click(); // B: 5 on the par-4 1st; A: 4 (par)
+  await me.getByRole('button', { name: 'Save hole 1' }).click();
+  await expect(me.getByRole('heading', { name: 'Hole 2', exact: true })).toBeVisible();
+
+  const { data: players } = await db.from('players').select('id, name');
+  await expect
+    .poll(async () => {
+      const { data } = await db.from('scores').select('player_id, gross').eq('hole', 1);
+      return Object.fromEntries(data!.map((s) => [players!.find((p) => p.id === s.player_id)!.name, s.gross]));
+    })
+    .toEqual({ 'Alex Adams': 4, 'Ben Brown': 4, 'Gus Green': 5, 'Harry Hill': 5 });
+  await me.goto('/#/');
+  await expect(group1Card(me).getByTestId('status')).toHaveText('1 UP');
+});

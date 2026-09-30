@@ -147,16 +147,31 @@
     }),
   );
 
+  // 2-man scramble: one row per team (the A1 and B1 rows), saved for both partners.
+  const scramble = $derived(found?.group.matches[0]?.def.scramble ? found.group.matches[0].def : null);
+  const rowSlots = $derived<Slot[]>(scramble ? ['A1', 'B1'] : SLOTS);
+  function teamLabel(slot: Slot): string {
+    if (!found) return '';
+    const ids = (slot.startsWith('A') ? ['A1', 'A2'] : ['B1', 'B2']).map((s) => found!.group.slots[s as Slot]).filter((x): x is string => !!x);
+    return ids.map(playerShort).sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' })).join(' & ');
+  }
+
   async function save() {
     if (!found) return;
+    const group = found.group;
     // Pin the hole being saved: `hole` is derived and, when no hole was tapped, moves on to the next
     // incomplete hole as soon as these scores land — so reading it afterwards would skip a hole.
     const saving = hole;
     const at = new Date().toISOString();
+    // The rows as they are now: saving a score updates rows live, and a scramble partner must be saved
+    // from the team row as it was, not as it becomes once the first partner's score lands.
+    const rows = Object.fromEntries(Object.entries(draft).map(([id, d]) => [id, { ...d }]));
     for (const slot of SLOTS) {
-      const pid = found.group.slots[slot];
-      if (!pid || locked(pid, saving) || !draft[pid]) continue;
-      const d = draft[pid];
+      const pid = group.slots[slot];
+      // Scramble: the team's row (A1/B1) is the score for both partners.
+      const from = scramble && (slot === 'A2' || slot === 'B2') ? group.slots[slot === 'A2' ? 'A1' : 'B1'] : pid;
+      if (!pid || !from || locked(pid, saving) || !rows[from]) continue;
+      const d = rows[from];
       // Untouched rows that already have a score (possibly entered on another phone) are left alone.
       if (!d.edited && d.hasScore) continue;
       await enterScore({
@@ -223,15 +238,20 @@
     {/each}
   </div>
 
-  {#each SLOTS as slot (slot)}
+  {#each rowSlots as slot (slot)}
     {@const pid = found.group.slots[slot]}
     {#if pid && draft[pid]}
       {@const sh = shots(pid)}
       {@const isLocked = locked(pid, hole)}
+      {@const team = scramble ? teamLabel(slot) : null}
       <div class="prow card" class:shot={sh.bb === 1} class:shot2={sh.bb >= 2} data-testid="row-{slot}">
-        <Avatar name={playerName(pid)} url={photoUrl(pid)} colour={slot.startsWith('A') ? 'var(--team-a)' : 'var(--team-b)'} size={44} />
+        <Avatar name={team ?? playerName(pid)} url={team ? null : photoUrl(pid)} colour={slot.startsWith('A') ? 'var(--team-a)' : 'var(--team-b)'} size={44} />
         <div class="who">
-          <strong>{playerName(pid)}</strong> <span class="muted small">({found.group.playingHcp[pid]})</span>
+          {#if team}
+            <strong>{team}</strong> <span class="muted small">({scramble?.teamHandicap?.[pid]})</span>
+          {:else}
+            <strong>{playerName(pid)}</strong> <span class="muted small">({found.group.playingHcp[pid]})</span>
+          {/if}
           <div class="chips">
             {#if sh.label}<span class="chip shotchip">{sh.label}</span>{/if}
             {#if sh.stableford}<span class="chip pts">{points(pid, sh.bb)} pts</span>{/if}

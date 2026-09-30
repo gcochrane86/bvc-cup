@@ -41,6 +41,8 @@ export function computeForm(view: EventView, roundId: string | null): FormRow[] 
       for (const pid of Object.values(g.slots)) {
         const r = pid ? rows.get(pid) : undefined;
         if (!pid || !r) continue;
+        // A scramble day's scores are the team's, not the player's own: they only count for pairs.
+        if (rv.settings.fourballFormat === 'scramble') continue;
         const courseHcp = g.playingHcp[pid] ?? 0;
         for (const h of rv.holes) {
           const e = g.scores.get(scoreKey(pid, h.hole));
@@ -120,7 +122,9 @@ export function computePairForm(view: EventView, roundId: string | null): PairFo
             .filter(({ e }) => !e.pickedUp && e.gross !== null)
             .map(({ id, e }) => {
               const own = g.teeHoles[id]?.find((x) => x.hole === h.hole) ?? h;
-              const net = e.gross! - strokesOnHole(g.playingHcp[id] ?? 0, own.strokeIndex);
+              // Scramble: the team's handicap; otherwise each player's full course handicap.
+              const hcp = fourball.def.teamHandicap?.[id] ?? g.playingHcp[id] ?? 0;
+              const net = e.gross! - strokesOnHole(hcp, own.strokeIndex);
               return { gross: e.gross! - own.par, net: net - own.par, points: Math.max(0, 2 + own.par - net) };
             });
           if (!played.length) {

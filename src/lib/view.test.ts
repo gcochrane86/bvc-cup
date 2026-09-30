@@ -298,3 +298,16 @@ describe('onlyGroupId', () => {
     expect(onlyGroupId([])).toBeNull();
   });
 });
+
+describe('scramble days', () => {
+  // Everyone off 10: a team handicap of 3.5 + 3.5 = 7 → no shot on hole 9 (SI 9), where full handicaps give one.
+  const hole9 = ['a1', 'a2', 'b1', 'b2'].map((p) => ({
+    round_id: 'r1', player_id: p, hole: 9, gross: 4, picked_up: false, client_updated_at: '2026-10-01T09:10:00Z',
+  }));
+  it("uses the team's scramble handicap for the pair net line", () => {
+    const scramble = buildEventView(snapshot({ rounds: [{ ...baseRound, fourball_format: 'scramble' }], scores: hole9 }))!;
+    expect(scramble.rounds[0].groups[0].matches[0].net?.a).toEqual({ toPar: 0, thru: 1 });
+    const matchplay = buildEventView(snapshot({ scores: hole9 }))!;
+    expect(matchplay.rounds[0].groups[0].matches[0].net?.a).toEqual({ toPar: -1, thru: 1 });
+  });
+});

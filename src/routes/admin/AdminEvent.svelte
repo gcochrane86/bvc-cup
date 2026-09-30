@@ -280,6 +280,7 @@
             <option value="matchplay">Match play (off the low)</option>
             <option value="stableford">Stableford (full handicaps)</option>
             <option value="flat">Match play, flat (no shots)</option>
+            <option value="scramble">2-man scramble (35% each)</option>
           </select>
         </div>
         <div class="row">
@@ -289,8 +290,11 @@
           {/if}
           <div class="field"><label for="rp-{r.id}">Fourball pts</label><input id="rp-{r.id}" type="number" step="0.5" bind:value={r.better_ball_points} /></div>
         </div>
-        <label class="row"><input type="checkbox" bind:checked={r.singles_enabled} /> Also play 2 singles in each fourball</label>
-        {#if r.singles_enabled}
+        <!-- A scramble is one ball per team, so there are no singles that day. -->
+        {#if r.fourball_format !== 'scramble'}
+          <label class="row"><input type="checkbox" bind:checked={r.singles_enabled} /> Also play 2 singles in each fourball</label>
+        {/if}
+        {#if r.singles_enabled && r.fourball_format !== 'scramble'}
           <div class="row">
             <div class="field"><label for="rsp-{r.id}">Singles pts</label><input id="rsp-{r.id}" type="number" step="0.5" bind:value={r.singles_points} /></div>
             <div class="field"><label for="rsa-{r.id}">Singles allowance %</label><input id="rsa-{r.id}" type="number" min="0" max="100" bind:value={r.singles_allowance_pct} /></div>

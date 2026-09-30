@@ -48,6 +48,27 @@ describe('buildMatches', () => {
     expect(ms[1].strokes).toEqual({ a1: 0, b1: 5 }); // singles: off the low at their allowance, as before
   });
 
+  it('in a 2-man scramble, each team plays off 35% of each player added; the better team gives the difference', () => {
+    // A: 4 and 18 → 1.4 + 6.3 = 7.7 → 8. B: 9 and 14 → 3.15 + 4.9 = 8.05 → 8. Level: no shots.
+    const level = buildMatches('g1', players, { ...settings, fourballFormat: 'scramble' });
+    expect(level).toHaveLength(1); // no singles in a scramble, even if switched on
+    expect(level[0].strokes).toEqual({ a1: 0, a2: 0, b1: 0, b2: 0 });
+    expect(level[0].scramble).toBe(true);
+    expect(level[0].teamHandicap).toEqual({ a1: 8, a2: 8, b1: 8, b2: 8 });
+    // The example: 5 and 9 → 1.75 + 3.15 = 4.9 → 5; v 10 and 20 → 3.5 + 7 = 10.5 → 11: 6 shots to B.
+    const ex = buildMatches(
+      'g1',
+      [
+        { slot: 'A1', playerId: 'a1', handicap: 5 }, { slot: 'A2', playerId: 'a2', handicap: 9 },
+        { slot: 'B1', playerId: 'b1', handicap: 10 }, { slot: 'B2', playerId: 'b2', handicap: 20 },
+      ],
+      { ...settings, fourballFormat: 'scramble', singlesEnabled: true },
+    );
+    expect(ex).toHaveLength(1);
+    expect(ex[0].teamHandicap).toEqual({ a1: 5, a2: 5, b1: 11, b2: 11 });
+    expect(ex[0].strokes).toEqual({ a1: 0, a2: 0, b1: 6, b2: 6 });
+  });
+
   it('match play (the default) is unchanged', () => {
     expect(buildMatches('g1', players, { ...settings, fourballFormat: 'matchplay' })).toEqual(buildMatches('g1', players, settings));
     expect(buildMatches('g1', players, settings)[0].stableford).toBeUndefined();

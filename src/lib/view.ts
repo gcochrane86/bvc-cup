@@ -135,7 +135,11 @@ export function buildEventView(s: Snapshot): EventView | null {
               : null;
             const net =
               def.type === 'better_ball'
-                ? { a: pairNet(def.sideA, holes, scores, playingHcp, teeHoles), b: pairNet(def.sideB, holes, scores, playingHcp, teeHoles) }
+                ? {
+                    // Scramble: net off the team's scramble handicap; otherwise each player's full handicap.
+                    a: pairNet(def.sideA, holes, scores, def.teamHandicap ?? playingHcp, teeHoles),
+                    b: pairNet(def.sideB, holes, scores, def.teamHandicap ?? playingHcp, teeHoles),
+                  }
                 : undefined;
             return { def, state: computeMatchState(def, holes, scores), result, number: ++matchNo, net };
           });

@@ -242,6 +242,7 @@ describe('confirmation and locking', () => {
     expect(r.rows[0]).toEqual({ fourball_format: 'matchplay' });
     await db.query(`update public.rounds set fourball_format = 'stableford' where id = $1`, [s.roundId]);
     await db.query(`update public.rounds set fourball_format = 'flat' where id = $1`, [s.roundId]);
+    await db.query(`update public.rounds set fourball_format = 'scramble' where id = $1`, [s.roundId]);
     await expect(db.query(`update public.rounds set fourball_format = 'skins'`)).rejects.toThrow(/check constraint/);
   });
 
