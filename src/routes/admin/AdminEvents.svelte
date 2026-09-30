@@ -104,7 +104,7 @@
   .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .head button { padding: 8px 14px; }
   .actions { display: flex; gap: 8px; }
-  .tile { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 16px 40px 16px 16px; margin-bottom: 10px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); color: var(--text); text-decoration: none; }
+  .tile { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 16px 40px 16px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); color: var(--text); text-decoration: none; }
   .tile .name { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; }
   .tile .sub { color: var(--muted); font-size: 0.85rem; }
   .tile .arrow { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 1.6rem; color: var(--muted); }
