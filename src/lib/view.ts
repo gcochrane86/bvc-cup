@@ -198,6 +198,12 @@ export function matchesLabel(group: GroupView): string {
   return ns.length === 1 ? `Match ${ns[0]}` : `Matches ${Math.min(...ns)}–${Math.max(...ns)}`;
 }
 
+/** The only match left to score (so Scores can skip the list), or null when there's a choice or nothing to score. */
+export function onlyGroupId(list: { groups: GroupView[] }[]): string | null {
+  const all = list.flatMap((d) => d.groups);
+  return all.length === 1 ? all[0].group.id : null;
+}
+
 /** The match this phone was scoring, if it's still on the scoring list (i.e. not yet confirmed). */
 export function resumeGroupId(remembered: string | null, list: { groups: GroupView[] }[]): string | null {
   if (!remembered) return null;

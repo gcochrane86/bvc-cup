@@ -828,3 +828,16 @@ test('the Form tab can rank pairs as well as individuals', async ({ page }) => {
   await page.getByRole('button', { name: 'Individuals' }).click();
   await expect(page.getByTestId('form-row').first()).not.toContainText('&');
 });
+
+test('with only one match to score, Scores opens it straight away', async ({ page }) => {
+  const db = serviceDb();
+  const { data: groups } = await db.from('groups').select('id, group_no, rounds(round_no)');
+  const keep = groups!.find((g) => g.group_no === 1 && (g.rounds as unknown as { round_no: number }).round_no === 1)!;
+  await db.from('groups').delete().in('id', groups!.filter((g) => g.id !== keep.id).map((g) => g.id));
+
+  await login(page);
+  await page.getByRole('link', { name: 'Scores' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/score/${keep.id}$`));
+  await expect(page.getByRole('heading', { name: /^Hole \d+$/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: '← All matches' })).toHaveCount(0); // nothing else to pick
+});

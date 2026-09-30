@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildEventView, defaultRoundId, findGroup, firstIncompleteHole, leaderboardRoundId, matchLabel, matchesLabel, pairingLabel, resumeGroupId, scoringList } from './view';
+import { buildEventView, defaultRoundId, onlyGroupId, findGroup, firstIncompleteHole, leaderboardRoundId, matchLabel, matchesLabel, pairingLabel, resumeGroupId, scoringList } from './view';
 import type { RoundRow, ScoreRow, Snapshot } from './data/types';
+import type { GroupView } from './view';
 import type { Slot, Team } from './scoring';
 
 const baseRound: RoundRow = {
@@ -283,5 +284,17 @@ describe('tees', () => {
     const s = withTee();
     const v = buildEventView({ ...s, roundTees: [...s.roundTees, { round_id: 'r1', player_id: 'nobody', course_id: 'c2' }] })!;
     expect(Object.keys(v.rounds[0].groups[0].teeOf)).toEqual(['a1']);
+  });
+});
+
+describe('onlyGroupId', () => {
+  const g = (id: string) => ({ group: { id } }) as unknown as GroupView;
+  it('is the single match left to score, so Scores can open it directly', () => {
+    expect(onlyGroupId([{ groups: [g('x')] }])).toBe('x');
+  });
+  it('is null when there is a choice to make, or nothing to score', () => {
+    expect(onlyGroupId([{ groups: [g('x')] }, { groups: [g('y')] }])).toBeNull();
+    expect(onlyGroupId([{ groups: [g('x'), g('y')] }])).toBeNull();
+    expect(onlyGroupId([])).toBeNull();
   });
 });

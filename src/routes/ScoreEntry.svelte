@@ -2,7 +2,7 @@
   import { readScoringGroup, rememberScoringGroup } from '../lib/scoringMemory';
   import { untrack } from 'svelte';
   import { db, enterScore, loadAll, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
-  import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
+  import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, onlyGroupId, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
   import { isScoreLocked, playerHole, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
   import HoleGrid from '../components/HoleGrid.svelte';
@@ -31,7 +31,8 @@
       return;
     }
     if (!fresh) return;
-    const resume = resumeGroupId(remembered(), toScore);
+    // Back to the match this phone was scoring — or straight into the only match there is to score.
+    const resume = resumeGroupId(remembered(), toScore) ?? onlyGroupId(toScore);
     if (resume) location.replace(`#/score/${resume}`);
     else remember(null); // confirmed or gone: forget it and show the list
   });
@@ -247,7 +248,7 @@
   {/each}
 
   <button class="save" onclick={save} disabled={allLocked}>Save hole {hole}</button>
-  <p class="muted small"><a href="#/score" onclick={allMatches}>← All matches</a></p>
+  {#if !onlyGroupId(toScore)}<p class="muted small"><a href="#/score" onclick={allMatches}>← All matches</a></p>{/if}
 {/if}
 
 <style>
