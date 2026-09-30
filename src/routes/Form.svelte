@@ -21,11 +21,10 @@
   const view = $derived(buildEventView(db));
   const ranked = $derived(view ? rankForm(computeForm(view, roundId === 'all' ? null : roundId), metric) : []);
   const rankedPairs = $derived(view ? rankForm(computePairForm(view, roundId === 'all' ? null : roundId), metric) : []);
-  const pairName = (r: PairFormRow) =>
-    r.playerIds
-      .map(playerShort)
-      .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }))
-      .join(' & ');
+  // The pair's players in name order (the name and the photos follow the same order).
+  const pairIds = (r: PairFormRow) =>
+    [...r.playerIds].sort((a, b) => playerShort(a).localeCompare(playerShort(b), 'en', { sensitivity: 'base' }));
+  const pairName = (r: PairFormRow) => pairIds(r).map(playerShort).join(' & ');
   function pairMain(r: PairFormRow): string {
     switch (metric) {
       case 'gross': return r.holes ? toPar(r.grossToPar) : '–';
@@ -79,7 +78,7 @@
     <button class:active={who === 'individuals'} aria-pressed={who === 'individuals'} onclick={() => (who = 'individuals')}>Individuals</button>
     <button class:active={who === 'pairs'} aria-pressed={who === 'pairs'} onclick={() => (who = 'pairs')}>Pairs</button>
   </div>
-  <p class="muted small">{note}{#if who === 'pairs'} Pairs count their better ball on each hole both have played; the same pair on several days adds up.{/if}</p>
+  <p class="muted small">{note}{#if who === 'pairs'}&nbsp;Pairs count their better ball on each hole both have played; the same pair on several days adds up.{/if}</p>
 
   {#if who === 'pairs'}
     <ol class="list" data-testid="form-list">
@@ -88,7 +87,7 @@
         <li class="card item" data-testid="form-row">
           <span class="rank">{rank ?? '–'}</span>
           <span class="faces">
-            {#each row.playerIds as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour={c} size={34} />{/each}
+            {#each pairIds(row) as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour={c} size={34} />{/each}
           </span>
           <span class="who">
             <strong style="color:{c}">{pairName(row)}</strong>
