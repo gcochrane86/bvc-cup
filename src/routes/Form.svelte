@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { db, photoUrl, playerName } from '../lib/data/store.svelte';
+  import { db, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
   import { buildEventView } from '../lib/view';
-  import { computeForm, rankForm, type FormMetric, type FormRow } from '../lib/form';
+  import { computeForm, computePairForm, rankForm, type FormMetric, type FormRow, type PairFormRow } from '../lib/form';
   import { formatPoints } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
 
@@ -16,9 +16,26 @@
 
   let metric = $state<FormMetric>('net');
   let roundId = $state<string>('all');
+  let who = $state<'individuals' | 'pairs'>('individuals');
 
   const view = $derived(buildEventView(db));
   const ranked = $derived(view ? rankForm(computeForm(view, roundId === 'all' ? null : roundId), metric) : []);
+  const rankedPairs = $derived(view ? rankForm(computePairForm(view, roundId === 'all' ? null : roundId), metric) : []);
+  const pairName = (r: PairFormRow) =>
+    r.playerIds
+      .map(playerShort)
+      .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }))
+      .join(' & ');
+  function pairMain(r: PairFormRow): string {
+    switch (metric) {
+      case 'gross': return r.holes ? toPar(r.grossToPar) : '–';
+      case 'net': return r.holes ? toPar(r.netToPar) : '–';
+      case 'stableford': return String(r.stableford);
+      case 'points': return formatPoints(r.points);
+      case 'birdies': return String(r.birdies);
+      case 'trebles': return String(r.trebles);
+    }
+  }
   const note = $derived(METRICS.find((m) => m.id === metric)!.note);
 
   const toPar = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : String(n));
@@ -58,21 +75,46 @@
       {#each view.rounds as rv (rv.round.id)}<option value={rv.round.id}>{rv.round.name}</option>{/each}
     </select>
   </div>
-  <p class="muted small">{note}</p>
+  <div class="who-toggle" role="group" aria-label="Rank players or pairs">
+    <button class:active={who === 'individuals'} aria-pressed={who === 'individuals'} onclick={() => (who = 'individuals')}>Individuals</button>
+    <button class:active={who === 'pairs'} aria-pressed={who === 'pairs'} onclick={() => (who = 'pairs')}>Pairs</button>
+  </div>
+  <p class="muted small">{note}{#if who === 'pairs'} Pairs count their better ball on each hole both have played; the same pair on several days adds up.{/if}</p>
 
-  <ol class="list" data-testid="form-list">
-    {#each ranked as { row, rank } (row.playerId)}
-      <li class="card item" data-testid="form-row">
-        <span class="rank">{rank ?? '–'}</span>
-        <Avatar name={playerName(row.playerId)} url={photoUrl(row.playerId)} colour={colour(row)} size={40} />
-        <span class="who">
-          <strong style="color:{colour(row)}">{playerName(row.playerId)}</strong>
-          {#if detail(row)}<span class="muted small">{detail(row)}</span>{/if}
-        </span>
-        <span class="value" data-testid="form-value">{main(row)}</span>
-      </li>
-    {/each}
-  </ol>
+  {#if who === 'pairs'}
+    <ol class="list" data-testid="form-list">
+      {#each rankedPairs as { row, rank } (row.key)}
+        {@const c = row.team === 'A' ? 'var(--team-a)' : 'var(--team-b)'}
+        <li class="card item" data-testid="form-row">
+          <span class="rank">{rank ?? '–'}</span>
+          <span class="faces">
+            {#each row.playerIds as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour={c} size={34} />{/each}
+          </span>
+          <span class="who">
+            <strong style="color:{c}">{pairName(row)}</strong>
+            <span class="muted small">{row.holes ? `${row.holes} holes` : 'yet to play'}</span>
+          </span>
+          <span class="value" data-testid="form-value">{pairMain(row)}</span>
+        </li>
+      {:else}
+        <p class="muted">No fourball pairs yet.</p>
+      {/each}
+    </ol>
+  {:else}
+    <ol class="list" data-testid="form-list">
+      {#each ranked as { row, rank } (row.playerId)}
+        <li class="card item" data-testid="form-row">
+          <span class="rank">{rank ?? '–'}</span>
+          <Avatar name={playerName(row.playerId)} url={photoUrl(row.playerId)} colour={colour(row)} size={40} />
+          <span class="who">
+            <strong style="color:{colour(row)}">{playerName(row.playerId)}</strong>
+            {#if detail(row)}<span class="muted small">{detail(row)}</span>{/if}
+          </span>
+          <span class="value" data-testid="form-value">{main(row)}</span>
+        </li>
+      {/each}
+    </ol>
+  {/if}
 {/if}
 
 <style>
@@ -80,6 +122,13 @@
   .metrics button { flex: none; background: var(--surface); color: var(--text); border: 1px solid var(--line); padding: 10px 12px; font-size: 0.9rem; }
   .metrics button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .list { list-style: none; padding: 0; margin: 0; }
+  .who-toggle { display: flex; gap: 0; margin: 4px 0 8px; }
+  .who-toggle button { flex: 1; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 0; padding: 8px; font-size: 0.9rem; }
+  .who-toggle button:first-child { border-radius: 8px 0 0 8px; }
+  .who-toggle button:last-child { border-radius: 0 8px 8px 0; }
+  .who-toggle button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .faces { display: flex; flex: none; }
+  .faces :global(.avatar + .avatar) { margin-left: -10px; }
   .item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 8px; }
   .rank { width: 24px; text-align: center; font-weight: 800; color: var(--muted); }
   .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }

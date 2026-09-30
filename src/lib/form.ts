@@ -78,7 +78,75 @@ export function computeForm(view: EventView, roundId: string | null): FormRow[] 
   return [...rows.values()];
 }
 
-const METRICS: Record<FormMetric, { value: (r: FormRow) => number; lowestFirst: boolean; needsHoles: boolean }> = {
+/** A fourball pair's better-ball form: the pair's best score on each hole (both players entered). */
+export interface PairFormRow {
+  /** The two player ids, sorted and joined — the same pair on several days is one row. */
+  key: string;
+  playerIds: [string, string];
+  team: Team;
+  holes: number;
+  /** Best gross to par per hole (each player's own tee par); both picked up counts +2. */
+  grossToPar: number;
+  /** Best net to par per hole off full course handicaps; both picked up counts +2. */
+  netToPar: number;
+  /** Best Stableford points per hole (0 when both picked up). */
+  stableford: number;
+  /** Points from the pair's confirmed fourball matches. */
+  points: number;
+  /** Holes where the pair's best gross was a birdie or better. */
+  birdies: number;
+  /** Holes where the pair's best gross was a treble bogey or worse, or both picked up. */
+  trebles: number;
+}
+
+export function computePairForm(view: EventView, roundId: string | null): PairFormRow[] {
+  const rows = new Map<string, PairFormRow>();
+  for (const rv of view.rounds) {
+    if (roundId && rv.round.id !== roundId) continue;
+    for (const g of rv.groups) {
+      const fourball = g.matches.find((m) => m.def.type === 'better_ball');
+      if (!fourball) continue;
+      for (const [side, team] of [[fourball.def.sideA, 'A'], [fourball.def.sideB, 'B']] as const) {
+        const ids = [...side].sort() as [string, string];
+        const key = ids.join('+');
+        const r = rows.get(key) ?? { key, playerIds: ids, team, holes: 0, grossToPar: 0, netToPar: 0, stableford: 0, points: 0, birdies: 0, trebles: 0 };
+        rows.set(key, r);
+        for (const h of rv.holes) {
+          const entries = ids.map((id) => g.scores.get(scoreKey(id, h.hole)));
+          if (entries.some((e) => !e)) continue; // count a hole once both players have a score in
+          r.holes++;
+          const played = ids
+            .map((id, i) => ({ id, e: entries[i]! }))
+            .filter(({ e }) => !e.pickedUp && e.gross !== null)
+            .map(({ id, e }) => {
+              const own = g.teeHoles[id]?.find((x) => x.hole === h.hole) ?? h;
+              const net = e.gross! - strokesOnHole(g.playingHcp[id] ?? 0, own.strokeIndex);
+              return { gross: e.gross! - own.par, net: net - own.par, points: Math.max(0, 2 + own.par - net) };
+            });
+          if (!played.length) {
+            r.grossToPar += 2;
+            r.netToPar += 2;
+            r.trebles++;
+            continue;
+          }
+          const bestGross = Math.min(...played.map((x) => x.gross));
+          r.grossToPar += bestGross;
+          r.netToPar += Math.min(...played.map((x) => x.net));
+          r.stableford += Math.max(...played.map((x) => x.points));
+          if (bestGross <= -1) r.birdies++;
+          if (bestGross >= 3) r.trebles++;
+        }
+        if (fourball.result) r.points += team === 'A' ? fourball.result.pointsA : fourball.result.pointsB;
+      }
+    }
+  }
+  return [...rows.values()];
+}
+
+/** What rankForm needs from a player's or a pair's row. */
+type Ranked = Pick<FormRow, 'holes' | 'grossToPar' | 'netToPar' | 'stableford' | 'points' | 'birdies' | 'trebles'>;
+
+const METRICS: Record<FormMetric, { value: (r: Ranked) => number; lowestFirst: boolean; needsHoles: boolean }> = {
   gross: { value: (r) => r.grossToPar, lowestFirst: true, needsHoles: true },
   net: { value: (r) => r.netToPar, lowestFirst: true, needsHoles: true },
   stableford: { value: (r) => r.stableford, lowestFirst: false, needsHoles: false },
@@ -88,12 +156,12 @@ const METRICS: Record<FormMetric, { value: (r: FormRow) => number; lowestFirst: 
 };
 
 /** Rows in ranking order; tied values share a rank (1, 1, 3). Players yet to play rank null for gross/net. */
-export function rankForm(rows: FormRow[], metric: FormMetric): { row: FormRow; rank: number | null; value: number }[] {
+export function rankForm<T extends Ranked>(rows: T[], metric: FormMetric): { row: T; rank: number | null; value: number }[] {
   const m = METRICS[metric];
   const ranked = rows
     .filter((r) => !m.needsHoles || r.holes > 0)
     .sort((a, b) => (m.lowestFirst ? m.value(a) - m.value(b) : m.value(b) - m.value(a)));
-  const out: { row: FormRow; rank: number | null; value: number }[] = [];
+  const out: { row: T; rank: number | null; value: number }[] = [];
   ranked.forEach((row, i) => {
     const value = m.value(row);
     const prev = out[i - 1];

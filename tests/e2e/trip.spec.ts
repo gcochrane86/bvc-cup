@@ -811,3 +811,20 @@ test('with many days, the leaderboard opens scrolled to the latest day; earlier 
   await expect(page.getByRole('tab', { name: 'Day 1', exact: true })).toBeInViewport();
   await expect(page.getByRole('tab', { name: 'Day 1', exact: true })).toHaveAttribute('aria-selected', 'true');
 });
+
+test('the Form tab can rank pairs as well as individuals', async ({ page }) => {
+  const db = serviceDb();
+  await db.from('events').update({ show_form: true }).eq('is_active', true);
+  await login(page);
+  await openGroup1(page); // everyone off 10: a shot on hole 1
+  await enterHole(page, 1, 3, 5); // A pair: best net 2 (−2); B pair: best net 4 (E)
+  await page.getByRole('link', { name: 'Form' }).click();
+  await page.getByRole('tab', { name: 'Net' }).click();
+  await page.getByRole('button', { name: 'Pairs' }).click();
+  const first = page.getByTestId('form-row').first();
+  await expect(first).toContainText('Adams & Brown');
+  await expect(first.getByTestId('form-value')).toHaveText('-2');
+  await expect(page.getByTestId('form-row').nth(1)).toContainText('Green & Hill');
+  await page.getByRole('button', { name: 'Individuals' }).click();
+  await expect(page.getByTestId('form-row').first()).not.toContainText('&');
+});

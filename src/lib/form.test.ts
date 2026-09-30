@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeForm, rankForm } from './form';
+import { computeForm, computePairForm, rankForm } from './form';
 import { buildEventView } from './view';
 import type { RoundRow, ScoreRow, Snapshot } from './data/types';
 import type { Slot, Team } from './scoring';
@@ -101,5 +101,46 @@ describe('form', () => {
     const ranked = rankForm(computeForm(buildEventView(snapshot())!, null), 'points');
     expect(ranked.map((r) => r.rank)).toEqual([1, 1, 3, 3]);
     expect(rankForm(computeForm(buildEventView(snapshot())!, 'r1'), 'trebles')[0].row.playerId).toBe('a1');
+  });
+});
+
+describe('pair form', () => {
+  // Everyone off 10: a shot on holes 1 and 2 (SI 1, 2), par 4.
+  const pairSnapshot = (over: Partial<Snapshot> = {}) =>
+    snapshot({
+      scores: [
+        score('r1', 'a1', 1, 3), score('r1', 'a2', 1, 5), score('r1', 'b1', 1, 4), score('r1', 'b2', 1, null), // b2 picked up
+        score('r1', 'a1', 2, null), score('r1', 'a2', 2, null), score('r1', 'b1', 2, 5), score('r1', 'b2', 2, 6), // both As picked up
+        score('r2', 'a1', 1, 4), score('r2', 'a2', 1, 4), score('r2', 'b1', 1, 4), score('r2', 'b2', 1, 4),
+        score('r2', 'a1', 2, 4), // a2 has no score on r2 hole 2: not counted yet
+      ],
+      ...over,
+    });
+  const pair = (rows: ReturnType<typeof computePairForm>, a: string, b: string) => rows.find((r) => r.key === [a, b].sort().join('+'))!;
+
+  it('counts a pair on better ball over the days chosen, adding up days with the same pair', () => {
+    const rows = computePairForm(buildEventView(pairSnapshot())!, null);
+    expect(rows).toHaveLength(2);
+    expect(pair(rows, 'a1', 'a2')).toMatchObject({ team: 'A', playerIds: ['a1', 'a2'], holes: 3, grossToPar: 1, netToPar: -1, stableford: 7, birdies: 1, trebles: 1, points: 1 });
+    expect(pair(rows, 'b1', 'b2')).toMatchObject({ team: 'B', holes: 3, grossToPar: 1, netToPar: -2, stableford: 8, birdies: 0, trebles: 0, points: 0 });
+  });
+
+  it('can cover one day', () => {
+    expect(pair(computePairForm(buildEventView(pairSnapshot())!, 'r2'), 'b1', 'b2')).toMatchObject({ holes: 1, netToPar: -1, points: 0 });
+  });
+
+  it('gives a different pairing its own row', () => {
+    const s = pairSnapshot();
+    const v = buildEventView({
+      ...s,
+      eventPlayers: [...s.eventPlayers, { event_id: 'e', player_id: 'a3', team: 'A', handicap: 10 }],
+      groupPlayers: s.groupPlayers.map((gp) => (gp.group_id === 'g2' && gp.slot === 'A2' ? { ...gp, player_id: 'a3' } : gp)),
+    })!;
+    expect(computePairForm(v, null).map((r) => r.key).sort()).toEqual(['a1+a2', 'a1+a3', 'b1+b2']);
+  });
+
+  it('ranks pairs with the same rules as players', () => {
+    const ranked = rankForm(computePairForm(buildEventView(pairSnapshot())!, null), 'net');
+    expect(ranked.map((r) => [r.row.key, r.rank])).toEqual([['b1+b2', 1], ['a1+a2', 2]]);
   });
 });
