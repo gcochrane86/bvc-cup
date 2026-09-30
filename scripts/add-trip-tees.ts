@@ -1,4 +1,4 @@
-// Adds the other tees for the BvC trip courses (current WHS men's ratings), and names each course's existing
+// Adds the other tees for the BvC trip courses and Galgorm Castle (current WHS men's ratings), and names each course's existing
 // tee "White". New tees copy the existing tee's par and stroke index (every men's tee shares them — per the
 // club scorecards and yardage guides). Safe to run twice: tees are found by (name, tee) before creating.
 // Usage: npm run add-trip-tees -- --env .env.local
@@ -52,6 +52,16 @@ const COURSES: { name: string; tees: Tee[] }[] = [
       { tee: 'Blue', course_rating: 72.7, slope_rating: 139 },
       { tee: 'Yellow', course_rating: 70.6, slope_rating: 136 },
       { tee: 'Red', course_rating: 68.7, slope_rating: 131 },
+    ],
+  },
+  {
+    // GolfPass (Sept 2026), men's ratings; the existing tee (72.1 / 132) is White.
+    name: 'Galgorm Castle',
+    tees: [
+      { tee: 'Blue', course_rating: 76.1, slope_rating: 142 },
+      { tee: 'White', course_rating: 72.1, slope_rating: 132 },
+      { tee: 'Green', course_rating: 69.2, slope_rating: 124 },
+      { tee: 'Red', course_rating: 67.7, slope_rating: 107 },
     ],
   },
 ];
