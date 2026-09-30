@@ -17,13 +17,8 @@
     ...(eventGuides(db.rounds, db.courses, photoCourses()).length ? [{ href: '#/guide', label: 'Courses', active: router.route.name === 'guide' }] : []),
     // Form (rankings) only when the admin has switched it on for this event.
     ...(db.event?.show_form ? [{ href: '#/form', label: 'Form', active: router.route.name === 'form' }] : []),
-    // Players (photo uploads) is admin-only; everyone else just sees the leaderboard and scores.
-    ...(isAdmin()
-      ? [
-          { href: '#/players', label: 'Players', active: router.route.name === 'players' },
-          { href: '#/admin', label: 'Admin', active: router.route.name.startsWith('admin') },
-        ]
-      : []),
+    // Admin (player photos are added in Admin → Players).
+    ...(isAdmin() ? [{ href: '#/admin', label: 'Admin', active: router.route.name.startsWith('admin') }] : []),
   ]);
 </script>
 

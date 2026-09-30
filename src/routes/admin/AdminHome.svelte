@@ -6,12 +6,12 @@
 <h1>Admin</h1>
 <p class="muted">Active event: <strong>{db.event?.name ?? 'none'}</strong></p>
 
-<nav class="tiles">
+<div class="tiles">
   <a class="tile wide" href="#/admin/events"><span class="icon" aria-hidden="true">🏆</span><strong>Events</strong><span class="sub">Teams, rounds, pairings &amp; results</span></a>
   <a class="tile" href="#/admin/players"><span class="icon" aria-hidden="true">🏌️</span><strong>Players</strong><span class="sub">Handicaps</span></a>
   <a class="tile" href="#/admin/courses"><span class="icon" aria-hidden="true">⛳</span><strong>Courses</strong><span class="sub">Tees &amp; guides</span></a>
   <a class="tile wide quiet" href="#/admin/access"><span class="icon" aria-hidden="true">🔑</span><strong>Access</strong><span class="sub">Approve or remove people</span></a>
-</nav>
+</div>
 
 <button class="secondary" onclick={logout}>Sign out of admin</button>
 <p class="muted small">Tip: sign out and back in with the trip password to see exactly what everyone else sees.</p>

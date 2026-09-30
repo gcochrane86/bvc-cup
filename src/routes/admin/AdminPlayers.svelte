@@ -64,7 +64,7 @@
 </form>
 
 {#each db.players as p (p.id)}
-  <div class="card">
+  <div class="card" data-testid="admin-player">
     <div class="row">
       <Avatar name={p.name} url={photoUrl(p.id)} colour="var(--accent)" size={48} />
       <PhotoUpload playerId={p.id} label={p.photo_path ? 'Change photo' : 'Add photo'} />

@@ -113,10 +113,12 @@ test('scores entered offline are sent when signal returns', async ({ browser }) 
   await expect(group1Card(viewer).getByTestId('status')).toHaveText('1 UP', { timeout: 30_000 });
 });
 
-test('a player photo can be uploaded', async ({ page }) => {
-  await login(page);
-  await page.goto('/#/players');
-  const row = page.getByTestId('player-row').first();
+test('the admin uploads player photos in Admin → Players; there is no separate Players tab', async ({ page }) => {
+  await loginAdmin(page);
+  await expect(page.locator('nav a', { hasText: 'Admin' })).toBeVisible();
+  await expect(page.locator('nav a', { hasText: 'Players' })).toHaveCount(0);
+  await page.getByRole('link', { name: /^Players/ }).click();
+  const row = page.getByTestId('admin-player').first();
   await row.locator('input[type=file]').setInputFiles('public/icon-512.png');
   await expect(row.locator('img')).toBeVisible();
 });

@@ -18,7 +18,6 @@
   import AdminCourses from './routes/admin/AdminCourses.svelte';
   import AdminCourse from './routes/admin/AdminCourse.svelte';
   import AdminGuide from './routes/admin/AdminGuide.svelte';
-  import Players from './routes/Players.svelte';
   import ScoreEntry from './routes/ScoreEntry.svelte';
   import Match from './routes/Match.svelte';
   import Nav from './components/Nav.svelte';
@@ -72,8 +71,6 @@
         {#key `${route.groupId}:${route.hole}`}
           <ScoreEntry groupId={route.groupId} startHole={route.hole} />
         {/key}
-      {:else if route.name === 'players'}
-        <Players />
       {:else if route.name === 'admin'}
         <AdminHome />
       {:else if route.name === 'admin-players'}

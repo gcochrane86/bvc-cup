@@ -10,7 +10,6 @@ describe('parseRoute', () => {
     ['#/score/g1', { name: 'score', groupId: 'g1', hole: null }],
     ['#/score/g1/7', { name: 'score', groupId: 'g1', hole: 7 }],
     ['#/score/g1/19', { name: 'not-found' }],
-    ['#/players', { name: 'players' }],
     ['#/guide', { name: 'guide' }],
     ['#/form', { name: 'form' }],
     ['#/scorecards', { name: 'scorecards' }],
@@ -28,6 +27,7 @@ describe('parseRoute', () => {
     ['#/admin/pairings/r1', { name: 'admin-pairings', roundId: 'r1' }],
     ['#/match/g1/bogus', { name: 'not-found' }],
     ['#/nope', { name: 'not-found' }],
+    ['#/players', { name: 'not-found' }], // photos are added in Admin → Players
   ])('parses %s', (hash, expected) => {
     expect(parseRoute(hash)).toEqual(expected);
   });

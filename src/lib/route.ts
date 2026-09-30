@@ -4,7 +4,6 @@ export type Route =
   | { name: 'home' }
   | { name: 'match'; groupId: string; matchType: MatchType }
   | { name: 'score'; groupId: string | null; hole: number | null }
-  | { name: 'players' }
   | { name: 'guide' }
   | { name: 'form' }
   | { name: 'scorecards' }
@@ -30,7 +29,6 @@ export function parseRoute(hash: string): Route {
     return { name: 'match', groupId: b, matchType: c as MatchType };
   if (a === 'score' && p.length <= 2) return { name: 'score', groupId: b ?? null, hole: null };
   if (a === 'score' && p.length === 3 && /^([1-9]|1[0-8])$/.test(c)) return { name: 'score', groupId: b, hole: Number(c) };
-  if (a === 'players' && p.length === 1) return { name: 'players' };
   if (a === 'guide' && p.length === 1) return { name: 'guide' };
   if (a === 'form' && p.length === 1) return { name: 'form' };
   if (a === 'scorecards' && p.length === 1) return { name: 'scorecards' };
