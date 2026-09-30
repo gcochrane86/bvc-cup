@@ -17,6 +17,8 @@
   let msg = $state<string | null>(null);
   // course: the course name picked first; course_id: its tee (the longest tee until another is picked).
   let newRound = $state({ name: '', course: '', course_id: '', date: '' });
+  /** The Add round form only shows after '+ Add round' is pressed (always for an event with no rounds yet). */
+  let adding = $state(false);
   let roundTees = $state<RoundTeeRow[]>([]);
   let paired = $state<Record<string, number>>({});
   /** After saving teams: a day whose pairings still need setting (scores and the leaderboard need them). */
@@ -48,6 +50,7 @@
     ]);
     event = ev;
     rounds = rs;
+    if (!rs.length) adding = true; // a new event: straight to adding its first day
     const ids = rs.map((r) => r.id);
     if (ids.length) {
       const [tees, gs] = await Promise.all([
@@ -190,7 +193,10 @@
       )) as RoundRow;
       const paired = await pairTwoVTwo([added]);
       return paired.length ? `Round added · pairings set for ${added.name}` : 'Round added';
-    }, 'Round added').then(() => (newRound = { name: '', course: '', course_id: '', date: '' }));
+    }, 'Round added').then(() => {
+      newRound = { name: '', course: '', course_id: '', date: '' };
+      adding = false;
+    });
   };
 
   const saveRound = (r: RoundRow) =>
@@ -293,7 +299,10 @@
   </section>
 
   <section class="card">
-    <h2>Rounds</h2>
+    <div class="rhead">
+      <h2>Rounds</h2>
+      {#if !adding}<button class="addbtn" onclick={() => (adding = true)}>+ Add round</button>{/if}
+    </div>
     {#each rounds as r (r.id)}
       <div class="round">
         <div class="row">
@@ -376,6 +385,7 @@
       </div>
     {/each}
 
+    {#if adding}
     <form class="round" onsubmit={addRound}>
       <h3>Add round</h3>
       <div class="row">
@@ -405,8 +415,12 @@
           </select>
         </div>
       {/if}
-      <button type="submit">Add round</button>
+      <div class="row">
+        <button type="submit">Add round</button>
+        <button type="button" class="secondary" onclick={() => (adding = false)}>Cancel</button>
+      </div>
     </form>
+    {/if}
   </section>
 
   {#if nudge}
@@ -464,6 +478,9 @@
   .seg button { margin-top: 0; min-height: 40px; border-radius: 0; background: var(--surface); color: var(--muted); padding: 6px 10px; font-size: 0.8rem; }
   .seg button + button { border-left: 1px solid var(--line); }
   .wide { width: 100%; }
+  .rhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .rhead h2 { margin: 0; }
+  .addbtn { margin-top: 0; min-height: 38px; padding: 8px 14px; background: var(--surface); color: var(--accent); border: 2px solid var(--accent); }
   .pairing { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
   .pairbtn {
     display: block; text-align: center; padding: 12px 16px; border-radius: 10px; font-weight: 700; text-decoration: none;

@@ -1005,3 +1005,15 @@ test('saving teams of more than four without pairings warns (but saves), and eac
   await popup.getByRole('link', { name: 'Set pairings for Day 1 →' }).click();
   await expect(admin).toHaveURL(/#\/admin\/pairings\/[0-9a-f-]{36}$/);
 });
+
+test("an event's Add round form stays tucked away until '+ Add round' is pressed", async ({ browser }) => {
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto(`/#/admin/events/${await activeEventId()}`); // the seed event already has days
+  await expect(admin.getByRole('heading', { name: 'Add round' })).toHaveCount(0);
+  await admin.getByRole('button', { name: '+ Add round' }).click();
+  await expect(admin.getByRole('heading', { name: 'Add round' })).toBeVisible();
+  await admin.getByRole('button', { name: 'Cancel' }).click();
+  await expect(admin.getByRole('heading', { name: 'Add round' })).toHaveCount(0);
+  await expect(admin.getByRole('button', { name: '+ Add round' })).toBeVisible();
+});
