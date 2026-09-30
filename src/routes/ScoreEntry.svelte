@@ -24,17 +24,20 @@
   $effect(() => {
     if (!groupId && !fresh) void loadAll().then(() => (fresh = true));
   });
+  // Back to the match this phone was scoring — or straight into the only match there is to score. Decided from
+  // the data already on the phone, so the list never flashes up first.
+  const jumpTo = $derived(!groupId && view ? (resumeGroupId(remembered(), toScore) ?? onlyGroupId(toScore)) : null);
   $effect(() => {
     if (groupId) {
       // A hole link from another match's summary is a quick fix, not a switch of match.
       if (found && (startHole === null || !remembered())) remember(groupId);
       return;
     }
-    if (!fresh) return;
-    // Back to the match this phone was scoring — or straight into the only match there is to score.
-    const resume = resumeGroupId(remembered(), toScore) ?? onlyGroupId(toScore);
-    if (resume) location.replace(`#/score/${resume}`);
-    else remember(null); // confirmed or gone: forget it and show the list
+    if (jumpTo) {
+      location.replace(`#/score/${jumpTo}`);
+      return;
+    }
+    if (fresh) remember(null); // confirmed or gone (checked against fresh data): forget it and show the list
   });
   function allMatches(e: MouseEvent) {
     e.preventDefault();
@@ -174,6 +177,8 @@
 
 {#if !view}
   <p class="center">No active event yet.</p>
+{:else if !found && jumpTo}
+  <p class="center muted">Loading…</p>
 {:else if !found}
   <h1>Which match are you scoring?</h1>
   {#each toScore as day (day.round.round.id)}

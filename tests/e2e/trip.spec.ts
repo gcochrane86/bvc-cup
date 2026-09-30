@@ -836,8 +836,16 @@ test('with only one match to score, Scores opens it straight away', async ({ pag
   await db.from('groups').delete().in('id', groups!.filter((g) => g.id !== keep.id).map((g) => g.id));
 
   await login(page);
+  // Watch for the match list ever appearing, even for a moment.
+  await page.evaluate(() => {
+    (window as unknown as { listShown: boolean }).listShown = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="score-pick"]')) (window as unknown as { listShown: boolean }).listShown = true;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
   await page.getByRole('link', { name: 'Scores' }).click();
   await expect(page).toHaveURL(new RegExp(`#/score/${keep.id}$`));
+  expect(await page.evaluate(() => (window as unknown as { listShown: boolean }).listShown)).toBe(false); // no flash of the list
   await expect(page.getByRole('heading', { name: /^Hole \d+$/ })).toBeVisible();
   await expect(page.getByRole('link', { name: '← All matches' })).toHaveCount(0); // nothing else to pick
 });
