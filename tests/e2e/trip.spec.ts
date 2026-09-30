@@ -187,7 +187,7 @@ test('the admin can reset all scores back to the start', async ({ browser }) => 
   admin.on('dialog', (d) => void (d.type() === 'prompt' ? d.accept('RESET') : d.accept()));
   await loginAdmin(admin);
   await admin.getByRole('link', { name: /^Events/ }).click();
-  await admin.locator('a.card').first().click();
+  await admin.getByTestId('swipe-row').first().getByRole('link').click();
   const reset = admin.getByTestId('reset-scores');
   await expect(reset).toBeHidden(); // tucked away under More options until opened
   await admin.getByText('More options').click();
@@ -354,7 +354,7 @@ test('the admin can choose the singles line-up and it shows on the leaderboard',
   admin.on('dialog', (d) => void d.accept());
   await loginAdmin(admin);
   await admin.getByRole('link', { name: /^Events/ }).click();
-  await admin.locator('a.card').first().click();
+  await admin.getByTestId('swipe-row').first().getByRole('link').click();
   const day3 = admin.locator('.round').nth(2);
   await day3.getByLabel('Singles pairings').selectOption('selected');
   await day3.getByRole('button', { name: 'Save round' }).click();
@@ -467,6 +467,7 @@ test('the admin can swipe an event left to delete it', async ({ browser }) => {
   });
   await loginAdmin(admin);
   await admin.goto('/#/admin/events');
+  await admin.getByRole('button', { name: '+ New event' }).click();
   await admin.getByLabel('New event name').fill('Old Trip');
   await admin.getByRole('button', { name: 'Create event' }).click();
   await expect(admin).toHaveURL(/#\/admin\/events\/[0-9a-f-]{36}$/); // created and opened
@@ -501,7 +502,7 @@ test('the Form tab is off until the admin switches it on, then ranks players', a
   const admin = await newPhone(browser);
   await loginAdmin(admin);
   await admin.getByRole('link', { name: /^Events/ }).click();
-  await admin.locator('a.card').first().click();
+  await admin.getByTestId('swipe-row').first().getByRole('link').click();
   await admin.getByText('More options').click();
   await admin.getByLabel(/Show the Form tab to players/).check();
   await admin.getByRole('button', { name: 'Save tab settings' }).click();
@@ -919,6 +920,7 @@ test('adding a day to a new event picks the course, then its tees', async ({ bro
   const admin = await newPhone(browser);
   await loginAdmin(admin);
   await admin.goto('/#/admin/events');
+  await admin.getByRole('button', { name: '+ New event' }).click();
   await admin.getByLabel('New event name').fill('Winter League');
   await admin.getByRole('button', { name: 'Create event' }).click();
   await expect(admin).toHaveURL(/#\/admin\/events\/[0-9a-f-]{36}$/);
@@ -1086,4 +1088,31 @@ test("photos for a hole of a built-in guide replace that hole's pages; other hol
   await me.reload();
   await me.getByRole('button', { name: 'Guide hole 2', exact: true }).click();
   await expect(me.getByTestId('guide-layout')).toHaveAttribute('src', 'guides/dundonald/hole-02.webp');
+});
+
+test("Admin → Events lists the active event first with a summary, and the new-event form waits for '+ New event'", async ({ page }) => {
+  const db = serviceDb();
+  await db.from('events').insert({ name: 'Zzz Later Trip' });
+  await loginAdmin(page);
+  await page.goto('/#/admin/events');
+  const tiles = page.getByTestId('swipe-row');
+  await expect(tiles.first()).toContainText('Active');
+  await expect(tiles.first()).toContainText(/\d+ days? · .+ · \d+ players?/);
+  await expect(tiles.filter({ hasText: 'Zzz Later Trip' })).toContainText('No days yet · 0 players');
+  await expect(page.getByLabel('New event name')).toHaveCount(0);
+  await page.getByRole('button', { name: '+ New event' }).click();
+  await expect(page.getByLabel('New event name')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByLabel('New event name')).toHaveCount(0);
+});
+
+test('Admin → Courses shows each tee as a chip that opens it, and + Tee adds one', async ({ page }) => {
+  await loginAdmin(page);
+  await page.goto('/#/admin/courses');
+  const seed = page.getByTestId('course-group').filter({ hasText: 'Seed Links' });
+  await seed.getByRole('link', { name: 'Edit', exact: true }).click();
+  await expect(page).toHaveURL(/#\/admin\/courses\/[0-9a-f-]{36}$/);
+  await page.goBack();
+  await page.getByTestId('course-group').filter({ hasText: 'Seed Links' }).getByRole('link', { name: '+ Add a tee' }).click();
+  await expect(page).toHaveURL(/#\/admin\/courses\/new\/[0-9a-f-]{36}$/);
 });
