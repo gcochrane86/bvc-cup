@@ -882,3 +882,34 @@ test('a day can be a 2-man scramble: one score per team, saved for both players'
   await me.goto('/#/');
   await expect(group1Card(me).getByTestId('status')).toHaveText('1 UP');
 });
+
+test('adding a day to a new event picks the course, then its tees', async ({ browser }) => {
+  const db = serviceDb();
+  const { data: seedRound } = await db.from('rounds').select('course_id').limit(1).single();
+  const { data: holes } = await db.from('course_holes').select('*').eq('course_id', seedRound!.course_id);
+  const tees = [{ tee: 'White', course_rating: 70, slope_rating: 120 }, { tee: 'Gold', course_rating: 72, slope_rating: 128 }];
+  const ids: Record<string, string> = {};
+  for (const t of tees) {
+    const { data: c } = await db.from('courses').insert({ name: 'Tee Links', ...t }).select('id').single();
+    await db.from('course_holes').insert(holes!.map((h) => ({ ...h, course_id: c!.id })));
+    ids[t.tee] = c!.id;
+  }
+
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto('/#/admin/events');
+  await admin.getByLabel('New event name').fill('Winter League');
+  await admin.getByRole('button', { name: 'Create event' }).click();
+  await expect(admin).toHaveURL(/#\/admin\/events\/[0-9a-f-]{36}$/);
+  const eventId = admin.url().split('/events/')[1];
+
+  const form = admin.locator('form.round');
+  await expect(form.getByLabel('Tees')).toHaveCount(0); // no course chosen yet
+  await form.getByLabel('Course').selectOption('Tee Links');
+  await expect(form.getByLabel('Tees')).toHaveValue(ids.Gold); // longest tee first
+  await form.getByLabel('Tees').selectOption(ids.White);
+  await form.getByRole('button', { name: 'Add round' }).click();
+  await expect(admin.getByText('Round added')).toBeVisible();
+  const { data: added } = await db.from('rounds').select('name, course_id').eq('event_id', eventId);
+  expect(added).toEqual([{ name: 'Day 1', course_id: ids.White }]);
+});

@@ -2,7 +2,7 @@
   import { db, loadAll } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
-  import { courseGroups, courseLabel, teesOf } from '../../lib/courses';
+  import { courseGroups, teesOf } from '../../lib/courses';
   import { autoFourball } from '../../lib/scoring';
   import ResetScores from '../../components/ResetScores.svelte';
   import ConfirmedResults from '../../components/ConfirmedResults.svelte';
@@ -14,7 +14,8 @@
   let members = $state<Record<string, Member>>({});
   let rounds = $state<RoundRow[]>([]);
   let msg = $state<string | null>(null);
-  let newRound = $state({ name: '', course_id: '', date: '' });
+  // course: the course name picked first; course_id: its tee (the longest tee until another is picked).
+  let newRound = $state({ name: '', course: '', course_id: '', date: '' });
   let roundTees = $state<RoundTeeRow[]>([]);
   /** `${roundId}:${playerId}` for players whose match that day is confirmed (their tee is locked). */
   let locked = $state<Set<string>>(new Set());
@@ -158,7 +159,7 @@
       )) as RoundRow;
       const paired = await pairTwoVTwo([added]);
       return paired.length ? `Round added · pairings set for ${added.name}` : 'Round added';
-    }, 'Round added').then(() => (newRound = { name: '', course_id: '', date: '' }));
+    }, 'Round added').then(() => (newRound = { name: '', course: '', course_id: '', date: '' }));
   };
 
   const saveRound = (r: RoundRow) =>
@@ -323,11 +324,27 @@
       </div>
       <div class="field">
         <label for="nrc">Course</label>
-        <select id="nrc" bind:value={newRound.course_id} required>
+        <select
+          id="nrc"
+          value={newRound.course}
+          required
+          onchange={(e) => {
+            newRound.course = (e.currentTarget as HTMLSelectElement).value;
+            newRound.course_id = teesOf(db.courses, newRound.course)[0]?.id ?? '';
+          }}
+        >
           <option value="" disabled>Choose a course</option>
-          {#each courseGroups(db.courses).flatMap((g) => g.tees) as c (c.id)}<option value={c.id}>{courseLabel(c)}</option>{/each}
+          {#each courseGroups(db.courses) as g (g.name)}<option value={g.name}>{g.name}</option>{/each}
         </select>
       </div>
+      {#if teesOf(db.courses, newRound.course).some((t) => t.tee)}
+        <div class="field">
+          <label for="nrt">Tees</label>
+          <select id="nrt" bind:value={newRound.course_id}>
+            {#each teesOf(db.courses, newRound.course) as t (t.id)}<option value={t.id}>{t.tee ?? 'Main'} tees</option>{/each}
+          </select>
+        </div>
+      {/if}
       <button type="submit">Add round</button>
     </form>
   </section>
