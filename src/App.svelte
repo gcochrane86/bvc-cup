@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { auth, initAuth, isAdmin } from './lib/auth.svelte';
   import { router } from './lib/router.svelte';
+  import { startWatching, watch } from './lib/watch.svelte';
   import { db, leaderboardShown, startData, stopData } from './lib/data/store.svelte';
   import Login from './routes/Login.svelte';
   import Leaderboard from './routes/Leaderboard.svelte';
@@ -30,13 +31,28 @@
   // Only people the admin has approved get the app (the database enforces this too).
   const approved = $derived(auth.access === 'approved');
 
+  // Someone with an event's share link (and no approved sign-in) uses that event through the link:
+  // following and scoring, like a signed-in player (nothing admin).
+  const watching = $derived(!!watch.token && (!signedIn || (auth.access !== 'unknown' && !approved)));
+  $effect(() => {
+    if (route.name === 'watch') {
+      startWatching(route.token);
+      location.replace('#/');
+    }
+  });
+
   // With the Leaderboard hidden for this event, players (not the admin) go to Scores instead.
   $effect(() => {
-    if (db.loaded && !leaderboardShown() && (route.name === 'home' || route.name === 'match')) location.replace('#/score');
+    if (db.loaded && !leaderboardShown() && (route.name === 'home' || route.name === 'match'))
+      location.replace('#/score');
   });
   $effect(() => {
     if (signedIn && approved) {
       startData();
+      return stopData;
+    }
+    if (watching) {
+      startData('watch');
       return stopData;
     }
   });
@@ -46,6 +62,40 @@
   <p class="center muted">Loading…</p>
 {:else if route.name === 'admin-login' || (signedIn && needsAdmin && !isAdmin())}
   <Login mode="admin" />
+{:else if route.name === 'watch'}
+  <p class="center muted">Loading…</p>
+{:else if watching && !needsAdmin}
+  <div class="app" style="--team-a:{db.event?.team_a_colour ?? '#1f4e9c'};--team-b:{db.event?.team_b_colour ?? '#c8102e'}">
+    <p class="watching" data-testid="watching">{db.event?.name ?? 'Event'} · via share link</p>
+    {#if db.notice}
+      <button class="notice" onclick={() => (db.notice = null)}>{db.notice} (tap to dismiss)</button>
+    {/if}
+    {#if db.error}<p class="notice error">Connection problem: {db.error}</p>{/if}
+    <main>
+      {#if !db.loaded}
+        <p class="center muted">Loading…</p>
+      {:else if route.name === 'home'}
+        <Leaderboard />
+      {:else if route.name === 'match'}
+        {#key route.groupId + route.matchType}
+          <Match groupId={route.groupId} matchType={route.matchType} />
+        {/key}
+      {:else if route.name === 'score'}
+        {#key `${route.groupId}:${route.hole}`}
+          <ScoreEntry groupId={route.groupId} startHole={route.hole} />
+        {/key}
+      {:else if route.name === 'guide'}
+        <Guide />
+      {:else if route.name === 'scorecards'}
+        <Scorecards />
+      {:else if route.name === 'form' && db.event?.show_form}
+        <Form />
+      {:else}
+        <p class="center">Page not found. <a href="#/">Back to the leaderboard</a></p>
+      {/if}
+    </main>
+    <Nav />
+  </div>
 {:else if !signedIn}
   <Login mode="trip" />
 {:else if auth.access === 'unknown'}
@@ -109,3 +159,7 @@
     <Nav />
   </div>
 {/if}
+
+<style>
+  .watching { margin: 0; padding: 8px 16px; background: var(--accent); color: #fff; font-size: 0.85rem; text-align: center; }
+</style>

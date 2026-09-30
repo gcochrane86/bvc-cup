@@ -1116,3 +1116,46 @@ test('Admin → Courses shows each tee as a chip that opens it, and + Tee adds o
   await page.getByTestId('course-group').filter({ hasText: 'Seed Links' }).getByRole('link', { name: '+ Add a tee' }).click();
   await expect(page).toHaveURL(/#\/admin\/courses\/new\/[0-9a-f-]{36}$/);
 });
+
+test("an event's share link lets anyone follow and score without signing in, until it's turned off", async ({ browser }) => {
+  const admin = await newPhone(browser);
+  admin.on('dialog', (d) => void d.accept());
+  await loginAdmin(admin);
+  await admin.goto(`/#/admin/events/${await activeEventId()}`);
+  const card = admin.getByTestId('share-link');
+  await card.getByRole('button', { name: 'Create share link' }).click();
+  const url = (await card.getByTestId('share-url').textContent())!.trim();
+  expect(url).toMatch(/#\/watch\/[A-Za-z0-9_-]{22}$/);
+
+  // A phone that has never signed in opens the link: straight in, no sign-in.
+  const guest = await newPhone(browser);
+  await guest.goto(url);
+  await expect(guest.getByTestId('watching')).toContainText('via share link');
+  await expect(guest.getByLabel('Your email')).toHaveCount(0);
+  await expect(guest.locator('nav a', { hasText: 'Admin' })).toHaveCount(0);
+
+  // It scores like a signed-in player, and a signed-in viewer sees it.
+  const viewer = await newPhone(browser);
+  await login(viewer);
+  await openGroup1(guest);
+  await enterHole(guest, 1, 4, 5);
+  await expect(guest.getByTestId('pending')).toBeHidden({ timeout: 30_000 });
+  await expect(group1Card(viewer).getByTestId('status')).toHaveText('1 UP', { timeout: 30_000 });
+
+  // Scores entered elsewhere reach the link's phone too (it refreshes every few seconds).
+  await openGroup1(viewer);
+  await enterHole(viewer, 2, 4, 5);
+  await guest.goto('/#/');
+  await expect(group1Card(guest).getByTestId('status')).toHaveText('2 UP', { timeout: 30_000 });
+
+  // Reopening the saved app (no link in the address) still opens the event.
+  await guest.goto('/');
+  await expect(guest.getByTestId('watching')).toBeVisible();
+
+  // Turned off: the link's phone is asked to sign in, and told why.
+  await admin.getByTestId('share-link').getByRole('button', { name: 'Turn off' }).click();
+  await expect(admin.getByTestId('share-link').getByRole('button', { name: 'Create share link' })).toBeVisible();
+  await guest.reload();
+  await expect(guest.getByTestId('link-ended')).toBeVisible({ timeout: 20_000 });
+  await expect(guest.getByLabel('Your email')).toBeVisible();
+});

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ShareLink from '../../components/ShareLink.svelte';
   import { db, loadAll } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
@@ -247,6 +248,8 @@
     <label class="row"><input type="checkbox" bind:checked={event.is_active} /> Active event (shown on the leaderboard)</label>
     <button onclick={saveDetails}>Save event</button>
   </section>
+
+  <ShareLink {event} />
 
   <section class="card">
     <h2>Players</h2>

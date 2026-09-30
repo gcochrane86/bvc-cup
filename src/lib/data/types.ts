@@ -17,6 +17,8 @@ export interface EventRow {
   show_form: boolean;
   /** Show players the Leaderboard tab (off: they land on Scores; the admin still sees it). */
   show_leaderboard: boolean;
+  /** The share link token (#/watch/<token>); null = no link. */
+  watch_token: string | null;
 }
 export interface EventPlayerRow { event_id: string; player_id: string; team: Team; handicap: number }
 export interface RoundRow {

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { isWatching } from '../lib/data/store.svelte';
+  import { watch } from '../lib/watch.svelte';
   import { db, flushOutbox, loadAll } from '../lib/data/store.svelte';
   import { hasPendingFor } from '../lib/data/merge';
   import { must, supabase } from '../lib/supabase';
@@ -34,8 +36,10 @@
         alert('The result changed while syncing — please check the scores.');
         return;
       }
+      // Through a share link, confirming goes via the link (checked against its event).
       const r = await must(
-        supabase.rpc('confirm_match', {
+        supabase.rpc(isWatching() ? 'watch_confirm_match' : 'confirm_match', {
+          ...(isWatching() ? { p_token: watch.token } : {}),
           p_group_id: snap.groupId,
           p_match_type: snap.matchType,
           p_winner: snap.winner,

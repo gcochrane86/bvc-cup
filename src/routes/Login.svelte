@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { watch } from '../lib/watch.svelte';
   import { login, rememberedEmail } from '../lib/auth.svelte';
 
   let { mode }: { mode: 'trip' | 'admin' } = $props();
@@ -19,6 +20,7 @@
 <main class="login">
   <img class="logo" src="./icon.svg" alt="" width="96" height="96" />
   <h1>{mode === 'admin' ? 'Admin login' : 'BvC Cup'}</h1>
+  {#if mode === 'trip' && watch.ended}<p class="notice-box" data-testid="link-ended">That share link has been turned off. Sign in to see the event.</p>{/if}
   <form class="card" onsubmit={submit}>
     {#if mode === 'trip'}
       <div class="field">
@@ -42,6 +44,7 @@
 </main>
 
 <style>
+  .notice-box { background: #fff1dd; color: #9a5a12; border-radius: 10px; padding: 10px 12px; }
   .login { padding-top: 12vh; }
   .logo { display: block; margin: 0 auto 12px; border-radius: 22px; }
   h1 { text-align: center; margin-bottom: 24px; }

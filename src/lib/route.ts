@@ -7,6 +7,7 @@ export type Route =
   | { name: 'guide' }
   | { name: 'form' }
   | { name: 'scorecards' }
+  | { name: 'watch'; token: string }
   | { name: 'admin-login' }
   | { name: 'admin' }
   | { name: 'admin-players' }
@@ -32,6 +33,8 @@ export function parseRoute(hash: string): Route {
   if (a === 'guide' && p.length === 1) return { name: 'guide' };
   if (a === 'form' && p.length === 1) return { name: 'form' };
   if (a === 'scorecards' && p.length === 1) return { name: 'scorecards' };
+  // An event's share link; opening it remembers the link and opens the event (no sign-in).
+  if (a === 'watch' && p.length === 2) return { name: 'watch', token: b };
   if (a === 'admin') {
     if (p.length === 1) return { name: 'admin' };
     if (p.length === 2 && b === 'login') return { name: 'admin-login' };

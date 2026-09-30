@@ -4,6 +4,7 @@ import { must, supabase } from '../supabase';
 import { isAdmin } from '../auth.svelte';
 import { applyPending, isBehind, removeScoreRow, upsertScoreRow } from './merge';
 import { freshOnly } from './fresh';
+import { endWatching, watch } from '../watch.svelte';
 import { planPhotoUrls, PHOTO_URL_TTL_S, type SignedPhoto } from './photoUrls';
 import { createOutbox, pendingKey, type OutboxStorage, type PendingScore, type SendResult } from './outbox';
 import type {
@@ -37,8 +38,11 @@ const storage: OutboxStorage = {
 };
 
 async function send(p: PendingScore): Promise<SendResult> {
+  // Through a share link, scores go via the link (checked against its event) rather than a sign-in.
+  const link = watching ? { p_token: watch.token } : {};
   return must(
-    supabase.rpc('upsert_score', {
+    supabase.rpc(watching ? 'watch_upsert_score' : 'upsert_score', {
+      ...link,
       p_round_id: p.roundId,
       p_player_id: p.playerId,
       p_hole: p.hole,
@@ -130,7 +134,23 @@ export async function fetchEventData(eventId: string) {
   return { eventPlayers, rounds, groups, groupPlayers, scores, results, roundTees };
 }
 
+/** Using an event's share link (no sign-in): data comes from watch_event, polled; scores go via the link. */
+let watching = false;
+export const isWatching = () => watching;
+
+async function loadWatched() {
+  try {
+    const snap = (await must(supabase.rpc('watch_event', { p_token: watch.token }))) as (Snapshot & { guidePhotos: GuidePhotoRow[] }) | null;
+    if (!snap) return endWatching(); // the admin turned the link off (or replaced it)
+    Object.assign(db, { ...snap, pending: [], loaded: true, error: null });
+    await refreshPhotoUrls();
+  } catch (e) {
+    db.error = e instanceof Error ? e.message : String(e);
+  }
+}
+
 async function doLoad() {
+  if (watching) return loadWatched();
   try {
     const [events, players, courses, courseHoles, guidePhotos] = await Promise.all([
       must(supabase.from('events').select('*').eq('is_active', true).limit(1)) as Promise<EventRow[]>,
@@ -247,7 +267,21 @@ function onOnline() {
   void flushOutbox();
 }
 
-export function startData() {
+const WATCH_POLL_MS = 5_000;
+
+export function startData(mode: 'member' | 'watch' = 'member') {
+  if (mode === 'watch') {
+    // No realtime through a link (it needs a member's access): reload every few seconds while on screen.
+    watching = true;
+    void loadAll().then(() => flushOutbox());
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', onOnline);
+    pollTimer = setInterval(() => {
+      if (db.pending.length) void flushOutbox();
+      if (document.visibilityState === 'visible') void loadAll();
+    }, WATCH_POLL_MS);
+    return;
+  }
   void loadAll().then(() => flushOutbox());
   channel = supabase
     .channel('golf-live')
@@ -269,6 +303,7 @@ export function startData() {
 }
 
 export function stopData() {
+  watching = false;
   if (channel) void supabase.removeChannel(channel);
   channel = null;
   document.removeEventListener('visibilitychange', onVisible);

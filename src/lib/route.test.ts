@@ -27,6 +27,8 @@ describe('parseRoute', () => {
     ['#/admin/pairings/r1', { name: 'admin-pairings', roundId: 'r1' }],
     ['#/match/g1/bogus', { name: 'not-found' }],
     ['#/nope', { name: 'not-found' }],
+    ['#/watch/k7Qp2xVb9LmN4rTz8WcY1a', { name: 'watch', token: 'k7Qp2xVb9LmN4rTz8WcY1a' }], // an event's share link
+    ['#/watch', { name: 'not-found' }],
     ['#/players', { name: 'not-found' }], // photos are added in Admin → Players
   ])('parses %s', (hash, expected) => {
     expect(parseRoute(hash)).toEqual(expected);
