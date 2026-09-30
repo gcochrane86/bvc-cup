@@ -18,6 +18,9 @@
   // course: the course name picked first; course_id: its tee (the longest tee until another is picked).
   let newRound = $state({ name: '', course: '', course_id: '', date: '' });
   let roundTees = $state<RoundTeeRow[]>([]);
+  let paired = $state<Record<string, number>>({});
+  /** After saving teams: a day whose pairings still need setting (scores and the leaderboard need them). */
+  let nudge = $state<RoundRow | null>(null);
   /** `${roundId}:${playerId}` for players whose match that day is confirmed (their tee is locked). */
   let locked = $state<Set<string>>(new Set());
 
@@ -54,6 +57,8 @@
         >,
       ]);
       roundTees = tees;
+      // Fourballs with all four players, per day (for each day's pairing status).
+      paired = Object.fromEntries(ids.map((id) => [id, gs.filter((g) => g.round_id === id && g.group_players.length === 4).length]));
       locked = new Set(gs.filter((g) => g.match_results.length).flatMap((g) => g.group_players.map((gp) => `${g.round_id}:${gp.player_id}`)));
     }
     members = Object.fromEntries(
@@ -85,6 +90,14 @@
   let teamStep = $state<'who' | 'teams'>('teams');
   let search = $state('');
   const playingIds = $derived(db.players.filter((p) => members[p.id]?.playing).map((p) => p.id));
+  const savedPlaying = $derived(playingIds.filter((id) => members[id].team).length);
+  const fourballs = $derived(Math.floor(savedPlaying / 4));
+  const pairingStatus = (r: RoundRow) => {
+    const done = paired[r.id] ?? 0;
+    if (fourballs > 0 && done >= fourballs) return 'Pairings set ✓';
+    if (done > 0) return `${done} of ${fourballs} fourballs paired`;
+    return 'Pairings not set yet';
+  };
   const shown = $derived(db.players.filter((p) => members[p.id] && p.name.toLowerCase().includes(search.trim().toLowerCase())));
   const onTeam = (t: 'A' | 'B') => playingIds.filter((id) => members[id].team === t);
   const countA = $derived(onTeam('A').length);
@@ -117,7 +130,12 @@
       );
     }, 'Event saved');
 
-  const saveMembers = () =>
+  const saveMembers = async () => {
+    await saveTeams();
+    // More than one fourball can't be paired automatically: point at any day still needing pairings.
+    if (!msg?.startsWith('Error') && savedPlaying > 4) nudge = rounds.find((r) => (paired[r.id] ?? 0) < fourballs) ?? null;
+  };
+  const saveTeams = () =>
     act(async () => {
       const entries = Object.entries(members);
       const rows = entries
@@ -349,9 +367,11 @@
             </select>
           </div>
         {/if}
-        <div class="row">
-          <button onclick={() => saveRound(r)}>Save round</button>
-          <a href="#/admin/pairings/{r.id}">Pairings →</a>
+        <button onclick={() => saveRound(r)}>Save round</button>
+        <!-- Pairings: who plays with whom in each fourball (scores and the leaderboard need them). -->
+        <div class="pairing">
+          <a class="pairbtn" href="#/admin/pairings/{r.id}">Set pairings →</a>
+          <span class="pstatus" class:ok={pairingStatus(r).endsWith('✓')} data-testid="pairing-status">{pairingStatus(r)}</span>
         </div>
       </div>
     {/each}
@@ -388,6 +408,17 @@
       <button type="submit">Add round</button>
     </form>
   </section>
+
+  {#if nudge}
+    <div class="backdrop">
+      <div class="dialog card" role="dialog" aria-modal="true" aria-labelledby="nudge-title">
+        <h3 id="nudge-title">Teams saved — now set the pairings</h3>
+        <p>Scores and the leaderboard won't show these players until pairings are set.</p>
+        <a class="pairbtn" href="#/admin/pairings/{nudge.id}" onclick={() => (nudge = null)}>Set pairings for {nudge.name} →</a>
+        <button class="secondary" onclick={() => (nudge = null)}>OK, later</button>
+      </div>
+    </div>
+  {/if}
 
   <!-- Occasional settings, kept out of the way of setting up the event. -->
   <details class="more">
@@ -433,6 +464,18 @@
   .seg button { margin-top: 0; min-height: 40px; border-radius: 0; background: var(--surface); color: var(--muted); padding: 6px 10px; font-size: 0.8rem; }
   .seg button + button { border-left: 1px solid var(--line); }
   .wide { width: 100%; }
+  .pairing { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .pairbtn {
+    display: block; text-align: center; padding: 12px 16px; border-radius: 10px; font-weight: 700; text-decoration: none;
+    background: var(--surface); color: var(--accent); border: 2px solid var(--accent);
+  }
+  .pstatus { font-size: 0.85rem; color: #a0521a; text-align: center; }
+  .pstatus.ok { color: var(--shot-text); }
+  .backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.45); display: grid; place-items: center; padding: 16px; z-index: 50; }
+  .dialog { max-width: 420px; width: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .dialog h3 { margin: 0; }
+  .dialog p { margin: 0; }
+  .dialog button { margin-top: 0; }
   .hcp { text-align: center; color: var(--muted); }
   .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .round { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }

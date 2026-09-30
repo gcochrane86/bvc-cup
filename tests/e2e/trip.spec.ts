@@ -980,3 +980,28 @@ test("the admin ticks who's playing (search, select all, clear), then puts them 
   const { data: eps } = await db.from('event_players').select('team, players(name)').eq('event_id', ev!.id);
   expect(eps!.map((e) => `${(e.players as unknown as { name: string }).name}:${e.team}`).sort()).toEqual(['Alex Adams:A', 'Ben Brown:B', 'Chris Clark:B']);
 });
+
+test('saving teams of more than four without pairings warns (but saves), and each day shows its pairing status', async ({ browser }) => {
+  const db = serviceDb();
+  const { data: seedRound } = await db.from('rounds').select('course_id').limit(1).single();
+  await db.from('events').update({ is_active: false }).eq('is_active', true);
+  const { data: ev } = await db.from('events').insert({ name: 'Club Night', is_active: true }).select('id').single();
+  await db.from('rounds').insert({ event_id: ev!.id, round_no: 1, name: 'Day 1', course_id: seedRound!.course_id });
+
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await expect(admin.getByTestId('pairing-status')).toHaveText('Pairings not set yet');
+  const names = ['Alex Adams', 'Ben Brown', 'Chris Clark', 'Dan Davies', 'Ed Evans', 'Finn Fox', 'Gus Green', 'Harry Hill'];
+  for (const n of names) await admin.getByLabel(`${n} playing`).check();
+  await admin.getByRole('button', { name: 'Next: pick teams (8)' }).click();
+  for (const [i, n] of names.entries()) await admin.getByRole('button', { name: `${n}: ${i < 4 ? 'Team A' : 'Team B'}` }).click();
+  await admin.getByRole('button', { name: 'Save teams' }).click();
+
+  const popup = admin.getByRole('dialog');
+  await expect(popup).toContainText("Scores and the leaderboard won't show these players until pairings are set.");
+  const { count } = await db.from('event_players').select('player_id', { count: 'exact', head: true }).eq('event_id', ev!.id);
+  expect(count).toBe(8); // saved anyway
+  await popup.getByRole('link', { name: 'Set pairings for Day 1 →' }).click();
+  await expect(admin).toHaveURL(/#\/admin\/pairings\/[0-9a-f-]{36}$/);
+});
