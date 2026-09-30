@@ -150,11 +150,15 @@
   // 2-man scramble: one row per team (the A1 and B1 rows), saved for both partners.
   const scramble = $derived(found?.group.matches[0]?.def.scramble ? found.group.matches[0].def : null);
   const rowSlots = $derived<Slot[]>(scramble ? ['A1', 'B1'] : SLOTS);
-  function teamLabel(slot: Slot): string {
-    if (!found) return '';
-    const ids = (slot.startsWith('A') ? ['A1', 'A2'] : ['B1', 'B2']).map((s) => found!.group.slots[s as Slot]).filter((x): x is string => !!x);
-    return ids.map(playerShort).sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' })).join(' & ');
+  /** A scramble team's players, in name order. */
+  function teamIds(slot: Slot): string[] {
+    if (!found) return [];
+    return (slot.startsWith('A') ? ['A1', 'A2'] : ['B1', 'B2'])
+      .map((s) => found!.group.slots[s as Slot])
+      .filter((x): x is string => !!x)
+      .sort((a, b) => playerShort(a).localeCompare(playerShort(b), 'en', { sensitivity: 'base' }));
   }
+  const teamLabel = (slot: Slot) => teamIds(slot).map(playerShort).join(' & ');
 
   async function save() {
     if (!found) return;
@@ -230,7 +234,7 @@
     {#each found.group.matches as m (m.def.id)}
       {@const lead = m.result ? (m.result.winner === 'A' ? 1 : m.result.winner === 'B' ? -1 : 0) : m.state.lead}
       <span>
-        <small class="muted">{matchLabel(m.def.type)}</small>
+        <small class="muted">{(m.def.scramble ? 'Scramble' : matchLabel(m.def.type))}</small>
         <strong style="color:{lead > 0 ? 'var(--team-a)' : lead < 0 ? 'var(--team-b)' : 'var(--muted)'}">
           {m.result?.resultText ?? m.state.statusText}
         </strong>
@@ -245,7 +249,13 @@
       {@const isLocked = locked(pid, hole)}
       {@const team = scramble ? teamLabel(slot) : null}
       <div class="prow card" class:shot={sh.bb === 1} class:shot2={sh.bb >= 2} data-testid="row-{slot}">
-        <Avatar name={team ?? playerName(pid)} url={team ? null : photoUrl(pid)} colour={slot.startsWith('A') ? 'var(--team-a)' : 'var(--team-b)'} size={44} />
+        {#if team}
+          <span class="faces">
+            {#each teamIds(slot) as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour={slot.startsWith('A') ? 'var(--team-a)' : 'var(--team-b)'} size={36} />{/each}
+          </span>
+        {:else}
+          <Avatar name={playerName(pid)} url={photoUrl(pid)} colour={slot.startsWith('A') ? 'var(--team-a)' : 'var(--team-b)'} size={44} />
+        {/if}
         <div class="who">
           {#if team}
             <strong>{team}</strong> <span class="muted small">({scramble?.teamHandicap?.[pid]})</span>
@@ -255,7 +265,7 @@
           <div class="chips">
             {#if sh.label}<span class="chip shotchip">{sh.label}</span>{/if}
             {#if sh.stableford}<span class="chip pts">{points(pid, sh.bb)} pts</span>{/if}
-            {#if found.group.teeOf[pid]}<span class="chip tee">{found.group.teeOf[pid].tee ?? 'Other'} tees</span>{/if}
+            {#if !team && found.group.teeOf[pid]}<span class="chip tee">{found.group.teeOf[pid].tee ?? 'Other'} tees</span>{/if}
             {#if isLocked}<span class="chip lock">Locked</span>{/if}
           </div>
         </div>
@@ -294,6 +304,8 @@
   .chip { font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
   .shotchip { background: var(--shot-text); color: #fff; }
   .pts { background: var(--accent); color: #fff; }
+  .faces { display: flex; flex: none; }
+  .faces :global(.avatar + .avatar) { margin-left: -12px; }
   .tee { background: var(--line); color: var(--text); }
   .lock { background: #ddd; color: #333; }
   .stepper { grid-area: step; display: flex; align-items: center; gap: 6px; }
