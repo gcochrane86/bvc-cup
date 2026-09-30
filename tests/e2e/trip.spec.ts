@@ -621,11 +621,15 @@ test('a two-v-two event is paired automatically when the teams are saved', async
   const admin = await newPhone(browser);
   await loginAdmin(admin);
   await admin.goto(`/#/admin/events/${ev!.id}`);
-  const team = (name: string, t: string) => admin.getByLabel(`${name} team`).selectOption(t);
-  await team('Alex Adams', 'A');
-  await team('Ben Brown', 'A');
-  await team('Chris Clark', 'B');
-  await team('Dan Davies', 'B');
+  // Step 1: who's playing. Step 2: a one-tap team switch for each of them.
+  const playing = (name: string) => admin.getByLabel(`${name} playing`).check();
+  const team = (name: string, t: string) => admin.getByRole('button', { name: `${name}: ${t}` }).click();
+  for (const n of ['Alex Adams', 'Ben Brown', 'Chris Clark', 'Dan Davies']) await playing(n);
+  await admin.getByRole('button', { name: 'Next: pick teams (4)' }).click();
+  await team('Alex Adams', 'Team A');
+  await team('Ben Brown', 'Team A');
+  await team('Chris Clark', 'Team B');
+  await team('Dan Davies', 'Team B');
   await admin.getByRole('button', { name: 'Save teams' }).click();
   await expect(admin.getByText('Teams saved · pairings set for Day 1')).toBeVisible();
   await admin.goto('/#/');
@@ -636,8 +640,11 @@ test('a two-v-two event is paired automatically when the teams are saved', async
 
   // Swap a player: the pairing follows.
   await admin.goto(`/#/admin/events/${ev!.id}`);
-  await team('Dan Davies', '');
-  await team('Ed Evans', 'B');
+  await admin.getByRole('tab', { name: /Who's playing/ }).click();
+  await admin.getByLabel('Dan Davies playing').uncheck();
+  await playing('Ed Evans');
+  await admin.getByRole('tab', { name: /Teams/ }).click();
+  await team('Ed Evans', 'Team B');
   await admin.getByRole('button', { name: 'Save teams' }).click();
   await expect(admin.getByText('Teams saved · pairings set for Day 1')).toBeVisible();
   await admin.goto('/#/');
@@ -936,4 +943,40 @@ test('on an all-scramble event the Form tab opens on Pairs; Individuals explains
   await page.getByRole('button', { name: 'Individuals' }).click();
   await expect(page.getByText('Scramble days are team scores, so there are no individual rankings.')).toBeVisible();
   await expect(page.getByTestId('form-row')).toHaveCount(0);
+});
+
+test("the admin ticks who's playing (search, select all, clear), then puts them on teams", async ({ browser }) => {
+  const db = serviceDb();
+  await db.from('events').update({ is_active: false }).eq('is_active', true);
+  const { data: ev } = await db.from('events').insert({ name: 'Winter League', is_active: true, team_a_name: 'Ballymena', team_b_name: 'Coleraine' }).select('id').single();
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await expect(admin.getByRole('tab', { name: /Who's playing/ })).toHaveAttribute('aria-selected', 'true'); // nobody yet
+  await expect(admin.getByText('0 of 12 playing')).toBeVisible();
+
+  // Search narrows the list; ticking still counts everyone.
+  await admin.getByPlaceholder('Search players').fill('ha');
+  await expect(admin.getByTestId('pick-row')).toHaveText([/Harry Hill/]);
+  await admin.getByLabel('Harry Hill playing').check();
+  await admin.getByPlaceholder('Search players').fill('');
+  await admin.getByRole('button', { name: 'Select all' }).click();
+  await expect(admin.getByText('12 of 12 playing')).toBeVisible();
+  await admin.getByRole('button', { name: 'Clear' }).click();
+  await expect(admin.getByText('0 of 12 playing')).toBeVisible();
+  for (const n of ['Alex Adams', 'Ben Brown', 'Chris Clark']) await admin.getByLabel(`${n} playing`).check();
+  await admin.getByRole('button', { name: 'Next: pick teams (3)' }).click();
+
+  // Teams: one tap each; nobody can be left off a team when saving.
+  await expect(admin.getByText('3 players not on a team yet')).toBeVisible();
+  await expect(admin.getByRole('button', { name: 'Save teams' })).toBeDisabled();
+  await admin.getByRole('button', { name: 'Alex Adams: Ballymena' }).click();
+  await admin.getByRole('button', { name: 'Ben Brown: Coleraine' }).click();
+  await admin.getByRole('button', { name: 'Chris Clark: Coleraine' }).click();
+  await expect(admin.getByTestId('team-count-A')).toContainText('1');
+  await expect(admin.getByTestId('team-count-B')).toContainText('2');
+  await admin.getByRole('button', { name: 'Save teams' }).click();
+  await expect(admin.getByText('Teams saved')).toBeVisible();
+  const { data: eps } = await db.from('event_players').select('team, players(name)').eq('event_id', ev!.id);
+  expect(eps!.map((e) => `${(e.players as unknown as { name: string }).name}:${e.team}`).sort()).toEqual(['Alex Adams:A', 'Ben Brown:B', 'Chris Clark:B']);
 });

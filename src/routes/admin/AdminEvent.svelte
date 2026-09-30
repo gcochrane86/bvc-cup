@@ -9,7 +9,8 @@
 
   let { eventId }: { eventId: string } = $props();
 
-  type Member = { team: '' | 'A' | 'B'; handicap: number };
+  /** playing: ticked in step 1; team: picked in step 2 (only saved once every player playing has one). */
+  type Member = { playing: boolean; team: '' | 'A' | 'B'; handicap: number };
   let event = $state<EventRow | null>(null);
   let members = $state<Record<string, Member>>({});
   let rounds = $state<RoundRow[]>([]);
@@ -58,9 +59,10 @@
     members = Object.fromEntries(
       db.players.map((p) => {
         const m = eps.find((x) => x.player_id === p.id);
-        return [p.id, { team: m?.team ?? '', handicap: Number(p.default_handicap) }];
+        return [p.id, { playing: !!m, team: m?.team ?? '', handicap: Number(p.default_handicap) }];
       }),
     );
+    if (!Object.values(members).some((m) => m.playing)) teamStep = 'who';
   }
   $effect(() => {
     void load();
@@ -79,8 +81,19 @@
     }
   }
 
-  const countA = $derived(Object.values(members).filter((m) => m.team === 'A').length);
-  const countB = $derived(Object.values(members).filter((m) => m.team === 'B').length);
+  // Step 1 (who's playing, with search) and step 2 (a one-tap team switch for each of them).
+  let teamStep = $state<'who' | 'teams'>('teams');
+  let search = $state('');
+  const playingIds = $derived(db.players.filter((p) => members[p.id]?.playing).map((p) => p.id));
+  const shown = $derived(db.players.filter((p) => members[p.id] && p.name.toLowerCase().includes(search.trim().toLowerCase())));
+  const onTeam = (t: 'A' | 'B') => playingIds.filter((id) => members[id].team === t);
+  const countA = $derived(onTeam('A').length);
+  const countB = $derived(onTeam('B').length);
+  const unassigned = $derived(playingIds.filter((id) => !members[id].team));
+  const avg = (ids: string[]) => (ids.length ? (ids.reduce((sum, id) => sum + Number(members[id].handicap), 0) / ids.length).toFixed(1) : '–');
+  const setAll = (on: boolean) => {
+    for (const m of Object.values(members)) m.playing = on;
+  };
 
   const saveDetails = () =>
     act(async () => {
@@ -108,9 +121,9 @@
     act(async () => {
       const entries = Object.entries(members);
       const rows = entries
-        .filter(([, m]) => m.team)
+        .filter(([, m]) => m.playing && m.team)
         .map(([player_id, m]) => ({ event_id: eventId, player_id, team: m.team, handicap: Number(m.handicap) }));
-      const removed = entries.filter(([, m]) => !m.team).map(([id]) => id);
+      const removed = entries.filter(([, m]) => !m.playing || !m.team).map(([id]) => id);
       if (rows.length) await must(supabase.from('event_players').upsert(rows));
       if (removed.length) await must(supabase.from('event_players').delete().eq('event_id', eventId).in('player_id', removed));
       const paired = await pairTwoVTwo(rounds);
@@ -124,7 +137,7 @@
   async function pairTwoVTwo(days: RoundRow[]): Promise<string[]> {
     const slots = autoFourball(
       Object.entries(members)
-        .filter(([, m]) => m.team)
+        .filter(([, m]) => m.playing && m.team)
         .map(([playerId, m]) => ({ playerId, team: m.team as 'A' | 'B', handicap: Number(m.handicap) })),
     );
     if (!slots) return [];
@@ -212,26 +225,53 @@
   </section>
 
   <section class="card">
-    <h2>Teams</h2>
-    <p class="muted small">Handicap indexes are set on the <a href="#/admin/players">Players</a> page.</p>
-    <p class="muted small">
-      {event.team_a_name}: {countA} · {event.team_b_name}: {countB}
-      {countA === 2 && countB === 2 ? '(one fourball: paired automatically)' : '(6 each for three fourballs)'}
-    </p>
-    {#each db.players as p (p.id)}
-      {#if members[p.id]}
-        <div class="member">
-          <span class="pname">{p.name}</span>
-          <select aria-label="{p.name} team" bind:value={members[p.id].team}>
-            <option value="">—</option>
-            <option value="A">{event.team_a_name}</option>
-            <option value="B">{event.team_b_name}</option>
-          </select>
-          <span class="hcp" aria-label="{p.name} handicap index">{members[p.id].handicap}</span>
+    <h2>Players</h2>
+    <div class="steps" role="tablist">
+      <button role="tab" aria-selected={teamStep === 'who'} class:on={teamStep === 'who'} onclick={() => (teamStep = 'who')}>
+        1 · Who's playing{teamStep === 'teams' && playingIds.length ? ' ✓' : ''}
+      </button>
+      <button role="tab" aria-selected={teamStep === 'teams'} class:on={teamStep === 'teams'} onclick={() => (teamStep = 'teams')}>2 · Teams</button>
+    </div>
+
+    {#if teamStep === 'who'}
+      <p class="muted small">Tick everyone taking part. Handicap indexes are set on the <a href="#/admin/players">Players</a> page.</p>
+      <input class="search" type="search" placeholder="Search players" bind:value={search} />
+      <div class="pickbar">
+        <strong>{playingIds.length} of {db.players.length} playing</strong>
+        <span><button class="linkbtn" onclick={() => setAll(true)}>Select all</button><button class="linkbtn" onclick={() => setAll(false)}>Clear</button></span>
+      </div>
+      <div class="picklist">
+        {#each shown as p (p.id)}
+          <label class="pick" class:sel={members[p.id].playing} data-testid="pick-row">
+            <input type="checkbox" aria-label="{p.name} playing" bind:checked={members[p.id].playing} />
+            <span class="pname">{p.name}</span>
+            <span class="hcp">{members[p.id].handicap}</span>
+          </label>
+        {:else}
+          <p class="muted small">No players match “{search}”.</p>
+        {/each}
+      </div>
+      <button class="wide" disabled={!playingIds.length} onclick={() => ((teamStep = 'teams'), (search = ''))}>Next: pick teams ({playingIds.length}) →</button>
+    {:else}
+      <div class="totals">
+        <div class="tot" style="background:{event.team_a_colour}" data-testid="team-count-A"><span>{event.team_a_name}</span><strong>{countA}</strong><span>avg index {avg(onTeam('A'))}</span></div>
+        <div class="tot" style="background:{event.team_b_colour}" data-testid="team-count-B"><span>{event.team_b_name}</span><strong>{countB}</strong><span>avg index {avg(onTeam('B'))}</span></div>
+      </div>
+      {#if countA === 2 && countB === 2}<p class="muted small">One fourball: it's paired automatically when you save.</p>{/if}
+      {#if unassigned.length}<p class="warn">{unassigned.length} {unassigned.length === 1 ? 'player' : 'players'} not on a team yet</p>{/if}
+      {#if !playingIds.length}<p class="muted">Nobody's playing yet — tick players in step 1.</p>{/if}
+      {#each [...unassigned, ...onTeam('A'), ...onTeam('B')] as id (id)}
+        {@const p = db.players.find((x) => x.id === id)}
+        <div class="teamrow">
+          <span class="pname">{p?.name}<br /><span class="hcp small">{members[id].handicap}</span></span>
+          <span class="seg">
+            <button aria-label="{p?.name}: {event.team_a_name}" aria-pressed={members[id].team === 'A'} style={members[id].team === 'A' ? `background:${event.team_a_colour};color:#fff` : ''} onclick={() => (members[id].team = 'A')}>{event.team_a_name}</button>
+            <button aria-label="{p?.name}: {event.team_b_name}" aria-pressed={members[id].team === 'B'} style={members[id].team === 'B' ? `background:${event.team_b_colour};color:#fff` : ''} onclick={() => (members[id].team = 'B')}>{event.team_b_name}</button>
+          </span>
         </div>
-      {/if}
-    {/each}
-    <button onclick={saveMembers}>Save teams</button>
+      {/each}
+      <button class="wide" disabled={unassigned.length > 0} onclick={saveMembers}>Save teams</button>
+    {/if}
   </section>
 
   <section class="card">
@@ -258,7 +298,7 @@
           <details class="player-tees">
             <summary>Players on different tees</summary>
             <p class="muted small">Everyone plays the tees above unless picked here. Save the round first if you changed its course or tees.</p>
-            {#each Object.entries(members).filter(([, m]) => m.team) as [pid] (pid)}
+            {#each Object.entries(members).filter(([, m]) => m.playing && m.team) as [pid] (pid)}
               {@const p = db.players.find((x) => x.id === pid)}
               <div class="member">
                 <span class="pname">{p?.name}</span>
@@ -371,6 +411,28 @@
   section h2 { margin-bottom: 10px; }
   section button { margin-top: 8px; }
   .member { display: grid; grid-template-columns: 1fr 120px 80px; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .steps { display: flex; gap: 6px; margin-bottom: 10px; }
+  .steps button { flex: 1; min-height: 40px; background: var(--surface); color: var(--muted); border: 1px solid var(--line); font-size: 0.85rem; margin-top: 0; }
+  .steps button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .pickbar { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 6px; }
+  .linkbtn { background: none; color: var(--accent); min-height: 0; padding: 0 0 0 12px; margin-top: 0; }
+  .picklist { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
+  .pick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .pick:last-child { border-bottom: 0; }
+  .pick.sel { background: #eef5f0; }
+  .pick input { width: 22px; height: 22px; accent-color: var(--accent); }
+  .pick .pname { flex: 1; font-weight: 600; }
+  .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .tot { border-radius: 12px; padding: 8px 12px; color: #fff; display: flex; flex-direction: column; }
+  .tot strong { font-size: 1.4rem; }
+  .tot span { font-size: 0.78rem; opacity: 0.9; }
+  .warn { background: #fff4e5; border: 1px solid #f0c27a; border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; }
+  .teamrow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .teamrow .pname { flex: 1; font-weight: 600; }
+  .seg { display: flex; flex: none; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { margin-top: 0; min-height: 40px; border-radius: 0; background: var(--surface); color: var(--muted); padding: 6px 10px; font-size: 0.8rem; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .wide { width: 100%; }
   .hcp { text-align: center; color: var(--muted); }
   .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .round { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
