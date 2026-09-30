@@ -119,6 +119,7 @@ test('the admin uploads player photos in Admin → Players; there is no separate
   await expect(page.locator('nav a', { hasText: 'Players' })).toHaveCount(0);
   await page.getByRole('link', { name: /^Players/ }).click();
   const row = page.getByTestId('admin-player').first();
+  await row.getByRole('button').first().click(); // open the player to edit
   await row.locator('input[type=file]').setInputFiles('public/icon-512.png');
   await expect(row.locator('img')).toBeVisible();
 });
@@ -1158,4 +1159,42 @@ test("an event's share link lets anyone follow and score without signing in, unt
   await guest.reload();
   await expect(guest.getByTestId('link-ended')).toBeVisible({ timeout: 20_000 });
   await expect(guest.getByLabel('Your email')).toBeVisible();
+});
+
+test('Admin → Players is a compact list: search, filter to the event, tap a player to edit', async ({ page }) => {
+  const db = serviceDb();
+  await db.from('players').insert({ name: 'Zara Outsider', short_name: 'Outsider', default_handicap: 3.1 });
+  await loginAdmin(page);
+  await page.goto('/#/admin/players');
+  const rows = page.getByTestId('admin-player');
+  const total = await rows.count();
+  await expect(page.getByLabel('Full name')).toHaveCount(0); // nothing open, no add form
+
+  // Filter to the active event: the player who isn't in it drops out.
+  await page.getByRole('button', { name: /^All · / }).waitFor();
+  await page.getByRole('group', { name: 'Show' }).getByRole('button').nth(1).click();
+  await expect(rows.filter({ hasText: 'Zara Outsider' })).toHaveCount(0);
+  await page.getByRole('button', { name: /^All · / }).click();
+  await expect(rows).toHaveCount(total);
+
+  // Search.
+  await page.getByPlaceholder(/^Search \d+ players$/).fill('outsid');
+  await expect(rows).toHaveCount(1);
+  const zara = rows.filter({ hasText: 'Zara Outsider' });
+  await expect(zara).toContainText('3.1');
+
+  // Tap to edit, save a new handicap; the row shows it.
+  await zara.getByRole('button', { name: /Zara Outsider/ }).click();
+  await zara.getByLabel('Handicap index').fill('4.5');
+  await zara.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Saved Zara Outsider')).toBeVisible();
+  await expect(zara.getByRole('button', { name: /Zara Outsider/ })).toContainText('4.5');
+  await zara.getByRole('button', { name: /Zara Outsider/ }).click();
+  await expect(zara.getByLabel('Handicap index')).toHaveCount(0);
+
+  // Add player opens the form only when pressed.
+  await page.getByRole('button', { name: '+ Add player' }).click();
+  await expect(page.getByRole('heading', { name: 'Add player' })).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('heading', { name: 'Add player' })).toHaveCount(0);
 });
