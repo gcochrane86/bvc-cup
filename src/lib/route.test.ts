@@ -20,6 +20,7 @@ describe('parseRoute', () => {
     ['#/admin/results', { name: 'not-found' }], // Reopen moved to each event's admin page
     ['#/admin/access', { name: 'admin-access' }],
     ['#/admin/courses', { name: 'admin-courses' }],
+    ['#/admin/guide/c1', { name: 'admin-guide', courseId: 'c1' }],
     ['#/admin/courses/new', { name: 'admin-course', courseId: 'new', copyFrom: null }],
     ['#/admin/courses/new/c1', { name: 'admin-course', courseId: 'new', copyFrom: 'c1' }],
     ['#/admin/events', { name: 'admin-events' }],

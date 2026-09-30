@@ -14,6 +14,7 @@ export type Route =
   | { name: 'admin-access' }
   | { name: 'admin-courses' }
   | { name: 'admin-course'; courseId: string; copyFrom: string | null }
+  | { name: 'admin-guide'; courseId: string }
   | { name: 'admin-events' }
   | { name: 'admin-event'; eventId: string }
   | { name: 'admin-pairings'; roundId: string }
@@ -40,6 +41,7 @@ export function parseRoute(hash: string): Route {
     if (p.length === 2 && b === 'access') return { name: 'admin-access' };
     if (p.length === 2 && b === 'courses') return { name: 'admin-courses' };
     if (p.length === 3 && b === 'courses') return { name: 'admin-course', courseId: c, copyFrom: null };
+    if (p.length === 3 && b === 'guide') return { name: 'admin-guide', courseId: c };
     // A new tee for an existing course, copied from one of its tees (name, par and SI).
     if (p.length === 4 && b === 'courses' && c === 'new') return { name: 'admin-course', courseId: 'new', copyFrom: p[3] };
     if (p.length === 2 && b === 'events') return { name: 'admin-events' };

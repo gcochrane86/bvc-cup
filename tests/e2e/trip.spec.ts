@@ -1017,3 +1017,33 @@ test("an event's Add round form stays tucked away until '+ Add round' is pressed
   await expect(admin.getByRole('heading', { name: 'Add round' })).toHaveCount(0);
   await expect(admin.getByRole('button', { name: '+ Add round' })).toBeVisible();
 });
+
+test('the admin adds guide photos for a course; the Courses tab then shows them', async ({ browser }) => {
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto('/#/admin/courses');
+  const seed = admin.getByTestId('course-group').filter({ hasText: 'Seed Links' });
+  await expect(seed).toContainText('No guide yet');
+  await seed.getByRole('link', { name: 'Add guide photos →' }).click();
+  await expect(admin.getByRole('heading', { name: 'Seed Links guide' })).toBeVisible();
+  await admin.getByLabel('Add photos for hole 1', { exact: true }).setInputFiles('public/guides/glashedy/hole-01-green.webp');
+  await expect(admin.getByRole('img', { name: 'Hole 1 photo 1' })).toBeVisible({ timeout: 20_000 });
+  await admin.goto('/#/admin/courses');
+  await expect(admin.getByTestId('course-group').filter({ hasText: 'Seed Links' })).toContainText('Photo guide · 1 of 18 holes');
+
+  const me = await newPhone(browser);
+  await login(me);
+  await me.getByRole('link', { name: 'Courses' }).click();
+  await expect(me.getByRole('tab', { name: 'Seed Links' })).toBeVisible();
+  const photo = me.getByRole('img', { name: 'Hole 1 photo 1' });
+  await expect.poll(() => photo.evaluate((i: HTMLImageElement) => i.naturalWidth), { timeout: 20_000 }).toBeGreaterThan(0);
+
+  // Removing the only photo takes the guide (and the tab) away again.
+  admin.on('dialog', (d) => void d.accept());
+  await admin.goto('/#/admin/courses');
+  await admin.getByTestId('course-group').filter({ hasText: 'Seed Links' }).getByRole('link', { name: 'Edit guide photos →' }).click();
+  await admin.getByRole('button', { name: 'Remove hole 1 photo 1' }).click();
+  await expect(admin.getByRole('img', { name: 'Hole 1 photo 1' })).toHaveCount(0);
+  await me.reload();
+  await expect(me.locator('nav a', { hasText: 'Courses' })).toHaveCount(0);
+});

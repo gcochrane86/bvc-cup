@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GUIDES, eventGuides, guideFlyover, guideForCourse, guideNotes, guidePages, initialGuide, readGuideMemory, rememberGuideHole } from './guides';
+import { GUIDES, eventGuides, guideFlyover, guideForCourse, guideNotes, guidePages, guideStatus, initialGuide, readGuideMemory, rememberGuideHole } from './guides';
 
 describe('course guides', () => {
   it('has every guide: the three trip courses in playing order, then Glashedy', () => {
@@ -99,5 +99,29 @@ describe('eventGuides', () => {
     expect(initialGuide(bvc, 'ailsa')?.slug).toBe('ailsa');
     expect(initialGuide(eventGuides([r(1, 'gg')], courses), 'ailsa')?.slug).toBe('glashedy');
     expect(initialGuide(bvc, null)?.slug).toBe('dundonald');
+  });
+});
+
+describe('photo guides', () => {
+  const courses = [
+    { id: 'g', name: 'Galgorm Castle' },
+    { id: 'd', name: 'Dundonald Links' },
+  ];
+  const r = (round_no: number, course_id: string) => ({ round_no, course_id });
+
+  it("gives a course with uploaded photos a guide of its own (so the Courses tab shows)", () => {
+    const [g] = eventGuides([r(1, 'g')], courses, ['Galgorm Castle']);
+    expect(g).toMatchObject({ slug: 'photos:Galgorm Castle', name: 'Galgorm Castle', short: 'Galgorm Castle', kind: 'photos' });
+    expect(eventGuides([r(1, 'g')], courses, [])).toEqual([]);
+  });
+
+  it('prefers a built-in guide over uploaded photos', () => {
+    expect(eventGuides([r(1, 'd')], courses, ['Dundonald Links']).map((x) => x.slug)).toEqual(['dundonald']);
+  });
+
+  it('tells Admin which courses have a guide', () => {
+    expect(guideStatus('Dundonald Links', 0)).toEqual({ kind: 'builtin' });
+    expect(guideStatus('Galgorm Castle', 7)).toEqual({ kind: 'photos', holes: 7 });
+    expect(guideStatus('Galgorm Castle', 0)).toEqual({ kind: 'none' });
   });
 });

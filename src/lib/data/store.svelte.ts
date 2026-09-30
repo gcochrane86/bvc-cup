@@ -8,7 +8,7 @@ import { planPhotoUrls, PHOTO_URL_TTL_S, type SignedPhoto } from './photoUrls';
 import { createOutbox, pendingKey, type OutboxStorage, type PendingScore, type SendResult } from './outbox';
 import type {
   CourseHoleRow, CourseRow, EventPlayerRow, EventRow, GroupPlayerRow, GroupRow,
-  MatchResultRow, PlayerRow, RoundRow, RoundTeeRow, ScoreRow, Snapshot,
+  GuidePhotoRow, MatchResultRow, PlayerRow, RoundRow, RoundTeeRow, ScoreRow, Snapshot,
 } from './types';
 
 const empty = (): Snapshot => ({
@@ -23,6 +23,8 @@ export const db = $state({
   notice: null as string | null,
   pending: [] as PendingScore[],
   photoUrls: {} as Record<string, string>,
+  /** Guide photos uploaded in Admin, for every course (a handful of rows). */
+  guidePhotos: [] as GuidePhotoRow[],
 });
 
 // ---- offline outbox (IndexedDB) ----
@@ -130,11 +132,12 @@ export async function fetchEventData(eventId: string) {
 
 async function doLoad() {
   try {
-    const [events, players, courses, courseHoles] = await Promise.all([
+    const [events, players, courses, courseHoles, guidePhotos] = await Promise.all([
       must(supabase.from('events').select('*').eq('is_active', true).limit(1)) as Promise<EventRow[]>,
       must(supabase.from('players').select('*').order('name')) as Promise<PlayerRow[]>,
       must(supabase.from('courses').select('*').order('name')) as Promise<CourseRow[]>,
       must(supabase.from('course_holes').select('*')) as Promise<CourseHoleRow[]>,
+      must(supabase.from('guide_photos').select('*').order('created_at')) as Promise<GuidePhotoRow[]>,
     ]);
     const event = events[0] ?? null;
     const { eventPlayers, rounds, groups, groupPlayers, scores, results, roundTees } = event
@@ -142,7 +145,7 @@ async function doLoad() {
       : { eventPlayers: [], rounds: [], groups: [], groupPlayers: [], scores: [], results: [], roundTees: [] };
     const pending = await outbox.pending();
     Object.assign(db, {
-      event, players, courses, courseHoles, eventPlayers, rounds, groups, groupPlayers, results, roundTees,
+      event, players, courses, courseHoles, eventPlayers, rounds, groups, groupPlayers, results, roundTees, guidePhotos,
       scores: applyPending(scores, pending),
       pending,
       loaded: true,
@@ -176,6 +179,9 @@ export const playerName = (id: string) => db.players.find((p) => p.id === id)?.n
 /** Players see the Leaderboard (and match pages) unless the admin hid it for this event; the admin always does. */
 export const leaderboardShown = () => db.event?.show_leaderboard !== false || isAdmin();
 
+/** Courses (by name) that have uploaded guide photos. */
+export const photoCourses = () => [...new Set(db.guidePhotos.map((p) => p.course_name))];
+
 export const playerShort = (id: string) => db.players.find((p) => p.id === id)?.short_name ?? '?';
 
 // ---- catch-up check ----
@@ -203,7 +209,7 @@ async function checkForMissed() {
 }
 
 // ---- realtime ----
-const SETUP_TABLES = ['players', 'courses', 'course_holes', 'events', 'event_players', 'rounds', 'groups', 'group_players', 'round_tees'];
+const SETUP_TABLES = ['players', 'courses', 'course_holes', 'events', 'event_players', 'rounds', 'groups', 'group_players', 'round_tees', 'guide_photos'];
 let channel: RealtimeChannel | null = null;
 let reloadTimer: ReturnType<typeof setTimeout> | undefined;
 let pollTimer: ReturnType<typeof setInterval> | undefined;

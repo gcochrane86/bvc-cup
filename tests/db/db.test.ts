@@ -477,3 +477,23 @@ describe('tees', () => {
     expect(r.rows[0]).toEqual({ name: 'Links', tee: 'Gold', slope_rating: 126 });
   });
 });
+
+describe('guide photos', () => {
+  const add = (who: Who, hole = 1) =>
+    as(db, who, () => db.query(`insert into public.guide_photos (course_name, hole, path) values ('Seed Links', $1, 'seed-links/1/a.jpg')`, [hole]));
+
+  it('only the admin adds or removes guide photos; members see them', async () => {
+    await expect(add('trip')).rejects.toThrow(/row-level security/);
+    await add('admin');
+    expect((await as(db, 'trip', () => db.query(`select hole from public.guide_photos`))).rows).toEqual([{ hole: 1 }]);
+    expect((await as(db, 'pending', () => db.query(`select hole from public.guide_photos`))).rows).toEqual([]);
+    await as(db, 'trip', () => db.query(`delete from public.guide_photos`)); // silently removes nothing
+    expect((await db.query(`select count(*)::int as n from public.guide_photos`)).rows[0]).toEqual({ n: 1 });
+    await as(db, 'admin', () => db.query(`delete from public.guide_photos`));
+    expect((await db.query(`select count(*)::int as n from public.guide_photos`)).rows[0]).toEqual({ n: 0 });
+  });
+
+  it('only accepts holes 1–18', async () => {
+    await expect(add('admin', 19)).rejects.toThrow(/check constraint/);
+  });
+});

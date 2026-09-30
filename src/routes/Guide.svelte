@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { db } from '../lib/data/store.svelte';
+  import { db, photoCourses } from '../lib/data/store.svelte';
+  import { guidePhotoUrls } from '../lib/guidePhotos';
   import { eventGuides, guideFlyover, guideNotes, guidePages, initialGuide, readGuideMemory, rememberGuideHole, type GuideMemory } from '../lib/guides';
   import FlyoverPlayer from '../components/FlyoverPlayer.svelte';
 
@@ -16,14 +17,21 @@
 
   // Only the active event's courses (BvC: Dundonald, Robert the Bruce, Ailsa — as before). Opens on the
   // course this phone last looked at, if this event has it, else the event's first course.
-  const list = $derived(eventGuides(db.rounds, db.courses));
-  let slug = $state(untrack(() => initialGuide(eventGuides(db.rounds, db.courses), mem.course)?.slug ?? ''));
+  const list = $derived(eventGuides(db.rounds, db.courses, photoCourses()));
+  let slug = $state(untrack(() => initialGuide(eventGuides(db.rounds, db.courses, photoCourses()), mem.course)?.slug ?? ''));
   // None of this event's courses has a guide: the tab is hidden, and this page says so if opened directly.
   const guide = $derived(list.find((g) => g.slug === slug) ?? list[0] ?? null);
   const hole = $derived(guide ? (mem.holes[guide.slug] ?? 1) : 1);
-  const pages = $derived(guide ? guidePages(guide.slug, hole) : []);
+  const pages = $derived(guide && guide.kind !== 'photos' ? guidePages(guide.slug, hole) : []);
   const notes = $derived(guide ? guideNotes(guide.slug, hole) : null);
   const flyover = $derived(guide ? guideFlyover(guide.slug, hole) : null);
+  // A photo guide (uploaded in Admin): this hole's photos, via short-lived signed links.
+  const photos = $derived(guide?.kind === 'photos' ? db.guidePhotos.filter((p) => p.course_name === guide.name && p.hole === hole) : []);
+  let photoUrls = $state<Record<string, string>>({});
+  $effect(() => {
+    const paths = photos.map((p) => p.path);
+    if (paths.length) void guidePhotoUrls(paths).then((u) => (photoUrls = { ...photoUrls, ...u }));
+  });
 
   // Par and stroke index from admin: the course this event's day uses (so Black/White tees still match),
   // else any course with the guide's name.
@@ -93,6 +101,13 @@
   {/key}
 {/if}
 
+{#if guide.kind === 'photos'}
+  {#each photos as p, i (p.id)}
+    {#if photoUrls[p.path]}<img class="page yardage" src={photoUrls[p.path]} alt="Hole {hole} photo {i + 1}" loading={i === 0 ? 'eager' : 'lazy'} />{/if}
+  {:else}
+    <p class="muted">No photos for this hole yet.</p>
+  {/each}
+{/if}
 {#key pages[0]}
   {#each pages as src, i (src)}
     <img

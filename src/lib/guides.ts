@@ -11,7 +11,7 @@ export interface Guide {
   /** Matches the course name used in Admin → Courses. */
   match: RegExp;
   /** aerial: one photo + notes; turnberry: layout + approach pages; yardage: hole page + green page. */
-  kind: 'aerial' | 'turnberry' | 'yardage';
+  kind: 'aerial' | 'turnberry' | 'yardage' | 'photos';
   /** Where the pages come from (shown under the hole). */
   credit: string;
 }
@@ -29,15 +29,43 @@ export function guideForCourse(courseName: string): Guide | null {
   return GUIDES.find((g) => g.match.test(courseName)) ?? null;
 }
 
-/** The guides for the active event's courses, in day order, each once (none: the Courses tab is hidden). */
-export function eventGuides(rounds: { round_no: number; course_id: string }[], courses: { id: string; name: string }[]): Guide[] {
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** A guide made of photos uploaded in Admin for a course (by name, so every tee shares it). */
+export function photoGuide(courseName: string): Guide {
+  return {
+    slug: `photos:${courseName}`,
+    name: courseName,
+    short: courseName,
+    match: new RegExp(`^${escape(courseName)}$`),
+    kind: 'photos',
+    credit: 'Uploaded guide photos.',
+  };
+}
+
+/**
+ * The guides for the active event's courses, in day order, each once: a built-in guide, else the course's
+ * uploaded photos (photoCourses: names of courses that have some). None: the Courses tab is hidden.
+ */
+export function eventGuides(
+  rounds: { round_no: number; course_id: string }[],
+  courses: { id: string; name: string }[],
+  photoCourses: string[] = [],
+): Guide[] {
   const out: Guide[] = [];
   for (const r of [...rounds].sort((a, b) => a.round_no - b.round_no)) {
     const course = courses.find((c) => c.id === r.course_id);
-    const g = course ? guideForCourse(course.name) : null;
-    if (g && !out.includes(g)) out.push(g);
+    if (!course) continue;
+    const g = guideForCourse(course.name) ?? (photoCourses.includes(course.name) ? photoGuide(course.name) : null);
+    if (g && !out.some((x) => x.slug === g.slug)) out.push(g);
   }
   return out;
+}
+
+/** For Admin → Courses: a built-in guide, uploaded photos (for this many holes), or none yet. */
+export function guideStatus(courseName: string, photoHoles: number): { kind: 'builtin' } | { kind: 'photos'; holes: number } | { kind: 'none' } {
+  if (guideForCourse(courseName)) return { kind: 'builtin' };
+  return photoHoles > 0 ? { kind: 'photos', holes: photoHoles } : { kind: 'none' };
 }
 
 /** The course the Courses tab opens on: the remembered one if this event has it, else the first. */
