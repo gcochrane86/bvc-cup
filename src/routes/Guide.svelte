@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { db, photoCourses } from '../lib/data/store.svelte';
   import { guidePhotoUrls } from '../lib/guidePhotos';
-  import { eventGuides, guideFlyover, guideNotes, guidePages, initialGuide, readGuideMemory, rememberGuideHole, type GuideMemory } from '../lib/guides';
+  import { eventGuides, guideFlyover, guideNotes, guidePages, holePhotos, initialGuide, readGuideMemory, rememberGuideHole, type GuideMemory } from '../lib/guides';
   import FlyoverPlayer from '../components/FlyoverPlayer.svelte';
 
   const KEY = 'golf.guide';
@@ -22,11 +22,12 @@
   // None of this event's courses has a guide: the tab is hidden, and this page says so if opened directly.
   const guide = $derived(list.find((g) => g.slug === slug) ?? list[0] ?? null);
   const hole = $derived(guide ? (mem.holes[guide.slug] ?? 1) : 1);
-  const pages = $derived(guide && guide.kind !== 'photos' ? guidePages(guide.slug, hole) : []);
   const notes = $derived(guide ? guideNotes(guide.slug, hole) : null);
   const flyover = $derived(guide ? guideFlyover(guide.slug, hole) : null);
-  // A photo guide (uploaded in Admin): this hole's photos, via short-lived signed links.
-  const photos = $derived(guide?.kind === 'photos' ? db.guidePhotos.filter((p) => p.course_name === guide.name && p.hole === hole) : []);
+  // Photos uploaded in Admin for this hole (via short-lived signed links). On a built-in guide they replace
+  // the hole's pages; holes without any keep the built-in pages.
+  const photos = $derived(guide ? holePhotos(guide, hole, db.guidePhotos) : []);
+  const pages = $derived(guide && guide.kind !== 'photos' && !photos.length ? guidePages(guide.slug, hole) : []);
   let photoUrls = $state<Record<string, string>>({});
   $effect(() => {
     const paths = photos.map((p) => p.path);
@@ -101,13 +102,11 @@
   {/key}
 {/if}
 
-{#if guide.kind === 'photos'}
-  {#each photos as p, i (p.id)}
-    {#if photoUrls[p.path]}<img class="page yardage" src={photoUrls[p.path]} alt="Hole {hole} photo {i + 1}" loading={i === 0 ? 'eager' : 'lazy'} />{/if}
-  {:else}
-    <p class="muted">No photos for this hole yet.</p>
-  {/each}
-{/if}
+{#each photos as p, i (p.id)}
+  {#if photoUrls[p.path]}<img class="page yardage" src={photoUrls[p.path]} alt="Hole {hole} photo {i + 1}" loading={i === 0 ? 'eager' : 'lazy'} />{/if}
+{:else}
+  {#if guide.kind === 'photos'}<p class="muted">No photos for this hole yet.</p>{/if}
+{/each}
 {#key pages[0]}
   {#each pages as src, i (src)}
     <img
@@ -127,7 +126,7 @@
   <button class="secondary" disabled={hole === 1} onclick={() => go(guide.slug, hole - 1)}>← Hole {hole - 1}</button>
   <button class="secondary" disabled={hole === 18} onclick={() => go(guide.slug, hole + 1)}>Hole {hole + 1} →</button>
 </div>
-<p class="muted small">{guide.credit} Pinch to zoom.</p>
+<p class="muted small">{photos.length && guide.kind !== 'photos' ? 'Uploaded guide photos.' : guide.credit} Pinch to zoom.</p>
 {/if}
 
 <style>

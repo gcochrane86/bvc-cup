@@ -184,7 +184,7 @@ test('the admin can reset all scores back to the start', async ({ browser }) => 
   const admin = await newPhone(browser);
   admin.on('dialog', (d) => void (d.type() === 'prompt' ? d.accept('RESET') : d.accept()));
   await loginAdmin(admin);
-  await admin.getByRole('link', { name: /Events, teams/ }).click();
+  await admin.getByRole('link', { name: /^Events/ }).click();
   await admin.locator('a.card').first().click();
   const reset = admin.getByTestId('reset-scores');
   await expect(reset).toBeHidden(); // tucked away under More options until opened
@@ -351,7 +351,7 @@ test('the admin can choose the singles line-up and it shows on the leaderboard',
   const admin = await newPhone(browser);
   admin.on('dialog', (d) => void d.accept());
   await loginAdmin(admin);
-  await admin.getByRole('link', { name: /Events, teams/ }).click();
+  await admin.getByRole('link', { name: /^Events/ }).click();
   await admin.locator('a.card').first().click();
   const day3 = admin.locator('.round').nth(2);
   await day3.getByLabel('Singles pairings').selectOption('selected');
@@ -498,7 +498,7 @@ test('the Form tab is off until the admin switches it on, then ranks players', a
 
   const admin = await newPhone(browser);
   await loginAdmin(admin);
-  await admin.getByRole('link', { name: /Events, teams/ }).click();
+  await admin.getByRole('link', { name: /^Events/ }).click();
   await admin.locator('a.card').first().click();
   await admin.getByText('More options').click();
   await admin.getByLabel(/Show the Form tab to players/).check();
@@ -1046,4 +1046,42 @@ test('the admin adds guide photos for a course; the Courses tab then shows them'
   await expect(admin.getByRole('img', { name: 'Hole 1 photo 1' })).toHaveCount(0);
   await me.reload();
   await expect(me.locator('nav a', { hasText: 'Courses' })).toHaveCount(0);
+});
+
+test("photos for a hole of a built-in guide replace that hole's pages; other holes keep the built-in guide", async ({ browser }) => {
+  await useTripCourses();
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto('/#/admin/courses');
+  const dundonald = admin.getByTestId('course-group').filter({ hasText: 'Dundonald Links' });
+  await expect(dundonald).toContainText('Guide ✓');
+  await dundonald.getByRole('link', { name: 'Add guide photos →' }).click();
+  await expect(admin.getByTestId('builtin-note')).toBeVisible();
+  await admin.getByLabel('Add photos for hole 2', { exact: true }).setInputFiles('public/guides/glashedy/hole-01-green.webp');
+  await expect(admin.getByRole('img', { name: 'Hole 2 photo 1' })).toBeVisible({ timeout: 20_000 });
+  await admin.goto('/#/admin/courses');
+  await expect(admin.getByTestId('course-group').filter({ hasText: 'Dundonald Links' })).toContainText('Guide ✓ · your photos on 1 hole');
+
+  const me = await newPhone(browser);
+  await login(me);
+  await me.getByRole('link', { name: 'Courses' }).click();
+  await me.getByRole('tab', { name: 'Dundonald' }).click();
+  await me.getByRole('button', { name: 'Guide hole 2', exact: true }).click();
+  const photo = me.getByRole('img', { name: 'Hole 2 photo 1' });
+  await expect.poll(() => photo.evaluate((i: HTMLImageElement) => i.naturalWidth), { timeout: 20_000 }).toBeGreaterThan(0);
+  await expect(me.getByTestId('guide-layout')).toHaveCount(0);
+  await expect(me.getByText('Uploaded guide photos.')).toBeVisible();
+
+  await me.getByRole('button', { name: 'Guide hole 3', exact: true }).click();
+  await expect(me.getByTestId('guide-layout')).toHaveAttribute('src', 'guides/dundonald/hole-03.webp');
+  await expect(me.getByRole('img', { name: /photo/ })).toHaveCount(0);
+
+  // Removing the photo gives hole 2 back to the built-in guide.
+  admin.on('dialog', (d) => void d.accept());
+  await admin.getByTestId('course-group').filter({ hasText: 'Dundonald Links' }).getByRole('link', { name: 'Edit guide photos →' }).click();
+  await admin.getByRole('button', { name: 'Remove hole 2 photo 1' }).click();
+  await expect(admin.getByRole('img', { name: 'Hole 2 photo 1' })).toHaveCount(0);
+  await me.reload();
+  await me.getByRole('button', { name: 'Guide hole 2', exact: true }).click();
+  await expect(me.getByTestId('guide-layout')).toHaveAttribute('src', 'guides/dundonald/hole-02.webp');
 });

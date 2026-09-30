@@ -15,7 +15,7 @@
   <div class="card" data-testid="course-group">
     <div class="top">
       <strong>{g.name}</strong>
-      {#if status.kind === 'builtin'}<span class="badge ok">Guide ✓</span>
+      {#if status.kind === 'builtin'}<span class="badge ok">Guide ✓{status.holes ? ` · your photos on ${status.holes} hole${status.holes === 1 ? '' : 's'}` : ''}</span>
       {:else if status.kind === 'photos'}<span class="badge part">Photo guide · {status.holes} of 18 holes</span>
       {:else}<span class="badge none">No guide yet</span>{/if}
     </div>
@@ -28,9 +28,7 @@
       {/each}
       <a href="#/admin/courses/new/{g.tees[0].id}">+ Add a tee</a>
     </div>
-    {#if status.kind !== 'builtin'}
-      <a class="guidebtn" href="#/admin/guide/{g.tees[0].id}">{status.kind === 'photos' ? 'Edit guide photos →' : 'Add guide photos →'}</a>
-    {/if}
+    <a class="guidebtn" href="#/admin/guide/{g.tees[0].id}">{status.kind !== 'none' && status.holes ? 'Edit guide photos →' : 'Add guide photos →'}</a>
   </div>
 {:else}
   <p class="muted">No courses yet.</p>

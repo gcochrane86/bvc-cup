@@ -62,10 +62,17 @@ export function eventGuides(
   return out;
 }
 
-/** For Admin → Courses: a built-in guide, uploaded photos (for this many holes), or none yet. */
-export function guideStatus(courseName: string, photoHoles: number): { kind: 'builtin' } | { kind: 'photos'; holes: number } | { kind: 'none' } {
-  if (guideForCourse(courseName)) return { kind: 'builtin' };
+/** For Admin → Courses: a built-in guide (with photos replacing this many of its holes), uploaded photos
+ *  (for this many holes), or none yet. */
+export function guideStatus(courseName: string, photoHoles: number): { kind: 'builtin' | 'photos'; holes: number } | { kind: 'none' } {
+  if (guideForCourse(courseName)) return { kind: 'builtin', holes: photoHoles };
   return photoHoles > 0 ? { kind: 'photos', holes: photoHoles } : { kind: 'none' };
+}
+
+/** A hole's uploaded photos for a guide's course. On a built-in guide they replace that hole's pages;
+ *  holes without any keep the built-in guide. */
+export function holePhotos<P extends { course_name: string; hole: number }>(guide: Guide, hole: number, photos: P[]): P[] {
+  return photos.filter((p) => p.hole === hole && guide.match.test(p.course_name));
 }
 
 /** The course the Courses tab opens on: the remembered one if this event has it, else the first. */

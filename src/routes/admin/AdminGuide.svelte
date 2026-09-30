@@ -3,6 +3,7 @@
   import { db, loadAll } from '../../lib/data/store.svelte';
   import { guidePhotoUrls, removeGuidePhoto, uploadGuidePhoto } from '../../lib/guidePhotos';
   import type { GuidePhotoRow } from '../../lib/data/types';
+  import { guideForCourse } from '../../lib/guides';
 
   let { courseId }: { courseId: string } = $props();
 
@@ -61,6 +62,11 @@
     Add photos for each hole — e.g. strokesaver pages or screenshots. They show in the Courses tab for any event at
     {course.name} (all tees).
   </p>
+  {#if guideForCourse(course.name)}
+    <p class="note small" data-testid="builtin-note">
+      This course has a built-in guide. A hole's photos replace it for that hole; holes without photos keep the built-in guide.
+    </p>
+  {/if}
   {#if msg}<p class="error">{msg}</p>{/if}
   <div class="card list">
     {#each holes as h (h.hole)}
@@ -91,6 +97,7 @@
 {/if}
 
 <style>
+  .note { background: #eef4ff; border-radius: 10px; padding: 8px 12px; }
   .list { padding: 4px 14px; }
   .hole { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
   .hole:last-child { border-bottom: 0; }

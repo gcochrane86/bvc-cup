@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GUIDES, eventGuides, guideFlyover, guideForCourse, guideNotes, guidePages, guideStatus, initialGuide, readGuideMemory, rememberGuideHole } from './guides';
+import { GUIDES, eventGuides, guideFlyover, guideForCourse, guideNotes, guidePages, guideStatus, holePhotos, initialGuide, readGuideMemory, rememberGuideHole } from './guides';
 
 describe('course guides', () => {
   it('has every guide: the three trip courses in playing order, then Glashedy', () => {
@@ -120,8 +120,23 @@ describe('photo guides', () => {
   });
 
   it('tells Admin which courses have a guide', () => {
-    expect(guideStatus('Dundonald Links', 0)).toEqual({ kind: 'builtin' });
+    expect(guideStatus('Dundonald Links', 0)).toEqual({ kind: 'builtin', holes: 0 });
+    expect(guideStatus('Dundonald Links', 2)).toEqual({ kind: 'builtin', holes: 2 });
     expect(guideStatus('Galgorm Castle', 7)).toEqual({ kind: 'photos', holes: 7 });
     expect(guideStatus('Galgorm Castle', 0)).toEqual({ kind: 'none' });
+  });
+});
+
+describe('uploaded photos on a built-in guide', () => {
+  const dundonald = GUIDES.find((g) => g.slug === 'dundonald')!;
+  const photo = (id: string, course_name: string, hole: number) => ({ id, course_name, hole, path: `${id}.jpg`, created_at: '' });
+  const photos = [photo('a', 'Dundonald Links', 3), photo('b', 'Galgorm Castle', 3), photo('c', 'Dundonald Links', 3), photo('d', 'Dundonald Links', 7)];
+
+  it("gives a hole the course's uploaded photos (they replace the built-in pages)", () => {
+    expect(holePhotos(dundonald, 3, photos).map((p) => p.id)).toEqual(['a', 'c']);
+  });
+
+  it('leaves a hole without uploads to the built-in guide', () => {
+    expect(holePhotos(dundonald, 4, photos)).toEqual([]);
   });
 });
