@@ -17,25 +17,27 @@
   // Only the active event's courses (BvC: Dundonald, Robert the Bruce, Ailsa — as before). Opens on the
   // course this phone last looked at, if this event has it, else the event's first course.
   const list = $derived(eventGuides(db.rounds, db.courses));
-  let slug = $state(untrack(() => initialGuide(eventGuides(db.rounds, db.courses), mem.course).slug));
-  const guide = $derived(list.find((g) => g.slug === slug) ?? list[0]);
-  const hole = $derived(mem.holes[guide.slug] ?? 1);
-  const pages = $derived(guidePages(guide.slug, hole));
-  const notes = $derived(guideNotes(guide.slug, hole));
-  const flyover = $derived(guideFlyover(guide.slug, hole));
+  let slug = $state(untrack(() => initialGuide(eventGuides(db.rounds, db.courses), mem.course)?.slug ?? ''));
+  // None of this event's courses has a guide: the tab is hidden, and this page says so if opened directly.
+  const guide = $derived(list.find((g) => g.slug === slug) ?? list[0] ?? null);
+  const hole = $derived(guide ? (mem.holes[guide.slug] ?? 1) : 1);
+  const pages = $derived(guide ? guidePages(guide.slug, hole) : []);
+  const notes = $derived(guide ? guideNotes(guide.slug, hole) : null);
+  const flyover = $derived(guide ? guideFlyover(guide.slug, hole) : null);
 
   // Par and stroke index from admin: the course this event's day uses (so Black/White tees still match),
   // else any course with the guide's name.
   const info = $derived.by(() => {
+    if (!guide) return undefined;
     const course =
       db.rounds.map((r) => db.courses.find((c) => c.id === r.course_id)).find((c) => c && guide.match.test(c.name)) ??
       db.courses.find((c) => guide.match.test(c.name));
     return course ? db.courseHoles.find((h) => h.course_id === course.id && h.hole === hole) : undefined;
   });
   const alt = (i: number) =>
-    guide.kind === 'turnberry'
+    guide?.kind === 'turnberry'
       ? i === 0 ? `Hole ${hole} layout with yardages` : `Hole ${hole} approach and description`
-      : guide.kind === 'yardage'
+      : guide?.kind === 'yardage'
         ? i === 0 ? `Hole ${hole} map with yardages` : `Hole ${hole} green`
         : `Hole ${hole} aerial view`;
 
@@ -52,6 +54,10 @@
 </script>
 
 <h1>Courses</h1>
+
+{#if !guide}
+  <p class="muted">No course guide for this event's courses yet.</p>
+{:else}
 
 <div class="courses" role="tablist">
   {#each list as g (g.slug)}
@@ -107,6 +113,7 @@
   <button class="secondary" disabled={hole === 18} onclick={() => go(guide.slug, hole + 1)}>Hole {hole + 1} →</button>
 </div>
 <p class="muted small">{guide.credit} Pinch to zoom.</p>
+{/if}
 
 <style>
   .courses { display: flex; gap: 8px; margin-bottom: 10px; }

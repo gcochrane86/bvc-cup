@@ -1,6 +1,7 @@
 <script lang="ts">
   import { router } from '../lib/router.svelte';
   import { db } from '../lib/data/store.svelte';
+  import { eventGuides } from '../lib/guides';
   import { isAdmin } from '../lib/auth.svelte';
   import { leaderboardShown } from '../lib/data/store.svelte';
 
@@ -12,7 +13,8 @@
     ...(db.event && db.event.show_leaderboard === false
       ? [{ href: '#/scorecards', label: 'Scorecard', active: router.route.name === 'scorecards' }]
       : []),
-    { href: '#/guide', label: 'Courses', active: router.route.name === 'guide' },
+    // Courses only when the active event plays a course that has a guide.
+    ...(eventGuides(db.rounds, db.courses).length ? [{ href: '#/guide', label: 'Courses', active: router.route.name === 'guide' }] : []),
     // Form (rankings) only when the admin has switched it on for this event.
     ...(db.event?.show_form ? [{ href: '#/form', label: 'Form', active: router.route.name === 'form' }] : []),
     // Players (photo uploads) is admin-only; everyone else just sees the leaderboard and scores.

@@ -89,15 +89,15 @@ describe('eventGuides', () => {
     expect(eventGuides([r(1, 'gg'), r(2, 'gw')], courses).map((g) => g.slug)).toEqual(['glashedy']);
   });
 
-  it('falls back to every guide when the event has none (e.g. mid-setup)', () => {
-    expect(eventGuides([r(1, 's')], courses)).toEqual(GUIDES);
-    expect(eventGuides([], courses)).toEqual(GUIDES);
+  it("is empty when none of the event's courses has a guide (the Courses tab is then hidden)", () => {
+    expect(eventGuides([r(1, 's')], courses)).toEqual([]);
+    expect(eventGuides([], courses)).toEqual([]);
   });
 
   it('opens the remembered course only if the event has it', () => {
     const bvc = eventGuides([r(1, 'd'), r(2, 'k'), r(3, 'a')], courses);
-    expect(initialGuide(bvc, 'ailsa').slug).toBe('ailsa');
-    expect(initialGuide(eventGuides([r(1, 'gg')], courses), 'ailsa').slug).toBe('glashedy');
-    expect(initialGuide(bvc, null).slug).toBe('dundonald');
+    expect(initialGuide(bvc, 'ailsa')?.slug).toBe('ailsa');
+    expect(initialGuide(eventGuides([r(1, 'gg')], courses), 'ailsa')?.slug).toBe('glashedy');
+    expect(initialGuide(bvc, null)?.slug).toBe('dundonald');
   });
 });

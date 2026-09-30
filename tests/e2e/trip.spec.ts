@@ -150,9 +150,11 @@ test('the admin can reopen a confirmed match for scoring', async ({ browser }) =
   await expect(trip.getByTestId('conf-a')).toHaveText('0'); // points back to projected
 });
 
-test('non-admins only see the Leaderboard, Scores and Courses tabs', async ({ page }) => {
-  await login(page);
-  await expect(page.locator('nav a')).toHaveText(['Leaderboard', 'Scores', 'Courses']);
+test('non-admins only see the Leaderboard and Scores tabs (Courses only when the event has a guide)', async ({ page }) => {
+  await login(page); // the seed course has no guide
+  await expect(page.locator('nav a')).toHaveText(['Leaderboard', 'Scores']);
+  await page.goto('/#/guide');
+  await expect(page.getByText("No course guide for this event's courses yet.")).toBeVisible();
 });
 
 test('the Scores tab goes back to the match this phone is scoring', async ({ page }) => {
@@ -270,7 +272,17 @@ test('after reopening, correcting an earlier hole changes the outcome and can be
   await expect(trip.getByTestId('match-card')).toContainText('FINAL');
 });
 
+/** Point the seeded days at the real trip courses (which have guides), as on BvC. */
+async function useTripCourses() {
+  const db = serviceDb();
+  const make = async (name: string) => (await db.from('courses').insert({ name }).select().single()).data!.id as string;
+  const ids = [await make('Dundonald Links'), await make('King Robert the Bruce'), await make('The Championship Ailsa')];
+  const { data: rounds } = await db.from('rounds').select('id, round_no').order('round_no');
+  for (const [i, id] of ids.entries()) await db.from('rounds').update({ course_id: id }).eq('id', rounds![i].id);
+}
+
 test('the course guide remembers the course and hole on this phone', async ({ page }) => {
+  await useTripCourses();
   await login(page);
   await page.getByRole('link', { name: 'Courses' }).click();
   await page.getByRole('tab', { name: 'Robert the Bruce' }).click();
@@ -482,7 +494,7 @@ test('the admin can swipe an event left to delete it', async ({ browser }) => {
 test('the Form tab is off until the admin switches it on, then ranks players', async ({ browser }) => {
   const trip = await newPhone(browser);
   await login(trip);
-  await expect(trip.locator('nav a')).toHaveText(['Leaderboard', 'Scores', 'Courses']);
+  await expect(trip.locator('nav a')).toHaveText(['Leaderboard', 'Scores']);
 
   const admin = await newPhone(browser);
   await loginAdmin(admin);
@@ -497,7 +509,7 @@ test('the Form tab is off until the admin switches it on, then ranks players', a
   await openGroup1(trip);
   await enterHole(trip, 1, 3, 4);
   await trip.goto('/#/');
-  await expect(trip.locator('nav a')).toHaveText(['Leaderboard', 'Scores', 'Courses', 'Form'], { timeout: 20_000 });
+  await expect(trip.locator('nav a')).toHaveText(['Leaderboard', 'Scores', 'Form'], { timeout: 20_000 });
   await trip.getByRole('link', { name: 'Form' }).click();
   await trip.getByRole('tab', { name: 'Birdies' }).click();
   const rows = trip.getByTestId('form-row');
@@ -711,7 +723,7 @@ test('the admin can hide the Leaderboard tab from players; they land on Scores',
 
   const trip = await newPhone(browser);
   await login(trip, 'tester@example.com', process.env.TRIP_PASSWORD!, { expectLeaderboard: false });
-  await expect(trip.locator('nav a')).toHaveText(['Scores', 'Scorecard', 'Courses']); // Scorecard replaces the Leaderboard
+  await expect(trip.locator('nav a')).toHaveText(['Scores', 'Scorecard']); // Scorecard replaces the Leaderboard
   await expect(trip).toHaveURL(/#\/score$/);
   await trip.goto('/#/');
   await expect(trip).toHaveURL(/#\/score$/); // old links to the leaderboard go to Scores
@@ -767,7 +779,7 @@ test("with the Leaderboard hidden, players get a Scorecard tab with every match'
 
   await db.from('events').update({ show_leaderboard: false }).eq('id', ev!.id);
   await me.reload();
-  await expect(me.locator('nav a')).toHaveText(['Scores', 'Scorecard', 'Courses']);
+  await expect(me.locator('nav a')).toHaveText(['Scores', 'Scorecard']);
   await me.getByRole('link', { name: 'Scorecard' }).click();
   await expect(me.getByRole('tab', { name: 'Day 1' })).toHaveAttribute('aria-selected', 'true');
   const card = me.getByTestId('scorecard-group').filter({ hasText: /^Match 1\b/ });
@@ -912,4 +924,16 @@ test('adding a day to a new event picks the course, then its tees', async ({ bro
   await expect(admin.getByText('Round added')).toBeVisible();
   const { data: added } = await db.from('rounds').select('name, course_id').eq('event_id', eventId);
   expect(added).toEqual([{ name: 'Day 1', course_id: ids.White }]);
+});
+
+test('on an all-scramble event the Form tab opens on Pairs; Individuals explains why it is empty', async ({ page }) => {
+  const db = serviceDb();
+  await db.from('events').update({ show_form: true }).eq('is_active', true);
+  await db.from('rounds').update({ fourball_format: 'scramble' }).neq('id', '00000000-0000-0000-0000-000000000000');
+  await login(page);
+  await page.getByRole('link', { name: 'Form' }).click();
+  await expect(page.getByRole('button', { name: 'Pairs' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Individuals' }).click();
+  await expect(page.getByText('Scramble days are team scores, so there are no individual rankings.')).toBeVisible();
+  await expect(page.getByTestId('form-row')).toHaveCount(0);
 });

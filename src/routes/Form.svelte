@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { db, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
   import { buildEventView } from '../lib/view';
   import { computeForm, computePairForm, rankForm, type FormMetric, type FormRow, type PairFormRow } from '../lib/form';
@@ -16,9 +17,15 @@
 
   let metric = $state<FormMetric>('net');
   let roundId = $state<string>('all');
-  let who = $state<'individuals' | 'pairs'>('individuals');
 
   const view = $derived(buildEventView(db));
+  // Scramble days are team scores: when every chosen day is a scramble there are no individual rankings, so
+  // the tab opens on Pairs.
+  const scrambleOnly = $derived.by(() => {
+    const days = (view?.rounds ?? []).filter((r) => roundId === 'all' || r.round.id === roundId);
+    return days.length > 0 && days.every((r) => r.settings.fourballFormat === 'scramble');
+  });
+  let who = $state<'individuals' | 'pairs'>(untrack(() => (scrambleOnly ? 'pairs' : 'individuals')));
   const ranked = $derived(view ? rankForm(computeForm(view, roundId === 'all' ? null : roundId), metric) : []);
   const rankedPairs = $derived(view ? rankForm(computePairForm(view, roundId === 'all' ? null : roundId), metric) : []);
   // The pair's players in name order (the name and the photos follow the same order).
@@ -99,6 +106,8 @@
         <p class="muted">No fourball pairs yet.</p>
       {/each}
     </ol>
+  {:else if scrambleOnly}
+    <p class="muted">Scramble days are team scores, so there are no individual rankings. See Pairs.</p>
   {:else}
     <ol class="list" data-testid="form-list">
       {#each ranked as { row, rank } (row.playerId)}

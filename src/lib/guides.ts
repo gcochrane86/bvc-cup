@@ -29,7 +29,7 @@ export function guideForCourse(courseName: string): Guide | null {
   return GUIDES.find((g) => g.match.test(courseName)) ?? null;
 }
 
-/** The guides for the active event's courses, in day order, each once; every guide if none match. */
+/** The guides for the active event's courses, in day order, each once (none: the Courses tab is hidden). */
 export function eventGuides(rounds: { round_no: number; course_id: string }[], courses: { id: string; name: string }[]): Guide[] {
   const out: Guide[] = [];
   for (const r of [...rounds].sort((a, b) => a.round_no - b.round_no)) {
@@ -37,11 +37,11 @@ export function eventGuides(rounds: { round_no: number; course_id: string }[], c
     const g = course ? guideForCourse(course.name) : null;
     if (g && !out.includes(g)) out.push(g);
   }
-  return out.length ? out : GUIDES;
+  return out;
 }
 
 /** The course the Courses tab opens on: the remembered one if this event has it, else the first. */
-export function initialGuide(list: Guide[], remembered: string | null): Guide {
+export function initialGuide(list: Guide[], remembered: string | null): Guide | undefined {
   return list.find((g) => g.slug === remembered) ?? list[0];
 }
 
