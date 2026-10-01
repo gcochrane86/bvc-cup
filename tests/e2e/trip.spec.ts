@@ -1212,7 +1212,7 @@ test('the admin can switch player photos off for an event; everyone then shows i
 
   const me = await newPhone(browser);
   await login(me);
-  await expect(group1Card(me).getByRole('img', { name: 'Adams' })).toBeVisible({ timeout: 20_000 });
+  await expect(group1Card(me).getByRole('img', { name: 'Alex Adams' })).toBeVisible({ timeout: 20_000 });
 
   await openEvent(admin, await activeEventId());
   await admin.getByText('More options').click();

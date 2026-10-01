@@ -1,6 +1,6 @@
 <script lang="ts">
   import Avatar from './Avatar.svelte';
-  import { photoUrl, playerShort } from '../lib/data/store.svelte';
+  import { photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
   import { matchLabel, type MatchView } from '../lib/view';
   import { formatToPar, type PairNet } from '../lib/scoring';
 
@@ -36,7 +36,7 @@
   <div class="body">
     <div class="side">
       <div class="faces">
-        {#each mv.def.sideA as id (id)}<Avatar name={playerShort(id)} url={photoUrl(id)} colour="var(--team-a)" size={44} />{/each}
+        {#each mv.def.sideA as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour="var(--team-a)" size={44} />{/each}
       </div>
       {#each mv.def.sideA as id (id)}<div class="name">{playerShort(id)}</div>{/each}
       {#if mv.net?.a}<div class="net" data-testid="net-a">{netText(mv.net.a)}</div>{/if}
@@ -47,7 +47,7 @@
     </div>
     <div class="side right">
       <div class="faces">
-        {#each mv.def.sideB as id (id)}<Avatar name={playerShort(id)} url={photoUrl(id)} colour="var(--team-b)" size={44} />{/each}
+        {#each mv.def.sideB as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour="var(--team-b)" size={44} />{/each}
       </div>
       {#each mv.def.sideB as id (id)}<div class="name">{playerShort(id)}</div>{/each}
       {#if mv.net?.b}<div class="net" data-testid="net-b">{netText(mv.net.b)}</div>{/if}
