@@ -41,7 +41,9 @@ const COURSES: { name: string; pars: number[]; si: number[]; tees: Tee[] }[] = [
   },
   {
     name: 'Royal Portrush – Valley',
-    pars: [4, 4, 3, 5, 4, 4, 4, 5, 3, 4, 5, 4, 3, 4, 3, 5, 3, 4],
+    // The new routing, from the club's course planner (its pages 16–18, 10–15, 1–9 are holes 1–18 now).
+    // Stroke indexes are still the old card's until the club's new ones are known.
+    pars: [4, 3, 4, 4, 4, 5, 4, 5, 3, 5, 3, 4, 5, 4, 3, 4, 5, 3],
     si: [7, 3, 17, 11, 1, 5, 13, 9, 15, 2, 18, 4, 16, 12, 8, 14, 10, 6],
     tees: [
       { tee: 'Championship', course_rating: 70.3, slope_rating: 117 },
