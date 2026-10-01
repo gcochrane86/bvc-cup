@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGame, computeGameState, gameFor, gameResult, sixPoints, winnerIds } from './individual';
+import { buildGame, computeGameState, gameFor, gameResult, gamesToSet, sixPoints, winnerIds } from './individual';
 import { indexScores } from './matchState';
 import type { HoleInfo, RoundSettings, ScoreEntry } from './types';
 
@@ -155,5 +155,19 @@ describe('winnerIds', () => {
     expect(winnerIds(solo, 'B')).toEqual(['p2', 'p3']);
     const six = buildGame('g', three(0, 0, 0), base)!;
     expect(winnerIds(six, 'P3')).toEqual(['p3']);
+  });
+});
+
+describe('gamesToSet', () => {
+  it("follows the day's groups once they're set", () => {
+    expect(gamesToSet([3], 7)).toEqual({ pair: false, three: true });
+    expect(gamesToSet([2, 2], 7)).toEqual({ pair: true, three: false });
+    expect(gamesToSet([2, 3], 5)).toEqual({ pair: true, three: true });
+  });
+  it('before groups are set, goes by the number of players', () => {
+    expect(gamesToSet([], 2)).toEqual({ pair: true, three: false });
+    expect(gamesToSet([], 3)).toEqual({ pair: false, three: true });
+    expect(gamesToSet([], 5)).toEqual({ pair: true, three: true });
+    expect(gamesToSet([], 0)).toEqual({ pair: true, three: true });
   });
 });

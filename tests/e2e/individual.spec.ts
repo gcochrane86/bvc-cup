@@ -84,21 +84,21 @@ test("the admin creates an individual event, picks players and sets a day's game
   await unfoldEvent(page);
   const day1 = page.getByTestId('round').first();
   await expect(day1.getByLabel('Fourball game')).toHaveCount(0);
-  await day1.getByLabel('2-player game').selectOption('flat_match');
+  // 3 players and no groups yet: they can only be a 3-ball, so only the 3-player game is shown.
+  await expect(day1.getByLabel(/2-player game|groups of 2/)).toHaveCount(0);
+  await expect(day1.getByText('Stableford match play off the low man')).toHaveCount(0);
   await day1.getByLabel('3-player game').selectOption('two_v_one');
   await day1.getByRole('button', { name: 'Save round' }).click();
   await expect(page.getByText('Day 1 saved')).toBeVisible();
-  await expect(day1.locator('summary')).toContainText('Flat match play · 2 v 1 Stableford');
+  await expect(day1.locator('summary')).toContainText('2 v 1 Stableford');
+  await expect(day1.locator('summary')).not.toContainText('match play');
 
   const db = serviceDb();
   expect((await db.from('events').select('kind').eq('id', eventId).single()).data).toEqual({ kind: 'individual' });
   const eps = (await db.from('event_players').select('team').eq('event_id', eventId)).data!;
   expect(eps).toHaveLength(3);
   expect(eps.every((e) => e.team === null)).toBe(true);
-  expect((await db.from('rounds').select('pair_game, three_game').eq('event_id', eventId).single()).data).toEqual({
-    pair_game: 'flat_match',
-    three_game: 'two_v_one',
-  });
+  expect((await db.from('rounds').select('three_game').eq('event_id', eventId).single()).data).toEqual({ three_game: 'two_v_one' });
 });
 
 test('the admin builds a 2-ball and a 2 v 1 3-ball for an individual day, choosing the single', async ({ page }) => {
@@ -159,4 +159,21 @@ test("removing a group leaves a confirmed group, its players and its result alon
   await page.getByText('More options').click();
   await expect(page.getByTestId('reopen-row')).toContainText('Six pointer (Stableford)');
   await expect(page.getByTestId('reopen-row')).toContainText('Davies won · 40 pts');
+});
+
+test("with more players than one group, both games show until the day's groups are set", async ({ page }) => {
+  const { eventId, roundId } = await seedIndividual(); // 5 players: a 2-ball and a 3-ball
+  await loginAdmin(page);
+  await page.goto(`/#/admin/events/${eventId}`);
+  await unfoldEvent(page);
+  const day1 = page.getByTestId('round').first();
+  await expect(day1.getByLabel('Game for groups of 2')).toBeVisible(); // the day has a 2-ball and a 3-ball
+  await expect(day1.getByLabel('Game for groups of 3')).toBeVisible();
+  // With only the 3-ball left, only its game shows.
+  const db = serviceDb();
+  await db.from('groups').delete().eq('round_id', roundId).eq('group_no', 1);
+  await page.reload();
+  await unfoldEvent(page);
+  await expect(page.getByTestId('round').first().getByLabel(/groups of 2|2-player game/)).toHaveCount(0);
+  await expect(page.getByTestId('round').first().getByLabel(/groups of 3|3-player game/)).toBeVisible();
 });

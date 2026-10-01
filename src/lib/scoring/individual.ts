@@ -175,3 +175,14 @@ export function winnerIds(def: MatchDef, winner: Winner): string[] {
   const i = POSITIONS.indexOf(winner);
   return def.players?.[i] ? [def.players[i]] : [];
 }
+
+/**
+ * Which of a day's games the admin needs to set: those for the group sizes in the day's groups, or before
+ * groups are set, those the number of players allows (2 → a 2-ball, 3 → a 3-ball, more → either).
+ */
+export function gamesToSet(groupSizes: number[], players: number): { pair: boolean; three: boolean } {
+  if (groupSizes.length) return { pair: groupSizes.includes(2), three: groupSizes.includes(3) };
+  if (players === 2) return { pair: true, three: false };
+  if (players === 3) return { pair: false, three: true };
+  return { pair: true, three: true };
+}

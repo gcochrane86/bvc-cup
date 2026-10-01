@@ -4,7 +4,7 @@
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
   import { courseGroups, teesOf } from '../../lib/courses';
-  import { autoFourball, gameLabel, scrambleHandicap } from '../../lib/scoring';
+  import { autoFourball, gameLabel, gamesToSet, scrambleHandicap } from '../../lib/scoring';
   import { courseGuide } from '../../lib/guides';
   import ResetScores from '../../components/ResetScores.svelte';
   import ConfirmedResults from '../../components/ConfirmedResults.svelte';
@@ -23,6 +23,8 @@
   let adding = $state(false);
   let roundTees = $state<RoundTeeRow[]>([]);
   let paired = $state<Record<string, number>>({});
+  /** Individual events: each day's group sizes (2 or 3), which decide the games it needs. */
+  let groupSizes = $state<Record<string, number[]>>({});
   /** After saving teams: a day whose pairings still need setting (scores and the leaderboard need them). */
   let nudge = $state<RoundRow | null>(null);
   /** `${roundId}:${playerId}` for players whose match that day is confirmed (their tee is locked). */
@@ -67,6 +69,7 @@
       // Full groups per day (for each day's pairing status): fourballs of four, or individual groups of 2–3.
       const full = ev.kind === 'individual' ? 2 : 4;
       paired = Object.fromEntries(ids.map((id) => [id, gs.filter((g) => g.round_id === id && g.group_players.length >= full).length]));
+      groupSizes = Object.fromEntries(ids.map((id) => [id, gs.filter((g) => g.round_id === id && g.group_players.length >= 2).map((g) => g.group_players.length)]));
       locked = new Set(gs.filter((g) => g.match_results.length).flatMap((g) => g.group_players.map((gp) => `${g.round_id}:${gp.player_id}`)));
     }
     members = Object.fromEntries(
@@ -116,8 +119,11 @@
   const GAMES = { matchplay: 'Match play', stableford: 'Stableford', flat: 'Match play, flat', scramble: '2-man scramble' } as const;
   const roundDate = (d: string | null) =>
     d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'No date';
+  /** The games a day needs: by its groups' sizes, or before groups are set by how many are playing. */
+  const gamesOf = (r: RoundRow) => gamesToSet(groupSizes[r.id] ?? [], playingIds.length);
   const roundGame = (r: RoundRow) =>
-    individual ? `${gameLabel(r.pair_game)} · ${gameLabel(r.three_game)}`
+    individual
+      ? [gamesOf(r).pair && gameLabel(r.pair_game), gamesOf(r).three && gameLabel(r.three_game)].filter(Boolean).join(' · ')
     : r.fourball_format === 'matchplay' ? `${GAMES.matchplay} ${Number(r.allowance_pct)}%`
     : r.fourball_format === 'scramble' ? `${GAMES.scramble} ${Number(r.scramble_low_pct)}/${Number(r.scramble_high_pct)}`
     : GAMES[r.fourball_format];
@@ -414,32 +420,42 @@
           <p class="muted small">No course guide yet · <a href="#/admin/guide/{r.course_id}">add photos</a></p>
         {/if}
         {#if individual}
-          <div class="field">
-            <label for="rpg-{r.id}">2-player game</label>
-            <select id="rpg-{r.id}" bind:value={r.pair_game}>
-              <option value="stableford_match">Stableford match play</option>
-              <option value="stableford">Stableford</option>
-              <option value="flat_match">Flat match play (no shots)</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="rtg-{r.id}">3-player game</label>
-            <select id="rtg-{r.id}" bind:value={r.three_game}>
-              <option value="six_stableford">Six pointer (Stableford)</option>
-              <option value="six_flat">Six pointer (flat, no shots)</option>
-              <option value="two_v_one">2 v 1 Stableford</option>
-            </select>
-          </div>
-          {#if r.three_game === 'two_v_one'}
-            <p class="muted small">2 v 1: the single's Stableford points against the pair's better ball. Choose who plays alone on the groups page.</p>
-          {/if}
-          {#if r.pair_game === 'stableford_match'}
-            <label class="row"><input type="checkbox" bind:checked={r.match_off_low} /> Stableford match play off the low man</label>
-            {#if r.match_off_low}
-              <div class="field"><label for="rmp-{r.id}">Low man %</label><input id="rmp-{r.id}" type="number" min="0" max="100" bind:value={r.match_pct} /></div>
+          {@const games = gamesOf(r)}
+          {@const both = games.pair && games.three}
+          {#if games.pair}
+            <div class="field">
+              <label for="rpg-{r.id}">{both ? 'Game for groups of 2' : '2-player game'}</label>
+              <select id="rpg-{r.id}" bind:value={r.pair_game}>
+                <option value="stableford_match">Stableford match play</option>
+                <option value="stableford">Stableford</option>
+                <option value="flat_match">Flat match play (no shots)</option>
+              </select>
+            </div>
+            {#if r.pair_game === 'stableford_match'}
+              <label class="row"><input type="checkbox" bind:checked={r.match_off_low} /> Stableford match play off the low man</label>
+              {#if r.match_off_low}
+                <div class="field"><label for="rmp-{r.id}">Low man %</label><input id="rmp-{r.id}" type="number" min="0" max="100" bind:value={r.match_pct} /></div>
+              {/if}
             {/if}
           {/if}
-          <div class="field"><label for="rspc-{r.id}">Stableford %</label><input id="rspc-{r.id}" type="number" min="0" max="100" bind:value={r.stableford_pct} /></div>
+          {#if games.three}
+            <div class="field">
+              <label for="rtg-{r.id}">{both ? 'Game for groups of 3' : '3-player game'}</label>
+              <select id="rtg-{r.id}" bind:value={r.three_game}>
+                <option value="six_stableford">Six pointer (Stableford)</option>
+                <option value="six_flat">Six pointer (flat, no shots)</option>
+                <option value="two_v_one">2 v 1 Stableford</option>
+              </select>
+            </div>
+            {#if r.three_game === 'two_v_one'}
+              <p class="muted small">2 v 1: the single's Stableford points against the pair's better ball. Choose who plays alone on the groups page.</p>
+            {/if}
+          {/if}
+          {#if both}<p class="muted small">Groups of 2 play the first game, groups of 3 the second. Once the day's groups are set, only the games they need are shown.</p>{/if}
+          <!-- Stableford % only matters to the games played off it. -->
+          {#if (games.pair && r.pair_game === 'stableford') || (games.three && r.three_game !== 'six_flat')}
+            <div class="field"><label for="rspc-{r.id}">Stableford %</label><input id="rspc-{r.id}" type="number" min="0" max="100" bind:value={r.stableford_pct} /></div>
+          {/if}
         {:else}
         <div class="field">
           <label for="rf-{r.id}">Fourball game</label>
