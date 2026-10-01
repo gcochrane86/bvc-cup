@@ -36,3 +36,19 @@ export function pairingErrors(groups: PairingDraft[]): string[] {
   });
   return errors;
 }
+
+/** Individual events: each group is 2 or 3 players (empty places are null), and nobody plays twice. */
+export function individualPairingErrors(groups: (string | null)[][]): string[] {
+  const errors: string[] = [];
+  const seen = new Map<string, number>();
+  groups.forEach((g, i) => {
+    const ids = g.filter((id): id is string => !!id);
+    if (ids.length < 2 || ids.length > 3) errors.push(`Group ${i + 1} needs 2 or 3 players`);
+    for (const id of ids) {
+      const first = seen.get(id);
+      if (first !== undefined) errors.push(`A player is in more than one place (group ${first + 1} and group ${i + 1})`);
+      else seen.set(id, i);
+    }
+  });
+  return errors;
+}

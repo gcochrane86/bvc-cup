@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { autoFourball, orderSlots, pairingErrors } from './pairings';
+import { autoFourball, orderSlots, pairingErrors, individualPairingErrors } from './pairings';
 
 describe('orderSlots', () => {
   it('puts the lower handicap in slot 1', () => {
@@ -42,5 +42,17 @@ describe('autoFourball', () => {
   it('leaves bigger (or incomplete) events to be paired by hand', () => {
     expect(autoFourball([m('a1', 'A', 5), m('a2', 'A', 6), m('a3', 'A', 7), m('b1', 'B', 8), m('b2', 'B', 9), m('b3', 'B', 1)])).toBeNull();
     expect(autoFourball([m('a1', 'A', 5), m('a2', 'A', 6), m('b1', 'B', 8)])).toBeNull();
+  });
+});
+
+describe('individualPairingErrors', () => {
+  it('accepts groups of 2 and 3', () => {
+    expect(individualPairingErrors([['a', 'b', null], ['c', 'd', 'e']])).toEqual([]);
+  });
+  it('needs 2 or 3 players per group', () => {
+    expect(individualPairingErrors([['a', null, null]])).toEqual(['Group 1 needs 2 or 3 players']);
+  });
+  it('does not allow a player in two groups', () => {
+    expect(individualPairingErrors([['a', 'b'], ['b', 'c']])).toEqual(['A player is in more than one place (group 1 and group 2)']);
   });
 });

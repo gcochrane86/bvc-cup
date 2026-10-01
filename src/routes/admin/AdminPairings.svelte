@@ -1,7 +1,7 @@
 <script lang="ts">
   import { db, loadAll } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
-  import { orderSlots, pairingErrors, type Slot } from '../../lib/scoring';
+  import { individualPairingErrors, orderSlots, pairingErrors, type Slot } from '../../lib/scoring';
   import type { EventPlayerRow, GroupPlayerRow, GroupRow, RoundRow } from '../../lib/data/types';
 
   let { roundId }: { roundId: string } = $props();
@@ -13,6 +13,10 @@
   let drafts = $state<Draft[]>([]);
   let errors = $state<string[]>([]);
   let msg = $state<string | null>(null);
+  /** Individual events: groups of 2 or 3 (empty places ''), and which place plays alone in a 2 v 1. */
+  type IndDraft = { groupNo: number; teeTime: string; players: string[]; single: number };
+  let individual = $state(false);
+  let groupsDraft = $state<IndDraft[]>([]);
 
   async function load() {
     const id = roundId;
@@ -23,8 +27,18 @@
         (GroupRow & { group_players: GroupPlayerRow[]; match_results: { match_type: string }[] })[]
       >,
     ]);
+    const ev = (await must(supabase.from('events').select('kind').eq('id', r.event_id).single())) as { kind: string };
     round = r;
     members = eps;
+    individual = ev.kind === 'individual';
+    if (individual) {
+      // Each group's players by position; in a 2 v 1 the single is P1.
+      groupsDraft = gs.map((g) => {
+        const at = (slot: Slot) => g.group_players.find((p) => p.slot === slot)?.player_id ?? '';
+        return { groupNo: g.group_no, teeTime: g.tee_time?.slice(0, 5) ?? '', players: [at('P1'), at('P2'), at('P3')], single: 0 };
+      });
+      return;
+    }
     const count = Math.max(1, Math.floor(eps.length / 4));
     drafts = Array.from({ length: count }, (_, i) => {
       const g = gs.find((x) => x.group_no === i + 1);
@@ -76,6 +90,40 @@
     msg = 'Singles drawn — press Save pairings to publish them.';
   }
 
+  const twoVOne = $derived(round?.three_game === 'two_v_one');
+  const addGroup = () => groupsDraft.push({ groupNo: groupsDraft.length + 1, teeTime: '', players: ['', '', ''], single: 0 });
+  function removeGroup(i: number) {
+    groupsDraft.splice(i, 1);
+    groupsDraft.forEach((g, k) => (g.groupNo = k + 1));
+  }
+  async function saveGroups() {
+    msg = null;
+    errors = individualPairingErrors(groupsDraft.map((g) => g.players.map((p) => p || null)));
+    if (errors.length) return;
+    try {
+      for (const g of groupsDraft) {
+        const ids = g.players.filter(Boolean);
+        // 2 v 1: the single goes to P1; the others follow in order.
+        const single = g.players[g.single];
+        const ordered = twoVOne && ids.length === 3 && single ? [single, ...ids.filter((id) => id !== single)] : ids;
+        await must(
+          supabase.rpc('save_group', {
+            p_round_id: roundId,
+            p_group_no: g.groupNo,
+            p_tee_time: g.teeTime || null,
+            p_slots: ordered.map((player_id, i) => ({ slot: `P${i + 1}`, player_id })),
+          }),
+        );
+      }
+      // Groups taken off the list go, with their players.
+      await must(supabase.from('groups').delete().eq('round_id', roundId).gt('group_no', groupsDraft.length));
+      await loadAll();
+      msg = 'Groups saved';
+    } catch (e) {
+      errors = [(e as Error).message];
+    }
+  }
+
   async function saveAll() {
     msg = null;
     errors = pairingErrors(drafts.map((d) => ({ a: d.a.map((x) => x || null), b: d.b.map((x) => x || null) })));
@@ -108,7 +156,38 @@
   }
 </script>
 
-{#if round}
+{#if round && individual}
+  <p><a href="#/admin/events/{round.event_id}">← Event</a></p>
+  <h1>{round.name} groups</h1>
+  <p class="muted small">Groups of 2 or 3.{#if twoVOne} In a 3-ball, choose who plays alone (2 v 1).{/if}</p>
+  {#each groupsDraft as g, gi (g.groupNo)}
+    <section class="card">
+      <div class="row">
+        <h3>Group {g.groupNo}</h3>
+        <input aria-label="Group {g.groupNo} tee time" type="time" bind:value={g.teeTime} />
+        <button class="secondary remove" aria-label="Remove group {g.groupNo}" onclick={() => removeGroup(gi)}>✕</button>
+      </div>
+      {#each [0, 1, 2] as i (i)}
+        <div class="indrow">
+          <select aria-label="Group {g.groupNo} player {i + 1}" bind:value={g.players[i]}>
+            <option value="">{i === 2 ? '— (2-ball)' : '—'}</option>
+            {#each members as m (m.player_id)}<option value={m.player_id}>{nameOf(m.player_id)} ({m.handicap})</option>{/each}
+          </select>
+          {#if twoVOne && g.players.filter(Boolean).length === 3 && g.players[i]}
+            <label class="alone">
+              <input type="radio" name="single-{g.groupNo}" aria-label="Group {g.groupNo}: {nameOf(g.players[i])} plays alone" checked={g.single === i} onchange={() => (g.single = i)} />
+              alone
+            </label>
+          {/if}
+        </div>
+      {/each}
+    </section>
+  {/each}
+  <button class="secondary wide add" onclick={addGroup}>+ Add group</button>
+  {#each errors as err (err)}<p class="error">{err}</p>{/each}
+  {#if msg}<p>{msg}</p>{/if}
+  <button class="wide" onclick={saveGroups}>Save groups</button>
+{:else if round}
   <p><a href="#/admin/events/{round.event_id}">← Event</a></p>
   <h1>{round.name} pairings</h1>
   <p class="muted small">Pick 2 players per team for each group. The lower handicap is put first automatically; ⇅ swaps them.</p>
@@ -181,6 +260,11 @@
   .row h3 { margin: 0; flex: 1; }
   .row input { width: 120px; }
   .wide { width: 100%; }
+  .indrow { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .indrow select { flex: 1; }
+  .alone { display: flex; gap: 4px; align-items: center; white-space: nowrap; margin: 0; }
+  .remove { padding: 8px 12px; }
+  .add { margin-bottom: 8px; }
   .singles { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
   .singles p { margin: 0; }
   .pick { margin-bottom: 6px; }

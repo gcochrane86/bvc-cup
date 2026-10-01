@@ -100,3 +100,36 @@ test("the admin creates an individual event, picks players and sets a day's game
     three_game: 'two_v_one',
   });
 });
+
+test('the admin builds a 2-ball and a 2 v 1 3-ball for an individual day, choosing the single', async ({ page }) => {
+  const { roundId } = await seedIndividual({ threeGame: 'two_v_one' });
+  const db = serviceDb();
+  await db.from('groups').delete().eq('round_id', roundId); // start with no groups
+  await loginAdmin(page);
+  await page.goto(`/#/admin/pairings/${roundId}`);
+  await expect(page.getByRole('heading', { name: 'Day 1 groups' })).toBeVisible();
+  await page.getByRole('button', { name: '+ Add group' }).click();
+  await page.getByRole('button', { name: '+ Add group' }).click();
+  await page.getByLabel('Group 1 player 1').selectOption({ label: 'Alex Adams (10)' });
+  await page.getByLabel('Group 1 player 2').selectOption({ label: 'Ben Brown (10)' });
+  await page.getByLabel('Group 2 player 1').selectOption({ label: 'Chris Clark (6)' });
+  await page.getByLabel('Group 2 player 2').selectOption({ label: 'Dan Davies (14)' });
+  await page.getByLabel('Group 2 player 3').selectOption({ label: 'Ed Evans (3)' });
+  await page.getByLabel('Group 2: Dan Davies plays alone').check();
+  await page.getByRole('button', { name: 'Save groups' }).click();
+  await expect(page.getByText('Groups saved')).toBeVisible();
+
+  const groups = (await db.from('groups').select('group_no, group_players(slot, player_id)').eq('round_id', roundId).order('group_no')).data!;
+  const players = (await db.from('players').select('id, name')).data!;
+  const nameOf = (id: string) => players.find((p) => p.id === id)!.name;
+  expect(groups).toHaveLength(2);
+  const g2 = Object.fromEntries((groups[1].group_players as { slot: string; player_id: string }[]).map((gp) => [gp.slot, nameOf(gp.player_id)]));
+  expect(g2.P1).toBe('Dan Davies'); // the single is P1
+  expect(new Set([g2.P2, g2.P3])).toEqual(new Set(['Chris Clark', 'Ed Evans']));
+
+  // Removing a group drops it.
+  await page.getByRole('button', { name: 'Remove group 1' }).click();
+  await page.getByRole('button', { name: 'Save groups' }).click();
+  await expect(page.getByText('Groups saved')).toBeVisible();
+  await expect.poll(async () => (await db.from('groups').select('id').eq('round_id', roundId)).data?.length).toBe(1);
+});
