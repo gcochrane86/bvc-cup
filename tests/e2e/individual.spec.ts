@@ -133,3 +133,30 @@ test('the admin builds a 2-ball and a 2 v 1 3-ball for an individual day, choosi
   await expect(page.getByText('Groups saved')).toBeVisible();
   await expect.poll(async () => (await db.from('groups').select('id').eq('round_id', roundId)).data?.length).toBe(1);
 });
+
+test("removing a group leaves a confirmed group, its players and its result alone", async ({ page }) => {
+  const { roundId, twoBall, threeBall } = await seedIndividual();
+  const db = serviceDb();
+  // The 3-ball (group 2) is confirmed.
+  await db.from('match_results').insert({ group_id: threeBall, match_type: 'individual', winner: 'P2', points_a: 0, points_b: 0, result_text: '40 pts', final_hole: 18 });
+  const before = (await db.from('group_players').select('slot, player_id').eq('group_id', threeBall)).data!;
+  await loginAdmin(page);
+  await page.goto(`/#/admin/pairings/${roundId}`);
+  await expect(page.getByLabel('Group 2 player 1')).toBeDisabled(); // confirmed: locked
+  await expect(page.getByRole('button', { name: 'Remove group 2' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Remove group 1' }).click();
+  await page.getByRole('button', { name: 'Save groups' }).click();
+  await expect(page.getByText('Groups saved')).toBeVisible();
+
+  await expect.poll(async () => (await db.from('groups').select('id').eq('id', twoBall)).data?.length).toBe(0);
+  const after = (await db.from('group_players').select('slot, player_id').eq('group_id', threeBall)).data!;
+  expect(after.sort((a, b) => a.slot.localeCompare(b.slot))).toEqual(before.sort((a, b) => a.slot.localeCompare(b.slot)));
+  expect((await db.from('match_results').select('winner').eq('group_id', threeBall)).data).toEqual([{ winner: 'P2' }]);
+
+  // The admin's confirmed results name the winner (Davies is the 3-ball's P2).
+  const { data: ev } = await db.from('rounds').select('event_id').eq('id', roundId).single();
+  await page.goto(`/#/admin/events/${ev!.event_id}`);
+  await page.getByText('More options').click();
+  await expect(page.getByTestId('reopen-row')).toContainText('Six pointer (Stableford)');
+  await expect(page.getByTestId('reopen-row')).toContainText('Davies won · 40 pts');
+});

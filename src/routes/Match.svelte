@@ -48,7 +48,8 @@
           p_points_b: snap.pointsB,
           p_result_text: snap.resultText,
           p_final_hole: snap.finalHole,
-          p_player_points: snap.playerPoints ?? null,
+          // Only individual games send player points, so team confirms use the same arguments as before.
+          ...(snap.playerPoints ? { p_player_points: snap.playerPoints } : {}),
         }),
       );
       if (r === 'already_confirmed') alert('This match had already been confirmed.');

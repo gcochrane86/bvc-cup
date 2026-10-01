@@ -166,3 +166,12 @@ export function gameResult(def: MatchDef, state: MatchState): ConfirmedResult | 
     resultText: state.resultText, finalHole: state.finalHole, playerPoints,
   };
 }
+
+/** The player(s) who won an individual game: a side's players, a position's player, or none when halved. */
+export function winnerIds(def: MatchDef, winner: Winner): string[] {
+  if (winner === 'A') return def.sideA;
+  if (winner === 'B') return def.sideB;
+  if (winner === 'halved') return [];
+  const i = POSITIONS.indexOf(winner);
+  return def.players?.[i] ? [def.players[i]] : [];
+}

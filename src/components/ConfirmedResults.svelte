@@ -2,7 +2,8 @@
   // Confirmed results for one event (active or not), each with Reopen — on the event's admin page.
   import { db, fetchEventData, loadAll, playerShort } from '../lib/data/store.svelte';
   import { must, supabase } from '../lib/supabase';
-  import { buildEventView, matchesLabel, matchLabel, type EventView, type GroupView } from '../lib/view';
+  import { buildEventView, matchesLabel, matchLabel, type EventView, type GroupView, type MatchView } from '../lib/view';
+  import { gameLabel, winnerIds } from '../lib/scoring';
   import type { EventRow } from '../lib/data/types';
 
   let { event }: { event: EventRow } = $props();
@@ -25,6 +26,15 @@
   let msg = $state<string | null>(null);
 
   const teamName = (w: string) => (w === 'A' ? event.team_a_name : w === 'B' ? event.team_b_name : 'Halved');
+  /** "Won by Team Blue 3&2", or for an individual game "Davies won · 40 pts" / "Halved". */
+  function outcome(m: MatchView): string {
+    if (!m.result) return 'not confirmed';
+    if (m.def.game) {
+      const winners = winnerIds(m.def, m.result.winner).map(playerShort);
+      return winners.length ? `${winners.join(' & ')} won · ${m.result.resultText}` : 'Halved';
+    }
+    return `${teamName(m.result.winner)} ${m.result.winner === 'halved' ? '' : m.result.resultText}`;
+  }
 
   async function reopen(g: GroupView) {
     const label = matchesLabel(g);
@@ -58,8 +68,8 @@
         </div>
         {#each g.matches as m (m.def.id)}
           <div class="muted small">
-            {m.def.type === 'better_ball' ? '' : `${matchLabel(m.def.type)}: `}{[...m.def.sideA, ...m.def.sideB].map(playerShort).join(', ')} —
-            {m.result ? `${teamName(m.result.winner)} ${m.result.winner === 'halved' ? '' : m.result.resultText}` : 'not confirmed'}
+            {m.def.game ? `${gameLabel(m.def.game)}: ` : m.def.type === 'better_ball' ? '' : `${matchLabel(m.def.type)}: `}{[...m.def.sideA, ...m.def.sideB].map(playerShort).join(', ')} —
+            {outcome(m)}
           </div>
         {/each}
       </div>

@@ -14,9 +14,13 @@
   let errors = $state<string[]>([]);
   let msg = $state<string | null>(null);
   /** Individual events: groups of 2 or 3 (empty places ''), and which place plays alone in a 2 v 1. */
-  type IndDraft = { groupNo: number; teeTime: string; players: string[]; single: number };
+  /** locked: the group's game is confirmed, so its players can't change and it can't be removed. */
+  type IndDraft = { groupNo: number; teeTime: string; players: string[]; single: number; locked: boolean };
   let individual = $state(false);
   let groupsDraft = $state<IndDraft[]>([]);
+  /** Saved groups taken off the list: deleted (by number) on save. Groups keep their numbers, so a removal
+   *  never moves another group's players or confirmed result. */
+  let removedNos = $state<number[]>([]);
 
   async function load() {
     const id = roundId;
@@ -35,8 +39,12 @@
       // Each group's players by position; in a 2 v 1 the single is P1.
       groupsDraft = gs.map((g) => {
         const at = (slot: Slot) => g.group_players.find((p) => p.slot === slot)?.player_id ?? '';
-        return { groupNo: g.group_no, teeTime: g.tee_time?.slice(0, 5) ?? '', players: [at('P1'), at('P2'), at('P3')], single: 0 };
+        return {
+          groupNo: g.group_no, teeTime: g.tee_time?.slice(0, 5) ?? '', players: [at('P1'), at('P2'), at('P3')], single: 0,
+          locked: g.match_results.length > 0,
+        };
       });
+      removedNos = [];
       return;
     }
     const count = Math.max(1, Math.floor(eps.length / 4));
@@ -91,10 +99,11 @@
   }
 
   const twoVOne = $derived(round?.three_game === 'two_v_one');
-  const addGroup = () => groupsDraft.push({ groupNo: groupsDraft.length + 1, teeTime: '', players: ['', '', ''], single: 0 });
+  const addGroup = () =>
+    groupsDraft.push({ groupNo: Math.max(0, ...groupsDraft.map((g) => g.groupNo), ...removedNos) + 1, teeTime: '', players: ['', '', ''], single: 0, locked: false });
   function removeGroup(i: number) {
+    removedNos.push(groupsDraft[i].groupNo);
     groupsDraft.splice(i, 1);
-    groupsDraft.forEach((g, k) => (g.groupNo = k + 1));
   }
   async function saveGroups() {
     msg = null;
@@ -102,6 +111,7 @@
     if (errors.length) return;
     try {
       for (const g of groupsDraft) {
+        if (g.locked) continue; // a confirmed group stays exactly as it is
         const ids = g.players.filter(Boolean);
         // 2 v 1: the single goes to P1; the others follow in order.
         const single = g.players[g.single];
@@ -116,7 +126,8 @@
         );
       }
       // Groups taken off the list go, with their players.
-      await must(supabase.from('groups').delete().eq('round_id', roundId).gt('group_no', groupsDraft.length));
+      if (removedNos.length) await must(supabase.from('groups').delete().eq('round_id', roundId).in('group_no', removedNos));
+      removedNos = [];
       await loadAll();
       msg = 'Groups saved';
     } catch (e) {
@@ -161,19 +172,22 @@
   <h1>{round.name} groups</h1>
   <p class="muted small">Groups of 2 or 3.{#if twoVOne} In a 3-ball, choose who plays alone (2 v 1).{/if}</p>
   {#each groupsDraft as g, gi (g.groupNo)}
-    <section class="card">
+    <section class="card" data-testid="ind-group">
       <div class="row">
         <h3>Group {g.groupNo}</h3>
         <input aria-label="Group {g.groupNo} tee time" type="time" bind:value={g.teeTime} />
-        <button class="secondary remove" aria-label="Remove group {g.groupNo}" onclick={() => removeGroup(gi)}>✕</button>
+        {#if !g.locked}
+          <button class="secondary remove" aria-label="Remove group {g.groupNo}" onclick={() => removeGroup(gi)}>✕</button>
+        {/if}
       </div>
+      {#if g.locked}<p class="muted small">Confirmed, so this group is fixed. Reopen it on the event page to change it.</p>{/if}
       {#each [0, 1, 2] as i (i)}
         <div class="indrow">
-          <select aria-label="Group {g.groupNo} player {i + 1}" bind:value={g.players[i]}>
+          <select aria-label="Group {g.groupNo} player {i + 1}" bind:value={g.players[i]} disabled={g.locked}>
             <option value="">{i === 2 ? '— (2-ball)' : '—'}</option>
             {#each members as m (m.player_id)}<option value={m.player_id}>{nameOf(m.player_id)} ({m.handicap})</option>{/each}
           </select>
-          {#if twoVOne && g.players.filter(Boolean).length === 3 && g.players[i]}
+          {#if twoVOne && !g.locked && g.players.filter(Boolean).length === 3 && g.players[i]}
             <label class="alone">
               <input type="radio" name="single-{g.groupNo}" aria-label="Group {g.groupNo}: {nameOf(g.players[i])} plays alone" checked={g.single === i} onchange={() => (g.single = i)} />
               alone

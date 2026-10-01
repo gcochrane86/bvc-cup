@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGame, computeGameState, gameFor, gameResult, sixPoints } from './individual';
+import { buildGame, computeGameState, gameFor, gameResult, sixPoints, winnerIds } from './individual';
 import { indexScores } from './matchState';
 import type { HoleInfo, RoundSettings, ScoreEntry } from './types';
 
@@ -143,5 +143,17 @@ describe('gameResult', () => {
   it('is null until the game is decided', () => {
     const def = buildGame('g', two(0, 0), { ...base, pairGame: 'stableford' })!;
     expect(gameResult(def, computeGameState(def, holes, indexScores([])))).toBeNull();
+  });
+});
+
+describe('winnerIds', () => {
+  it('names the winning player or players of an individual game', () => {
+    const one = buildGame('g', two(0, 0), base)!;
+    expect(winnerIds(one, 'A')).toEqual(['p1']);
+    expect(winnerIds(one, 'halved')).toEqual([]);
+    const solo = buildGame('g', three(0, 0, 0), twoVOne)!;
+    expect(winnerIds(solo, 'B')).toEqual(['p2', 'p3']);
+    const six = buildGame('g', three(0, 0, 0), base)!;
+    expect(winnerIds(six, 'P3')).toEqual(['p3']);
   });
 });
