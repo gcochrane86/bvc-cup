@@ -248,6 +248,57 @@ describe('confirmation and locking', () => {
     await expect(db.query(`update public.rounds set scramble_high_pct = 101 where id = $1`, [s.roundId])).rejects.toThrow(/check constraint/);
   });
 
+  it('defaults events to team cups and new rounds to the individual game defaults', async () => {
+    const e = await db.query(`select kind from public.events where id = $1`, [s.eventId]);
+    expect(e.rows[0]).toEqual({ kind: 'team' });
+    await db.query(`update public.rounds set three_game = 'two_v_one' where id = $1`, [s.roundId]);
+    await db.query(`update public.rounds set three_game = 'six_stableford' where id = $1`, [s.roundId]);
+    const r = await db.query(
+      `select pair_game, three_game, stableford_pct::float as sp, match_pct::float as mp, match_off_low from public.rounds where id = $1`,
+      [s.roundId],
+    );
+    expect(r.rows[0]).toEqual({ pair_game: 'stableford_match', three_game: 'six_stableford', sp: 100, mp: 85, match_off_low: true });
+    await expect(db.query(`update public.rounds set pair_game = 'skins' where id = $1`, [s.roundId])).rejects.toThrow(/check constraint/);
+    await expect(db.query(`update public.events set kind = 'solo' where id = $1`, [s.eventId])).rejects.toThrow(/check constraint/);
+  });
+
+  it('lets an individual event have players without a team, in 2- or 3-player groups', async () => {
+    await db.query(`update public.events set kind = 'individual' where id = $1`, [s.eventId]);
+    await db.query(`update public.event_players set team = null where event_id = $1`, [s.eventId]);
+    await db.query(`delete from public.group_players where group_id = $1`, [s.groupId]);
+    for (const [slot, key] of [['P1', 'a1'], ['P2', 'a2'], ['P3', 'b1']] as const) {
+      await db.query(`insert into public.group_players(group_id, slot, player_id) values ($1, $2, $3)`, [s.groupId, slot, s.players[key]]);
+    }
+    await expect(db.query(`update public.event_players set team = 'C' where event_id = $1`, [s.eventId])).rejects.toThrow(/check constraint/);
+  });
+
+  it("confirms an individual game with each player's points, and locks its players' holes", async () => {
+    await db.query(`delete from public.group_players where group_id = $1`, [s.groupId]);
+    for (const [slot, key] of [['P1', 'a1'], ['P2', 'a2']] as const) {
+      await db.query(`insert into public.group_players(group_id, slot, player_id) values ($1, $2, $3)`, [s.groupId, slot, s.players[key]]);
+    }
+    const pts = JSON.stringify({ [s.players.a1]: { points: 0, stableford: 36 }, [s.players.a2]: { points: 0, stableford: 30 } });
+    const r = await as(db, 'trip', () =>
+      db.query<{ r: string }>(`select public.confirm_match($1::uuid, 'individual', 'A', 2, 0, '3&2', 16, $2::jsonb) as r`, [s.groupId, pts]),
+    );
+    expect(r.rows[0].r).toBe('ok');
+    const row = await db.query<{ winner: string; player_points: Record<string, { stableford: number }> }>(
+      `select winner, player_points from public.match_results where group_id = $1`,
+      [s.groupId],
+    );
+    expect(row.rows[0].winner).toBe('A');
+    expect(row.rows[0].player_points[s.players.a1].stableford).toBe(36);
+    expect(await upsert('trip', s.players.a1, 16, 5)).toBe('locked');
+    expect(await upsert('trip', s.players.a1, 17, 5)).toBe('ok');
+  });
+
+  it('accepts a six pointer winner by position', async () => {
+    const r = await as(db, 'trip', () =>
+      db.query<{ r: string }>(`select public.confirm_match($1::uuid, 'individual', 'P2', 0, 0, '40 pts', 18) as r`, [s.groupId]),
+    );
+    expect(r.rows[0].r).toBe('ok');
+  });
+
   it('defaults rounds to match-play fourballs and only accepts match play or Stableford', async () => {
     const r = await db.query<{ fourball_format: string }>(`select fourball_format from public.rounds where id = $1`, [s.roundId]);
     expect(r.rows[0]).toEqual({ fourball_format: 'matchplay' });
