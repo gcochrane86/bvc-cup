@@ -3,13 +3,15 @@
   import { untrack } from 'svelte';
   import { db, enterScore, loadAll, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
   import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, onlyGroupId, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
-  import { isScoreLocked, playerHole, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
+  import { gameLabel, isScoreLocked, playerHole, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
   import HoleGrid from '../components/HoleGrid.svelte';
 
   let { groupId, startHole = null }: { groupId: string | null; startHole?: number | null } = $props();
 
-  const SLOTS: Slot[] = ['A1', 'A2', 'B1', 'B2'];
+  const SLOTS: Slot[] = ['A1', 'A2', 'B1', 'B2', 'P1', 'P2', 'P3'];
+  /** A row's colour: team A/B, or in an individual game P1 (the single / first player) against the rest. */
+  const sideColour = (slot: Slot) => (slot.startsWith('A') || slot === 'P1' ? 'var(--team-a)' : 'var(--team-b)');
 
   const view = $derived(buildEventView(db));
   const found = $derived(view && groupId ? findGroup(view, groupId) : null);
@@ -105,7 +107,8 @@
 
   function shots(pid: string) {
     if (!found || !info) return { bb: 0, label: null as string | null, stableford: false };
-    const bbMatch = found.group.matches.find((m) => m.def.type === 'better_ball');
+    // The fourball, or an individual group's game: the shots each player gets on the hole.
+    const bbMatch = found.group.matches.find((m) => m.def.type === 'better_ball' || m.def.type === 'individual');
     const singles = found.group.matches.find(
       (m) => m.def.type !== 'better_ball' && [...m.def.sideA, ...m.def.sideB].includes(pid),
     );
@@ -225,7 +228,7 @@
   </header>
 
   <!-- Like the match summary: who won each hole and the running score (the fourball's), tap to pick a hole. -->
-  {@const summary = found.group.matches.find((m) => m.def.type === 'better_ball') ?? found.group.matches[0]}
+  {@const summary = found.group.matches.find((m) => m.def.type === 'better_ball' || m.def.type === 'individual') ?? found.group.matches[0]}
   {#if summary}
     <HoleGrid state={summary.state} onPick={(h) => (pickedHole = h)} selected={hole} holeClass={holeState} />
   {/if}
@@ -234,7 +237,7 @@
     {#each found.group.matches as m (m.def.id)}
       {@const lead = m.result ? (m.result.winner === 'A' ? 1 : m.result.winner === 'B' ? -1 : 0) : m.state.lead}
       <span>
-        <small class="muted">{(m.def.scramble ? 'Scramble' : matchLabel(m.def.type))}</small>
+        <small class="muted">{m.def.scramble ? 'Scramble' : m.def.game ? gameLabel(m.def.game) : matchLabel(m.def.type)}</small>
         <strong style="color:{lead > 0 ? 'var(--team-a)' : lead < 0 ? 'var(--team-b)' : 'var(--muted)'}">
           {m.result?.resultText ?? m.state.statusText}
         </strong>
@@ -251,10 +254,10 @@
       <div class="prow card" class:shot={sh.bb === 1} class:shot2={sh.bb >= 2} data-testid="row-{slot}">
         {#if team}
           <span class="faces">
-            {#each teamIds(slot) as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour={slot.startsWith('A') ? 'var(--team-a)' : 'var(--team-b)'} size={36} />{/each}
+            {#each teamIds(slot) as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour={sideColour(slot)} size={36} />{/each}
           </span>
         {:else}
-          <Avatar name={playerName(pid)} url={photoUrl(pid)} colour={slot.startsWith('A') ? 'var(--team-a)' : 'var(--team-b)'} size={44} />
+          <Avatar name={playerName(pid)} url={photoUrl(pid)} colour={sideColour(slot)} size={44} />
         {/if}
         <div class="who">
           {#if team}

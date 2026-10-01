@@ -88,3 +88,65 @@ export async function unfoldEvent(page: Page) {
   await expect(page.getByRole('heading', { name: 'Rounds' })).toBeVisible();
   await page.evaluate(() => document.querySelectorAll<HTMLDetailsElement>('details.round, details.fold').forEach((d) => (d.open = true)));
 }
+
+/**
+ * Make an individual event the active one (after reseed): Day 1 on Seed Links with a 2-ball (Adams v Brown,
+ * both off 10) and a 3-ball (Clark 6, Davies 14, Evans 3; in a 2 v 1 Clark plays alone). Returns the ids.
+ */
+export async function seedIndividual(opts: { pairGame?: string; threeGame?: string } = {}) {
+  const db = serviceDb();
+  const one = async <T>(q: PromiseLike<{ data: T; error: { message: string } | null }>): Promise<T> => {
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data;
+  };
+  const players = (await one(db.from('players').select('id, name'))) as { id: string; name: string }[];
+  const id = (name: string) => players.find((p) => p.name === name)!.id;
+  const course = (await one(db.from('courses').select('id').eq('name', 'Seed Links').single())) as { id: string };
+  await one(db.from('events').update({ is_active: false }).eq('is_active', true));
+  const event = (await one(
+    db.from('events').insert({ name: 'Saturday Swindle', kind: 'individual', is_active: true }).select('id').single(),
+  )) as { id: string };
+  const hcp: Record<string, number> = { 'Alex Adams': 10, 'Ben Brown': 10, 'Chris Clark': 6, 'Dan Davies': 14, 'Ed Evans': 3 };
+  await one(db.from('event_players').insert(Object.entries(hcp).map(([n, h]) => ({ event_id: event.id, player_id: id(n), team: null, handicap: h }))));
+  const round = (await one(
+    db
+      .from('rounds')
+      .insert({
+        event_id: event.id, round_no: 1, name: 'Day 1', course_id: course.id, date: new Date().toLocaleDateString('en-CA'),
+        ...(opts.pairGame ? { pair_game: opts.pairGame } : {}),
+        ...(opts.threeGame ? { three_game: opts.threeGame } : {}),
+      })
+      .select('id')
+      .single(),
+  )) as { id: string };
+  const group = async (no: number, names: string[]) => {
+    const g = (await one(db.from('groups').insert({ round_id: round.id, group_no: no }).select('id').single())) as { id: string };
+    await one(db.from('group_players').insert(names.map((n, i) => ({ group_id: g.id, slot: `P${i + 1}`, player_id: id(n) }))));
+    return g.id;
+  };
+  const twoBall = await group(1, ['Alex Adams', 'Ben Brown']);
+  const threeBall = await group(2, ['Chris Clark', 'Dan Davies', 'Ed Evans']);
+  return { eventId: event.id, roundId: round.id, twoBall, threeBall };
+}
+
+/** Set each row's gross on a hole of an individual group (rows by position, e.g. { P1: 4, P2: 5 }) and save. */
+export async function enterIndividualHole(page: Page, hole: number, gross: Record<string, number>) {
+  await page.getByRole('button', { name: `Hole ${hole}`, exact: true }).click();
+  await expect(page.getByRole('heading', { name: `Hole ${hole}`, exact: true })).toBeVisible();
+  for (const [slot, target] of Object.entries(gross)) {
+    const row = page.getByTestId(`row-${slot}`);
+    const value = row.getByTestId(`gross-${slot}`);
+    let current = Number(await value.textContent());
+    while (current < target) {
+      await row.getByRole('button', { name: /^Increase/ }).click();
+      current++;
+    }
+    while (current > target) {
+      await row.getByRole('button', { name: /^Decrease/ }).click();
+      current--;
+    }
+    await expect(value).toHaveText(String(target));
+  }
+  await page.getByRole('button', { name: `Save hole ${hole}` }).click();
+}

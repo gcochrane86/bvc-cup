@@ -6,7 +6,7 @@
   import { must, supabase } from '../lib/supabase';
   import { isAdmin } from '../lib/auth.svelte';
   import { buildEventView, findGroup, matchLabel } from '../lib/view';
-  import { resultFromState, type MatchType } from '../lib/scoring';
+  import { gameLabel, resultFromState, type MatchType } from '../lib/scoring';
   import MatchCard from '../components/MatchCard.svelte';
   import HoleGrid from '../components/HoleGrid.svelte';
   import Scorecard from '../components/Scorecard.svelte';
@@ -22,7 +22,8 @@
     if (!mv || !found) return;
     const preview = resultFromState(mv.def, mv.state);
     if (!preview) return;
-    if (!confirm(`Confirm ${matchLabel(mv.def.type)}: ${preview.resultText}? This locks the scores for this match.`)) return;
+    const label = mv.def.game ? gameLabel(mv.def.game) : matchLabel(mv.def.type);
+    if (!confirm(`Confirm ${label}: ${preview.resultText}? This locks the scores for this match.`)) return;
     busy = true;
     try {
       // Queued scores must reach the server first, or the lock would reject them.
@@ -47,6 +48,7 @@
           p_points_b: snap.pointsB,
           p_result_text: snap.resultText,
           p_final_hole: snap.finalHole,
+          p_player_points: snap.playerPoints ?? null,
         }),
       );
       if (r === 'already_confirmed') alert('This match had already been confirmed.');

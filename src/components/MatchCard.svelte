@@ -2,7 +2,7 @@
   import Avatar from './Avatar.svelte';
   import { photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
   import { matchLabel, type MatchView } from '../lib/view';
-  import { formatToPar, type PairNet } from '../lib/scoring';
+  import { formatToPar, gameLabel, type PairNet } from '../lib/scoring';
 
   let { mv, teeTime = null, link = true }: { mv: MatchView; teeTime?: string | null; link?: boolean } = $props();
 
@@ -29,10 +29,24 @@
     <span class="slot">{#if badge && lead >= 0}<span class="badge" style="background:{colour}">{badge}</span>{/if}</span>
     <span class="title">
       <strong>Match {mv.number}</strong>
-      {#if mv.def.type !== 'better_ball'}<small class="muted">{matchLabel(mv.def.type)}</small>{/if}
+      {#if mv.def.game}<small class="muted">{gameLabel(mv.def.game)}</small>
+      {:else if mv.def.type !== 'better_ball'}<small class="muted">{matchLabel(mv.def.type)}</small>{/if}
     </span>
     <span class="slot right">{#if badge && lead < 0}<span class="badge" style="background:{colour}">{badge}</span>{/if}</span>
   </header>
+  {#if mv.def.game === 'six_stableford' || mv.def.game === 'six_flat'}
+    <!-- Six pointer: three players, each with their points so far. -->
+    <div class="six">
+      {#each mv.def.players ?? [] as id (id)}
+        <div class="who">
+          <Avatar name={playerName(id)} url={photoUrl(id)} colour="var(--team-a)" size={40} />
+          <span class="name">{playerShort(id)}</span>
+          <strong class="pts">{mv.result?.playerPoints?.[id]?.points ?? mv.state.totals?.[id] ?? 0}</strong>
+        </div>
+      {/each}
+    </div>
+    <div class="status six-status"><strong data-testid="status">{status}</strong>{#if sub}<small class="muted">{sub}</small>{/if}</div>
+  {:else}
   <div class="body">
     <div class="side">
       <div class="faces">
@@ -53,6 +67,7 @@
       {#if mv.net?.b}<div class="net" data-testid="net-b">{netText(mv.net.b)}</div>{/if}
     </div>
   </div>
+  {/if}
 </svelte:element>
 
 <style>
@@ -73,4 +88,9 @@
   .status { text-align: center; display: flex; flex-direction: column; min-width: 92px; }
   .status strong { font-size: 1.4rem; font-weight: 800; }
   .status small { font-size: 0.75rem; font-weight: 600; }
+  .six { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+  .six .who { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+  .six .name { max-width: 100%; }
+  .six .pts { font-size: 1.2rem; }
+  .six-status { margin-top: 6px; }
 </style>

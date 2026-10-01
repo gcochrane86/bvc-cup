@@ -24,6 +24,12 @@
   import Nav from './components/Nav.svelte';
 
   onMount(initAuth);
+  /** Side colours: the teams' own, or for an individual event a neutral green v bronze. */
+  const sideColours = $derived(
+    db.event?.kind === 'individual'
+      ? '--team-a:#0b3d2e;--team-b:#9a5b13'
+      : `--team-a:${db.event?.team_a_colour ?? '#1f4e9c'};--team-b:${db.event?.team_b_colour ?? '#c8102e'}`,
+  );
   const route = $derived(router.route);
   const signedIn = $derived(!!auth.session);
   const needsAdmin = $derived(route.name.startsWith('admin') && route.name !== 'admin-login');
@@ -65,7 +71,7 @@
 {:else if route.name === 'watch'}
   <p class="center muted">Loading…</p>
 {:else if watching && !needsAdmin}
-  <div class="app" style="--team-a:{db.event?.team_a_colour ?? '#1f4e9c'};--team-b:{db.event?.team_b_colour ?? '#c8102e'}">
+  <div class="app" style={sideColours}>
     <p class="watching" data-testid="watching">{db.event?.name ?? 'Event'} · via share link</p>
     {#if db.notice}
       <button class="notice" onclick={() => (db.notice = null)}>{db.notice} (tap to dismiss)</button>
@@ -103,7 +109,7 @@
 {:else if !approved}
   <Waiting />
 {:else}
-  <div class="app" style="--team-a:{db.event?.team_a_colour ?? '#1f4e9c'};--team-b:{db.event?.team_b_colour ?? '#c8102e'}">
+  <div class="app" style={sideColours}>
     {#if db.notice}
       <button class="notice" onclick={() => (db.notice = null)}>{db.notice} (tap to dismiss)</button>
     {/if}

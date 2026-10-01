@@ -36,10 +36,13 @@
   </p>
 {:else}
   <h1>{view.event.name}</h1>
-  <div bind:this={full}>
-    <TeamTracker tracker={view.tracker} event={view.event} breakdown={view.rounds.map((r) => ({ name: r.round.name, points: r.pointsAvailable }))} />
-  </div>
-  <ScoreBar tracker={view.tracker} event={view.event} visible={compact} />
+  <!-- Individual events have no teams, so no team tracker. -->
+  {#if view.event.kind !== 'individual'}
+    <div bind:this={full}>
+      <TeamTracker tracker={view.tracker} event={view.event} breakdown={view.rounds.map((r) => ({ name: r.round.name, points: r.pointsAvailable }))} />
+    </div>
+    <ScoreBar tracker={view.tracker} event={view.event} visible={compact} />
+  {/if}
   <!-- At least a screen tall, so the tracker can always scroll away and the bar appear — even on a
        day with few matches on a tall screen (the Home Screen app has no Safari bars). -->
   <div class="below">
@@ -47,7 +50,7 @@
     {#if rv}
       {@const course = db.courses.find((c) => c.id === rv.round.course_id)}
       {#if course}<h2 class="course">{courseLabel(course)}</h2>{/if}
-      <p class="muted small">{rv.completed} of {rv.totalMatches} matches completed</p>
+      <p class="muted small">{rv.completed} of {rv.totalMatches} {view.event.kind === 'individual' ? 'games' : 'matches'} completed</p>
       {#each rv.groups as g (g.group.id)}
         {#each g.matches as mv (mv.def.id)}
           <MatchCard {mv} teeTime={g.group.tee_time} />
