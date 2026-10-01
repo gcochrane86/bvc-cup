@@ -6,6 +6,7 @@ describe('parseRoute', () => {
     ['', { name: 'home' }],
     ['#/', { name: 'home' }],
     ['#/match/g1/low_singles', { name: 'match', groupId: 'g1', matchType: 'low_singles' }],
+    ['#/match/g1/individual', { name: 'match', groupId: 'g1', matchType: 'individual' }],
     ['#/score', { name: 'score', groupId: null, hole: null }],
     ['#/score/g1', { name: 'score', groupId: 'g1', hole: null }],
     ['#/score/g1/7', { name: 'score', groupId: 'g1', hole: 7 }],

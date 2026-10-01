@@ -21,7 +21,7 @@ export type Route =
   | { name: 'admin-pairings'; roundId: string }
   | { name: 'not-found' };
 
-const MATCH_TYPES: MatchType[] = ['better_ball', 'low_singles', 'high_singles'];
+const MATCH_TYPES: MatchType[] = ['better_ball', 'low_singles', 'high_singles', 'individual'];
 
 export function parseRoute(hash: string): Route {
   const p = hash.replace(/^#/, '').split('/').filter(Boolean);
