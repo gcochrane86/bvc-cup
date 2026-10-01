@@ -8,11 +8,12 @@ const baseRound: RoundRow = {
   id: 'r1', event_id: 'e', course_id: 'c', round_no: 1, date: '2026-10-01', name: 'Day 1',
   allowance_pct: 90, better_ball_points: 1, singles_enabled: false, singles_points: 0.5, singles_allowance_pct: 90,
   singles_pairing: 'handicap', fourball_format: 'matchplay', scramble_low_pct: 35, scramble_high_pct: 35,
+  pair_game: 'stableford_match', three_game: 'six_stableford', stableford_pct: 100, match_pct: 85, match_off_low: true,
 };
 
 function snapshot(over: Partial<Snapshot> = {}): Snapshot {
   return {
-    event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: false, show_leaderboard: true, show_photos: true, watch_token: null },
+    event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: false, show_leaderboard: true, show_photos: true, watch_token: null, kind: 'team' },
     players: [],
     courses: [{ id: 'c', name: 'Links', tee: null, slope_rating: null, course_rating: null }],
     courseHoles: Array.from({ length: 18 }, (_, i) => ({ course_id: 'c', hole: i + 1, par: 4, stroke_index: i + 1 })),
@@ -309,5 +310,46 @@ describe('scramble days', () => {
     expect(scramble.rounds[0].groups[0].matches[0].net?.a).toEqual({ toPar: 0, thru: 1 });
     const matchplay = buildEventView(snapshot({ scores: hole9 }))!;
     expect(matchplay.rounds[0].groups[0].matches[0].net?.a).toEqual({ toPar: -1, thru: 1 });
+  });
+});
+
+describe('individual events', () => {
+  const ind = (slots: [Slot, string][], round: Partial<RoundRow> = {}, scores: ScoreRow[] = []) =>
+    snapshot({
+      event: { ...snapshot().event!, kind: 'individual' },
+      eventPlayers: ['a1', 'a2', 'b1'].map((id) => ({ event_id: 'e', player_id: id, team: null, handicap: 10 })),
+      rounds: [{ ...baseRound, ...round }],
+      groupPlayers: slots.map(([slot, player_id]) => ({ group_id: 'g1', slot, player_id, handicap: null })),
+      scores,
+    });
+
+  it("a 2-player group plays the round's 2-player game as one individual game, with no team points", () => {
+    const view = buildEventView(ind([['P1', 'a1'], ['P2', 'a2']]))!;
+    const g = view.rounds[0].groups[0];
+    expect(g.matches).toHaveLength(1);
+    expect(g.matches[0].def.type).toBe('individual');
+    expect(g.matches[0].def.game).toBe('stableford_match');
+    expect(view.rounds[0].pointsAvailable).toBe(0);
+  });
+
+  it("a 3-player group plays the round's 3-player game, scored as a six pointer", () => {
+    const scores: ScoreRow[] = (['a1', 'a2', 'b1'] as const).map((p, i) => ({
+      round_id: 'r1', player_id: p, hole: 1, gross: 3 + i, picked_up: false, client_updated_at: '2026-10-01T09:10:00Z',
+    }));
+    const view = buildEventView(ind([['P1', 'a1'], ['P2', 'a2'], ['P3', 'b1']], {}, scores))!;
+    const m = view.rounds[0].groups[0].matches[0];
+    expect(m.def.game).toBe('six_stableford');
+    expect(m.state.statusText).toBe('4 · 2 · 0');
+  });
+
+  it('labels individual groups by their players', () => {
+    const short = (id: string) => id.toUpperCase();
+    const solo = buildEventView(ind([['P1', 'a1'], ['P2', 'a2'], ['P3', 'b1']], { three_game: 'two_v_one' }))!;
+    expect(solo.rounds[0].groups[0].matches[0].def.game).toBe('two_v_one');
+    expect(pairingLabel(solo.rounds[0].groups[0], short)).toBe('A1 v A2/B1');
+    const six = buildEventView(ind([['P1', 'a1'], ['P2', 'a2'], ['P3', 'b1']]))!;
+    expect(pairingLabel(six.rounds[0].groups[0], short)).toBe('A1 v A2 v B1');
+    const pair = buildEventView(ind([['P1', 'a1'], ['P2', 'a2']]))!;
+    expect(pairingLabel(pair.rounds[0].groups[0], short)).toBe('A1 v A2');
   });
 });

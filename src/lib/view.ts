@@ -1,5 +1,7 @@
 import {
+  buildGame,
   buildMatches,
+  computeGameState,
   computeMatchState,
   computeTracker,
   pointsStep,
@@ -58,13 +60,20 @@ export function settingsOf(r: RoundRow): RoundSettings {
     fourballFormat: r.fourball_format ?? 'matchplay',
     scrambleLowPct: Number(r.scramble_low_pct ?? 35),
     scrambleHighPct: Number(r.scramble_high_pct ?? 35),
+    pairGame: r.pair_game ?? 'stableford_match',
+    threeGame: r.three_game ?? 'six_stableford',
+    stablefordPct: Number(r.stableford_pct ?? 100),
+    matchPct: Number(r.match_pct ?? 85),
+    matchOffLow: r.match_off_low ?? true,
   };
 }
 
 export function buildEventView(s: Snapshot): EventView | null {
   if (!s.event) return null;
   const handicapOf = Object.fromEntries(s.eventPlayers.map((p) => [p.player_id, Number(p.handicap)]));
-  const teamOf = Object.fromEntries(s.eventPlayers.map((p) => [p.player_id, p.team])) as Record<string, Team>;
+  // Individual events: no teams; everyone takes side A's colour (App gives individual events neutral colours).
+  const individual = s.event.kind === 'individual';
+  const teamOf = Object.fromEntries(s.eventPlayers.map((p) => [p.player_id, p.team ?? 'A'])) as Record<string, Team>;
   const groupCount = Math.floor(s.eventPlayers.length / 4);
   const everyMatch: MatchView[] = [];
   let total = 0;
@@ -74,7 +83,7 @@ export function buildEventView(s: Snapshot): EventView | null {
     .sort((a, b) => a.round_no - b.round_no)
     .map((round): RoundView => {
       const settings = settingsOf(round);
-      const pointsAvailable = roundPointsAvailable(settings, groupCount);
+      const pointsAvailable = individual ? 0 : roundPointsAvailable(settings, groupCount);
       total += pointsAvailable;
       const holesOf = (courseId: string): HoleInfo[] =>
         s.courseHoles
@@ -116,12 +125,11 @@ export function buildEventView(s: Snapshot): EventView | null {
             }),
           );
           const onOtherTees = Object.keys(teeOf).length > 0;
-          const defs = buildMatches(
-            group.id,
-            members.map((gp) => ({ slot: gp.slot, playerId: gp.player_id, handicap: playingHcp[gp.player_id] })),
-            settings,
-            !!group.singles_crossed,
-          ).map((def) => (onOtherTees ? { ...def, teeHoles } : def));
+          const players = members.map((gp) => ({ slot: gp.slot, playerId: gp.player_id, handicap: playingHcp[gp.player_id] }));
+          const built = individual
+            ? [buildGame(group.id, players, settings)].filter((d): d is MatchDef => d !== null)
+            : buildMatches(group.id, players, settings, !!group.singles_crossed);
+          const defs = built.map((def) => (onOtherTees ? { ...def, teeHoles } : def));
           const matches = defs.map((def): MatchView => {
             const row = s.results.find((r) => r.group_id === group.id && r.match_type === def.type);
             const result: ConfirmedResult | null = row
@@ -133,6 +141,7 @@ export function buildEventView(s: Snapshot): EventView | null {
                   pointsB: Number(row.points_b),
                   resultText: row.result_text,
                   finalHole: row.final_hole,
+                  playerPoints: row.player_points ?? undefined,
                 }
               : null;
             const net =
@@ -143,7 +152,8 @@ export function buildEventView(s: Snapshot): EventView | null {
                     b: pairNet(def.sideB, holes, scores, def.teamHandicap ?? playingHcp, teeHoles),
                   }
                 : undefined;
-            return { def, state: computeMatchState(def, holes, scores), result, number: ++matchNo, net };
+            const state = def.game ? computeGameState(def, holes, scores) : computeMatchState(def, holes, scores);
+            return { def, state, result, number: ++matchNo, net };
           });
           everyMatch.push(...matches);
           return { group, slots, matches, scores, playingHcp, teeHoles, teeOf };
@@ -219,6 +229,11 @@ export function resumeGroupId(remembered: string | null, list: { groups: GroupVi
 
 /** "Cochrane/Trimble vs Connaughty/McCaughey" — team A pair vs team B pair, each pair alphabetical. */
 export function pairingLabel(group: GroupView, short: (playerId: string) => string): string {
+  if (group.slots.P1) {
+    const ids = (['P1', 'P2', 'P3'] as Slot[]).map((s) => group.slots[s]).filter((x): x is string => !!x);
+    // 2 v 1: the single, then the pair; otherwise everyone for themselves.
+    return group.matches[0]?.def.game === 'two_v_one' ? `${short(ids[0])} v ${ids.slice(1).map(short).join('/')}` : ids.map(short).join(' v ');
+  }
   const side = (slots: Slot[]) =>
     slots
       .map((s) => group.slots[s])

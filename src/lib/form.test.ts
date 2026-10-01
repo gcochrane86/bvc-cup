@@ -7,7 +7,7 @@ import type { Slot, Team } from './scoring';
 const round = (id: string, round_no: number): RoundRow => ({
   id, event_id: 'e', course_id: 'c', round_no, date: null, name: `Day ${round_no}`,
   allowance_pct: 90, better_ball_points: 1, singles_enabled: false, singles_points: 0.5, singles_allowance_pct: 90,
-  singles_pairing: 'handicap', fourball_format: 'matchplay', scramble_low_pct: 35, scramble_high_pct: 35,
+  singles_pairing: 'handicap', fourball_format: 'matchplay', scramble_low_pct: 35, scramble_high_pct: 35, pair_game: 'stableford_match', three_game: 'six_stableford', stableford_pct: 100, match_pct: 85, match_off_low: true,
 });
 const score = (round_id: string, player_id: string, hole: number, gross: number | null): ScoreRow => ({
   round_id, player_id, hole, gross, picked_up: gross === null, client_updated_at: '2026-10-01T09:00:00Z',
@@ -16,7 +16,7 @@ const score = (round_id: string, player_id: string, hole: number, gross: number 
 // Par 4 everywhere, SI = hole; everyone off 10 (no slope/rating), so 1 shot on holes 1–10.
 function snapshot(over: Partial<Snapshot> = {}): Snapshot {
   return {
-    event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: true, show_leaderboard: true, show_photos: true, watch_token: null, },
+    event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: true, show_leaderboard: true, show_photos: true, watch_token: null, kind: 'team', },
     players: [],
     courses: [{ id: 'c', name: 'Links', tee: null, slope_rating: null, course_rating: null }],
     courseHoles: Array.from({ length: 18 }, (_, i) => ({ course_id: 'c', hole: i + 1, par: 4, stroke_index: i + 1 })),

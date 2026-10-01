@@ -21,8 +21,11 @@ export interface EventRow {
   show_photos: boolean;
   /** The share link token (#/watch/<token>); null = no link. */
   watch_token: string | null;
+  /** Team cup (A v B) or individual (2- and 3-player games, no teams). */
+  kind: 'team' | 'individual';
 }
-export interface EventPlayerRow { event_id: string; player_id: string; team: Team; handicap: number }
+/** team: null in individual events. */
+export interface EventPlayerRow { event_id: string; player_id: string; team: Team | null; handicap: number }
 export interface RoundRow {
   id: string; event_id: string; course_id: string; round_no: number; date: string | null; name: string;
   allowance_pct: number; better_ball_points: number;
@@ -31,6 +34,10 @@ export interface RoundRow {
   singles_pairing: 'handicap' | 'random' | 'selected';
   /** The fourball game: match play off the lowest handicap, Stableford off full handicaps, or flat (no shots). */
   fourball_format: 'matchplay' | 'stableford' | 'flat' | 'scramble';
+  /** Individual events: the 2-player game, the 3-player game, and handicap settings. */
+  pair_game: 'stableford' | 'flat_match' | 'stableford_match';
+  three_game: 'six_stableford' | 'six_flat' | 'two_v_one';
+  stableford_pct: number; match_pct: number; match_off_low: boolean;
   /** 2-man scramble: % of the lower and the higher partner's handicap that make the team handicap. */
   scramble_low_pct: number; scramble_high_pct: number;
 }
