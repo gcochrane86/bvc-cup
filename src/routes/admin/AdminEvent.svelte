@@ -275,7 +275,7 @@
 
   <details class="card fold" bind:open={playersOpen}>
     <summary class="tile">
-      <span><strong>Players</strong><span class="sub">{savedPlaying} playing · {countA} v {countB}</span></span>
+      <span><h2>Players</h2><span class="sub">{savedPlaying} playing · {countA} v {countB}</span></span>
       <span class="pill" class:todo={!savedPlaying || unassigned.length > 0}>{savedPlaying && !unassigned.length ? 'Teams ✓' : 'Set teams'}</span>
     </summary>
     <div class="steps" role="tablist">
@@ -555,6 +555,9 @@
   .pill { flex: none; font-size: 0.75rem; font-weight: 600; padding: 3px 9px; border-radius: 99px; background: #e3efe7; color: var(--shot-text); white-space: nowrap; }
   .pill.todo { background: #fff4e5; color: #a0521a; }
   .fold[open] > summary { margin-bottom: 12px; }
+  /* Players reads as a section heading, like Rounds. */
+  .fold h2 { margin: 0 0 2px; }
+  .fold .sub { font-size: 0.9rem; }
   .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .team { display: flex; gap: 6px; }
   .team input[type='color'] { width: 44px; flex: none; }
