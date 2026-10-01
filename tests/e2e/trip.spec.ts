@@ -971,21 +971,23 @@ test("the admin ticks who's playing (search, select all, clear), then puts them 
   await expect(admin.getByText('12 of 12 playing')).toBeVisible();
   await admin.getByRole('button', { name: 'Clear' }).click();
   await expect(admin.getByText('0 of 12 playing')).toBeVisible();
-  for (const n of ['Alex Adams', 'Ben Brown', 'Chris Clark']) await admin.getByLabel(`${n} playing`).check();
-  await admin.getByRole('button', { name: 'Next: pick teams (3)' }).click();
+  // 4 or more players play teams (2 or 3 would be a 2- or 3-ball individual game).
+  for (const n of ['Alex Adams', 'Ben Brown', 'Chris Clark', 'Dan Davies']) await admin.getByLabel(`${n} playing`).check();
+  await admin.getByRole('button', { name: 'Next: pick teams (4)' }).click();
 
   // Teams: one tap each; nobody can be left off a team when saving.
-  await expect(admin.getByText('3 players not on a team yet')).toBeVisible();
+  await expect(admin.getByText('4 players not on a team yet')).toBeVisible();
   await expect(admin.getByRole('button', { name: 'Save teams' })).toBeDisabled();
   await admin.getByRole('button', { name: 'Alex Adams: Ballymena' }).click();
   await admin.getByRole('button', { name: 'Ben Brown: Coleraine' }).click();
   await admin.getByRole('button', { name: 'Chris Clark: Coleraine' }).click();
+  await admin.getByRole('button', { name: 'Dan Davies: Coleraine' }).click();
   await expect(admin.getByTestId('team-count-A')).toContainText('1');
-  await expect(admin.getByTestId('team-count-B')).toContainText('2');
+  await expect(admin.getByTestId('team-count-B')).toContainText('3');
   await admin.getByRole('button', { name: 'Save teams' }).click();
   await expect(admin.getByText('Teams saved')).toBeVisible();
   const { data: eps } = await db.from('event_players').select('team, players(name)').eq('event_id', ev!.id);
-  expect(eps!.map((e) => `${(e.players as unknown as { name: string }).name}:${e.team}`).sort()).toEqual(['Alex Adams:A', 'Ben Brown:B', 'Chris Clark:B']);
+  expect(eps!.map((e) => `${(e.players as unknown as { name: string }).name}:${e.team}`).sort()).toEqual(['Alex Adams:A', 'Ben Brown:B', 'Chris Clark:B', 'Dan Davies:B']);
 });
 
 test('saving teams of more than four without pairings warns (but saves), and each day shows its pairing status', async ({ browser }) => {
