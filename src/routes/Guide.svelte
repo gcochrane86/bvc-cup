@@ -2,8 +2,12 @@
   import { untrack } from 'svelte';
   import { db, photoCourses } from '../lib/data/store.svelte';
   import { guidePhotoUrls } from '../lib/guidePhotos';
-  import { eventGuides, guideFlyover, guideNotes, guidePages, holePhotos, initialGuide, readGuideMemory, rememberGuideHole, type GuideMemory } from '../lib/guides';
+  import { courseGuide, eventGuides, guideFlyover, guideNotes, guidePages, holePhotos, initialGuide, readGuideMemory, rememberGuideHole, type GuideMemory } from '../lib/guides';
   import FlyoverPlayer from '../components/FlyoverPlayer.svelte';
+
+  /** preview: the admin looking at one course's guide (from an event's round), as players would see it. */
+  let { preview = null }: { preview?: { courseId: string; backHref: string } | null } = $props();
+  const previewCourse = $derived(preview ? db.courses.find((c) => c.id === preview.courseId) : undefined);
 
   const KEY = 'golf.guide';
   function load(): GuideMemory {
@@ -17,8 +21,13 @@
 
   // Only the active event's courses (BvC: Dundonald, Robert the Bruce, Ailsa — as before). Opens on the
   // course this phone last looked at, if this event has it, else the event's first course.
-  const list = $derived(eventGuides(db.rounds, db.courses, photoCourses()));
-  let slug = $state(untrack(() => initialGuide(eventGuides(db.rounds, db.courses, photoCourses()), mem.course)?.slug ?? ''));
+  const guidesNow = () => {
+    if (!preview) return eventGuides(db.rounds, db.courses, photoCourses());
+    const g = previewCourse && courseGuide(previewCourse.name, photoCourses());
+    return g ? [g] : [];
+  };
+  const list = $derived(guidesNow());
+  let slug = $state(untrack(() => initialGuide(guidesNow(), mem.course)?.slug ?? ''));
   // None of this event's courses has a guide: the tab is hidden, and this page says so if opened directly.
   const guide = $derived(list.find((g) => g.slug === slug) ?? list[0] ?? null);
   const hole = $derived(guide ? (mem.holes[guide.slug] ?? 1) : 1);
@@ -39,6 +48,7 @@
   const info = $derived.by(() => {
     if (!guide) return undefined;
     const course =
+      previewCourse ??
       db.rounds.map((r) => db.courses.find((c) => c.id === r.course_id)).find((c) => c && guide.match.test(c.name)) ??
       db.courses.find((c) => guide.match.test(c.name));
     return course ? db.courseHoles.find((h) => h.course_id === course.id && h.hole === hole) : undefined;
@@ -53,6 +63,7 @@
   function go(nextSlug: string, nextHole: number) {
     slug = nextSlug;
     mem = rememberGuideHole(mem, nextSlug, Math.min(18, Math.max(1, nextHole)));
+    if (preview) return void window.scrollTo(0, 0); // a preview doesn't change where players' Courses tab opens
     try {
       localStorage.setItem(KEY, JSON.stringify(mem));
     } catch {
@@ -62,10 +73,13 @@
   }
 </script>
 
+{#if preview}
+  <p class="preview" data-testid="guide-preview"><span>Preview · as players see it</span><a href={preview.backHref}>← Back to event</a></p>
+{/if}
 <h1>Courses</h1>
 
 {#if !guide}
-  <p class="muted">No course guide for this event's courses yet.</p>
+  <p class="muted">{preview ? 'No course guide for this course yet: add photos in Admin → Courses.' : "No course guide for this event's courses yet."}</p>
 {:else}
 
 <div class="courses" role="tablist">
@@ -130,6 +144,11 @@
 {/if}
 
 <style>
+  .preview {
+    display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 12px;
+    background: #fff4e5; border: 1px solid #f0c27a; border-radius: 10px; font-size: 0.9rem;
+  }
+  .preview a { font-weight: 600; }
   .courses { display: flex; gap: 8px; margin-bottom: 10px; }
   .courses button { flex: 1; background: var(--surface); color: var(--text); border: 1px solid var(--line); padding: 10px 4px; font-size: 0.85rem; line-height: 1.15; }
   .courses button.active { background: var(--accent); color: #fff; border-color: var(--accent); }

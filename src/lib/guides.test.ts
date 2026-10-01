@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GUIDES, eventGuides, guideFlyover, guideForCourse, guideNotes, guidePages, guideStatus, holePhotos, initialGuide, readGuideMemory, rememberGuideHole } from './guides';
+import { GUIDES, courseGuide, eventGuides, guideFlyover, guideForCourse, guideNotes, guidePages, guideStatus, holePhotos, initialGuide, readGuideMemory, rememberGuideHole } from './guides';
 
 describe('course guides', () => {
   it('has every guide: the three trip courses in playing order, then Glashedy', () => {
@@ -138,5 +138,13 @@ describe('uploaded photos on a built-in guide', () => {
 
   it('leaves a hole without uploads to the built-in guide', () => {
     expect(holePhotos(dundonald, 4, photos)).toEqual([]);
+  });
+});
+
+describe('courseGuide', () => {
+  it("is a course's built-in guide, else its uploaded photos, else none", () => {
+    expect(courseGuide('Glashedy Links (White)')?.slug).toBe('glashedy');
+    expect(courseGuide('Portstewart', ['Portstewart'])?.kind).toBe('photos');
+    expect(courseGuide('Portstewart', [])).toBeNull();
   });
 });

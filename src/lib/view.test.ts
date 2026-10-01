@@ -7,12 +7,12 @@ import type { Slot, Team } from './scoring';
 const baseRound: RoundRow = {
   id: 'r1', event_id: 'e', course_id: 'c', round_no: 1, date: '2026-10-01', name: 'Day 1',
   allowance_pct: 90, better_ball_points: 1, singles_enabled: false, singles_points: 0.5, singles_allowance_pct: 90,
-  singles_pairing: 'handicap', fourball_format: 'matchplay',
+  singles_pairing: 'handicap', fourball_format: 'matchplay', scramble_low_pct: 35, scramble_high_pct: 35,
 };
 
 function snapshot(over: Partial<Snapshot> = {}): Snapshot {
   return {
-    event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: false, show_leaderboard: true, watch_token: null, },
+    event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: false, show_leaderboard: true, show_photos: true, watch_token: null },
     players: [],
     courses: [{ id: 'c', name: 'Links', tee: null, slope_rating: null, course_rating: null }],
     courseHoles: Array.from({ length: 18 }, (_, i) => ({ course_id: 'c', hole: i + 1, par: 4, stroke_index: i + 1 })),

@@ -237,6 +237,17 @@ describe('confirmation and locking', () => {
     expect(r.rows[0]).toEqual({ show_leaderboard: true });
   });
 
+  it('shows player photos by default', async () => {
+    const r = await db.query<{ show_photos: boolean }>(`select show_photos from public.events where id = $1`, [s.eventId]);
+    expect(r.rows[0]).toEqual({ show_photos: true });
+  });
+
+  it('starts new rounds on a 35% / 15% scramble split, kept between 0 and 100', async () => {
+    const r = await db.query(`select scramble_low_pct::float as low, scramble_high_pct::float as high from public.rounds where id = $1`, [s.roundId]);
+    expect(r.rows[0]).toEqual({ low: 35, high: 15 });
+    await expect(db.query(`update public.rounds set scramble_high_pct = 101 where id = $1`, [s.roundId])).rejects.toThrow(/check constraint/);
+  });
+
   it('defaults rounds to match-play fourballs and only accepts match play or Stableford', async () => {
     const r = await db.query<{ fourball_format: string }>(`select fourball_format from public.rounds where id = $1`, [s.roundId]);
     expect(r.rows[0]).toEqual({ fourball_format: 'matchplay' });

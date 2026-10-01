@@ -37,13 +37,15 @@ export function buildMatches(groupId: string, players: SlotPlayer[], s: RoundSet
   return matches;
 }
 
-/** Two-man scramble team handicap: 35% of each player's course handicap, added and rounded. */
-export const scrambleHandicap = (a: number, b: number) => roundHalfUp(0.35 * a + 0.35 * b);
+/** Two-man scramble team handicap: lowPct of the lower course handicap plus highPct of the higher, rounded. */
+export const scrambleHandicap = (a: number, b: number, lowPct = 35, highPct = 35) =>
+  roundHalfUp((lowPct * Math.min(a, b) + highPct * Math.max(a, b)) / 100);
 
 /** 2-man scramble: one ball per team. The better team plays off 0; the other gets the difference. No singles. */
 function scramble(groupId: string, sideA: SlotPlayer[], sideB: SlotPlayer[], s: RoundSettings): MatchDef {
-  const ta = scrambleHandicap(sideA[0].handicap, sideA[1].handicap);
-  const tb = scrambleHandicap(sideB[0].handicap, sideB[1].handicap);
+  const teamHcp = (side: SlotPlayer[]) => scrambleHandicap(side[0].handicap, side[1].handicap, s.scrambleLowPct, s.scrambleHighPct);
+  const ta = teamHcp(sideA);
+  const tb = teamHcp(sideB);
   const low = Math.min(ta, tb);
   const team = (side: SlotPlayer[], t: number) => side.map((p) => [p.playerId, t] as const);
   return {

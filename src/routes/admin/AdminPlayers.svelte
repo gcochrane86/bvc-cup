@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { db, loadAll, photoUrl } from '../../lib/data/store.svelte';
+  import { db, loadAll, playerPhotoUrl } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
   import type { PlayerRow } from '../../lib/data/types';
   import Avatar from '../../components/Avatar.svelte';
@@ -93,7 +93,7 @@
   {#each shown as p (p.id)}
     <div class="player" class:open={open === p.id} data-testid="admin-player">
       <button class="line" aria-expanded={open === p.id} onclick={() => (open = open === p.id ? null : p.id)}>
-        <Avatar name={p.name} url={photoUrl(p.id)} colour="var(--accent)" size={40} />
+        <Avatar name={p.name} url={playerPhotoUrl(p.id)} colour="var(--accent)" size={40} />
         <span class="who">
           <strong>{p.name}</strong>
           <span class="muted small">{p.short_name}{inEvent(p.id) ? ' · in this event' : ''}</span>

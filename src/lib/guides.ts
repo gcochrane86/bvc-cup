@@ -43,6 +43,11 @@ export function photoGuide(courseName: string): Guide {
   };
 }
 
+/** A course's guide: its built-in one, else its uploaded photos (photoCourses: names of courses that have some). */
+export function courseGuide(courseName: string, photoCourses: string[] = []): Guide | null {
+  return guideForCourse(courseName) ?? (photoCourses.includes(courseName) ? photoGuide(courseName) : null);
+}
+
 /**
  * The guides for the active event's courses, in day order, each once: a built-in guide, else the course's
  * uploaded photos (photoCourses: names of courses that have some). None: the Courses tab is hidden.
@@ -56,7 +61,7 @@ export function eventGuides(
   for (const r of [...rounds].sort((a, b) => a.round_no - b.round_no)) {
     const course = courses.find((c) => c.id === r.course_id);
     if (!course) continue;
-    const g = guideForCourse(course.name) ?? (photoCourses.includes(course.name) ? photoGuide(course.name) : null);
+    const g = courseGuide(course.name, photoCourses);
     if (g && !out.some((x) => x.slug === g.slug)) out.push(g);
   }
   return out;

@@ -17,6 +17,9 @@ export interface RoundSettings {
   singlesAllowancePct: number;
   /** The fourball game: match play off the lowest handicap (default), Stableford off full handicaps, or flat (no shots). */
   fourballFormat?: 'matchplay' | 'stableford' | 'flat' | 'scramble';
+  /** 2-man scramble: % of the lower and the higher partner's course handicap that make the team handicap (default 35 each). */
+  scrambleLowPct?: number;
+  scrambleHighPct?: number;
 }
 
 export interface SlotPlayer {
@@ -46,7 +49,7 @@ export interface MatchDef {
   stableford?: boolean;
   /** 2-man scramble: each team plays one ball; both players carry the team's score and shots. */
   scramble?: boolean;
-  /** 2-man scramble: each player's team handicap (35% of each partner's course handicap, added). */
+  /** 2-man scramble: each player's team handicap (the round's % of the low and high partner's course handicap, added). */
   teamHandicap?: Record<string, number>;
   /** Players on a tee other than the day's main tee: that tee's holes (own par and stroke index). */
   teeHoles?: Record<string, HoleInfo[]>;

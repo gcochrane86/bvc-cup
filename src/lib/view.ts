@@ -56,6 +56,8 @@ export function settingsOf(r: RoundRow): RoundSettings {
     singlesPoints: Number(r.singles_points),
     singlesAllowancePct: Number(r.singles_allowance_pct),
     fourballFormat: r.fourball_format ?? 'matchplay',
+    scrambleLowPct: Number(r.scramble_low_pct ?? 35),
+    scrambleHighPct: Number(r.scramble_high_pct ?? 35),
   };
 }
 

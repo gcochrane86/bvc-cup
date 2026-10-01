@@ -1,10 +1,11 @@
 <script lang="ts">
   import ShareLink from '../../components/ShareLink.svelte';
-  import { db, loadAll } from '../../lib/data/store.svelte';
+  import { db, loadAll, photoCourses } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
   import { courseGroups, teesOf } from '../../lib/courses';
-  import { autoFourball } from '../../lib/scoring';
+  import { autoFourball, scrambleHandicap } from '../../lib/scoring';
+  import { courseGuide } from '../../lib/guides';
   import ResetScores from '../../components/ResetScores.svelte';
   import ConfirmedResults from '../../components/ConfirmedResults.svelte';
 
@@ -26,6 +27,10 @@
   let nudge = $state<RoundRow | null>(null);
   /** `${roundId}:${playerId}` for players whose match that day is confirmed (their tee is locked). */
   let locked = $state<Set<string>>(new Set());
+  /** Rounds show as one-line tiles; these are the ones opened for editing (kept open across saves). */
+  let openRounds = $state<Record<string, boolean>>({});
+  /** The Players section opens by itself while teams still need sorting. */
+  let playersOpen = $state(false);
 
   const courseName = (id: string) => db.courses.find((c) => c.id === id)?.name ?? '';
   const teeOfPlayer = (roundId: string, pid: string) => roundTees.find((t) => t.round_id === roundId && t.player_id === pid)?.course_id ?? '';
@@ -49,8 +54,6 @@
       must(supabase.from('event_players').select('*').eq('event_id', id)) as Promise<EventPlayerRow[]>,
       must(supabase.from('rounds').select('*').eq('event_id', id).order('round_no')) as Promise<RoundRow[]>,
     ]);
-    event = ev;
-    rounds = rs;
     if (!rs.length) adding = true; // a new event: straight to adding its first day
     const ids = rs.map((r) => r.id);
     if (ids.length) {
@@ -72,6 +75,10 @@
       }),
     );
     if (!Object.values(members).some((m) => m.playing)) teamStep = 'who';
+    if (!eps.length) playersOpen = true;
+    // Last, so the page never shows the event with its players and pairings still loading.
+    rounds = rs;
+    event = ev;
   }
   $effect(() => {
     void load();
@@ -102,6 +109,16 @@
     if (done > 0) return `${done} of ${fourballs} fourballs paired`;
     return 'Pairings not set yet';
   };
+  const GAMES = { matchplay: 'Match play', stableford: 'Stableford', flat: 'Match play, flat', scramble: '2-man scramble' } as const;
+  const roundDate = (d: string | null) =>
+    d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'No date';
+  const roundGame = (r: RoundRow) =>
+    r.fourball_format === 'matchplay' ? `${GAMES.matchplay} ${Number(r.allowance_pct)}%`
+    : r.fourball_format === 'scramble' ? `${GAMES.scramble} ${Number(r.scramble_low_pct)}/${Number(r.scramble_high_pct)}`
+    : GAMES[r.fourball_format];
+  const guideFor = (r: RoundRow) => courseGuide(courseName(r.course_id), photoCourses());
+  /** Players in this event with a photo, for the photo switch. */
+  const withPhotos = $derived(playingIds.filter((id) => db.players.find((p) => p.id === id)?.photo_path).length);
   const shown = $derived(db.players.filter((p) => members[p.id] && p.name.toLowerCase().includes(search.trim().toLowerCase())));
   const onTeam = (t: 'A' | 'B') => playingIds.filter((id) => members[id].team === t);
   const countA = $derived(onTeam('A').length);
@@ -129,6 +146,7 @@
             is_active: ev.is_active,
             show_form: ev.show_form,
             show_leaderboard: ev.show_leaderboard,
+            show_photos: ev.show_photos,
           })
           .eq('id', ev.id),
       );
@@ -217,6 +235,8 @@
               singles_allowance_pct: Number(r.singles_allowance_pct),
               singles_pairing: r.singles_pairing,
               fourball_format: r.fourball_format,
+              scramble_low_pct: Number(r.scramble_low_pct),
+              scramble_high_pct: Number(r.scramble_high_pct),
             })
             .eq('id', r.id),
         ).then(async () => {
@@ -237,22 +257,27 @@
   <section class="card">
     <h2>Event</h2>
     <div class="field"><label for="evn">Name</label><input id="evn" bind:value={event.name} /></div>
-    <div class="row">
-      <div class="field"><label for="ta">Team A name</label><input id="ta" bind:value={event.team_a_name} /></div>
-      <div class="field"><label for="tac">Colour</label><input id="tac" type="color" bind:value={event.team_a_colour} /></div>
+    <div class="teams">
+      <div class="field">
+        <label for="ta">Team A name</label>
+        <span class="team"><input id="ta" bind:value={event.team_a_name} /><input aria-label="Team A colour" type="color" bind:value={event.team_a_colour} /></span>
+      </div>
+      <div class="field">
+        <label for="tb">Team B name</label>
+        <span class="team"><input id="tb" bind:value={event.team_b_name} /><input aria-label="Team B colour" type="color" bind:value={event.team_b_colour} /></span>
+      </div>
     </div>
-    <div class="row">
-      <div class="field"><label for="tb">Team B name</label><input id="tb" bind:value={event.team_b_name} /></div>
-      <div class="field"><label for="tbc">Colour</label><input id="tbc" type="color" bind:value={event.team_b_colour} /></div>
-    </div>
-    <label class="row"><input type="checkbox" bind:checked={event.is_active} /> Active event (shown on the leaderboard)</label>
+    <label class="setting"><span>Active event<span class="sub">Shown on the leaderboard</span></span><input class="switch" type="checkbox" bind:checked={event.is_active} /></label>
     <button onclick={saveDetails}>Save event</button>
   </section>
 
   <ShareLink {event} />
 
-  <section class="card">
-    <h2>Players</h2>
+  <details class="card fold" bind:open={playersOpen}>
+    <summary class="tile">
+      <span><strong>Players</strong><span class="sub">{savedPlaying} playing · {countA} v {countB}</span></span>
+      <span class="pill" class:todo={!savedPlaying || unassigned.length > 0}>{savedPlaying && !unassigned.length ? 'Teams ✓' : 'Set teams'}</span>
+    </summary>
     <div class="steps" role="tablist">
       <button role="tab" aria-selected={teamStep === 'who'} class:on={teamStep === 'who'} onclick={() => (teamStep = 'who')}>
         1 · Who's playing{teamStep === 'teams' && playingIds.length ? ' ✓' : ''}
@@ -299,7 +324,7 @@
       {/each}
       <button class="wide" disabled={unassigned.length > 0} onclick={saveMembers}>Save teams</button>
     {/if}
-  </section>
+  </details>
 
   <section class="card">
     <div class="rhead">
@@ -307,7 +332,11 @@
       {#if !adding}<button class="addbtn" onclick={() => (adding = true)}>+ Add round</button>{/if}
     </div>
     {#each rounds as r (r.id)}
-      <div class="round">
+      <details class="round" bind:open={openRounds[r.id]} data-testid="round">
+        <summary class="tile">
+          <span><strong>{r.name} · {courseName(r.course_id)}</strong><span class="sub">{roundDate(r.date)} · {roundGame(r)}</span></span>
+          <span class="pill" class:todo={!pairingStatus(r).endsWith('✓')}>{pairingStatus(r).replace('Pairings set ✓', 'Paired ✓').replace('Pairings not set yet', 'Not paired').replace(' fourballs paired', ' paired')}</span>
+        </summary>
         <div class="row">
           <div class="field"><label for="rn-{r.id}">Name</label><input id="rn-{r.id}" bind:value={r.name} /></div>
           <div class="field"><label for="rd-{r.id}">Date</label><input id="rd-{r.id}" type="date" bind:value={r.date} /></div>
@@ -345,13 +374,18 @@
             {/each}
           </details>
         {/if}
+        {#if guideFor(r)}
+          <a class="guidebtn" href="#/admin/events/{eventId}/guide/{r.course_id}">View course guide →</a>
+        {:else}
+          <p class="muted small">No course guide yet · <a href="#/admin/guide/{r.course_id}">add photos</a></p>
+        {/if}
         <div class="field">
           <label for="rf-{r.id}">Fourball game</label>
           <select id="rf-{r.id}" bind:value={r.fourball_format}>
             <option value="matchplay">Match play (off the low)</option>
             <option value="stableford">Stableford (full handicaps)</option>
             <option value="flat">Match play, flat (no shots)</option>
-            <option value="scramble">2-man scramble (35% each)</option>
+            <option value="scramble">2-man scramble</option>
           </select>
         </div>
         <div class="row">
@@ -361,6 +395,18 @@
           {/if}
           <div class="field"><label for="rp-{r.id}">Fourball pts</label><input id="rp-{r.id}" type="number" step="0.5" bind:value={r.better_ball_points} /></div>
         </div>
+        {#if r.fourball_format === 'scramble'}
+          <!-- Team handicap: this % of the lower partner's handicap plus this % of the higher. -->
+          <div class="row">
+            <div class="field"><label for="rsl-{r.id}">Low handicap %</label><input id="rsl-{r.id}" type="number" min="0" max="100" bind:value={r.scramble_low_pct} /></div>
+            <div class="field"><label for="rsh-{r.id}">High handicap %</label><input id="rsh-{r.id}" type="number" min="0" max="100" bind:value={r.scramble_high_pct} /></div>
+          </div>
+          <p class="calc" data-testid="scramble-example">
+            Example: 8 &amp; 20 → {Number(r.scramble_low_pct)}% × 8 + {Number(r.scramble_high_pct)}% × 20 =
+            {((Number(r.scramble_low_pct) * 8 + Number(r.scramble_high_pct) * 20) / 100).toFixed(1)} →
+            <strong>team plays off {scrambleHandicap(8, 20, Number(r.scramble_low_pct), Number(r.scramble_high_pct))}</strong>
+          </p>
+        {/if}
         <!-- A scramble is one ball per team, so there are no singles that day. -->
         {#if r.fourball_format !== 'scramble'}
           <label class="row"><input type="checkbox" bind:checked={r.singles_enabled} /> Also play 2 singles in each fourball</label>
@@ -385,7 +431,7 @@
           <a class="pairbtn" href="#/admin/pairings/{r.id}">Set pairings →</a>
           <span class="pstatus" class:ok={pairingStatus(r).endsWith('✓')} data-testid="pairing-status">{pairingStatus(r)}</span>
         </div>
-      </div>
+      </details>
     {/each}
 
     {#if adding}
@@ -441,10 +487,11 @@
   <details class="more">
     <summary>More options</summary>
     <section class="card">
-      <h2>Tabs for players</h2>
-      <label class="row"><input type="checkbox" bind:checked={event.show_leaderboard} /> Show the Leaderboard tab to players (off: they go straight to Scores)</label>
-      <label class="row"><input type="checkbox" bind:checked={event.show_form} /> Show the Form tab to players (rankings by gross, net, points, birdies…)</label>
-      <button onclick={saveDetails}>Save tab settings</button>
+      <h2>What players see</h2>
+      <label class="setting"><span>Leaderboard tab<span class="sub">Off: players go straight to Scores</span></span><input class="switch" type="checkbox" aria-label="Show the Leaderboard tab to players" bind:checked={event.show_leaderboard} /></label>
+      <label class="setting"><span>Form tab<span class="sub">Rankings by gross, net, points, birdies…</span></span><input class="switch" type="checkbox" aria-label="Show the Form tab to players" bind:checked={event.show_form} /></label>
+      <label class="setting"><span>Player photos<span class="sub">{withPhotos} of {playingIds.length} players have one · off shows initials for everyone</span></span><input class="switch" type="checkbox" aria-label="Show player photos" bind:checked={event.show_photos} /></label>
+      <button onclick={saveDetails}>Save settings</button>
     </section>
     {#key event.id}<ConfirmedResults {event} />{/key}
     {#if rounds.length}
@@ -499,6 +546,22 @@
   .hcp { text-align: center; color: var(--muted); }
   .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .round { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+  .round[open] > summary { margin-bottom: 12px; }
+  .tile { display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+  .tile::-webkit-details-marker { display: none; }
+  .tile > span:first-child { min-width: 0; }
+  .tile strong { display: block; }
+  .sub { display: block; font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+  .pill { flex: none; font-size: 0.75rem; font-weight: 600; padding: 3px 9px; border-radius: 99px; background: #e3efe7; color: var(--shot-text); white-space: nowrap; }
+  .pill.todo { background: #fff4e5; color: #a0521a; }
+  .fold[open] > summary { margin-bottom: 12px; }
+  .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .team { display: flex; gap: 6px; }
+  .team input[type='color'] { width: 44px; flex: none; }
+  .setting { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .setting:last-of-type { border-bottom: 0; }
+  .guidebtn { display: block; text-align: center; padding: 10px 16px; margin-bottom: 12px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1.5px solid var(--accent); }
+  .calc { background: #e3efe7; border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; margin: 0 0 12px; font-variant-numeric: tabular-nums; }
   .player-tees summary { cursor: pointer; font-weight: 600; margin: 4px 0 8px; }
   .more summary { cursor: pointer; font-weight: 700; padding: 12px 0; color: var(--muted); }
   input[type='color'] { padding: 4px; }

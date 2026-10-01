@@ -17,6 +17,7 @@ export type Route =
   | { name: 'admin-guide'; courseId: string }
   | { name: 'admin-events' }
   | { name: 'admin-event'; eventId: string }
+  | { name: 'admin-guide-preview'; eventId: string; courseId: string }
   | { name: 'admin-pairings'; roundId: string }
   | { name: 'not-found' };
 
@@ -47,6 +48,8 @@ export function parseRoute(hash: string): Route {
     if (p.length === 4 && b === 'courses' && c === 'new') return { name: 'admin-course', courseId: 'new', copyFrom: p[3] };
     if (p.length === 2 && b === 'events') return { name: 'admin-events' };
     if (p.length === 3 && b === 'events') return { name: 'admin-event', eventId: c };
+    // A course's guide as players see it, opened from one of the event's rounds.
+    if (p.length === 5 && b === 'events' && p[3] === 'guide') return { name: 'admin-guide-preview', eventId: c, courseId: p[4] };
     if (p.length === 3 && b === 'pairings') return { name: 'admin-pairings', roundId: c };
   }
   return { name: 'not-found' };

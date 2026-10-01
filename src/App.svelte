@@ -141,6 +141,10 @@
         {#key route.eventId}
           <AdminEvent eventId={route.eventId} />
         {/key}
+      {:else if route.name === 'admin-guide-preview'}
+        {#key route.courseId}
+          <Guide preview={{ courseId: route.courseId, backHref: `#/admin/events/${route.eventId}` }} />
+        {/key}
       {:else if route.name === 'admin-pairings'}
         {#key route.roundId}
           <AdminPairings roundId={route.roundId} />

@@ -191,7 +191,12 @@ async function refreshPhotoUrls() {
   db.photoUrls = Object.fromEntries(Object.entries(keep).map(([path, s]) => [path, s.url]));
 }
 
+/** A player's photo for the event's pages: none when the admin has switched photos off for this event. */
 export function photoUrl(playerId: string): string | null {
+  return db.event?.show_photos === false ? null : playerPhotoUrl(playerId);
+}
+/** A player's photo whatever the event's setting (Admin → Players). */
+export function playerPhotoUrl(playerId: string): string | null {
   const path = db.players.find((p) => p.id === playerId)?.photo_path;
   return path ? (db.photoUrls[path] ?? null) : null;
 }

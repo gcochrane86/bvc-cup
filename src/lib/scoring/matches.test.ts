@@ -69,6 +69,17 @@ describe('buildMatches', () => {
     expect(ex[0].strokes).toEqual({ a1: 0, a2: 0, b1: 6, b2: 6 });
   });
 
+  it('a scramble can weight the low and high handicap differently (e.g. 35% of the low, 15% of the high)', () => {
+    const four: SlotPlayer[] = [
+      { slot: 'A1', playerId: 'a1', handicap: 20 }, { slot: 'A2', playerId: 'a2', handicap: 8 },
+      { slot: 'B1', playerId: 'b1', handicap: 10 }, { slot: 'B2', playerId: 'b2', handicap: 12 },
+    ];
+    // A: 35% of 8 + 15% of 20 = 2.8 + 3 = 5.8 → 6 (whichever slot the low player is in). B: 3.5 + 1.8 = 5.3 → 5.
+    const ms = buildMatches('g1', four, { ...settings, fourballFormat: 'scramble', scrambleLowPct: 35, scrambleHighPct: 15 });
+    expect(ms[0].teamHandicap).toEqual({ a1: 6, a2: 6, b1: 5, b2: 5 });
+    expect(ms[0].strokes).toEqual({ a1: 1, a2: 1, b1: 0, b2: 0 });
+  });
+
   it('match play (the default) is unchanged', () => {
     expect(buildMatches('g1', players, { ...settings, fourballFormat: 'matchplay' })).toEqual(buildMatches('g1', players, settings));
     expect(buildMatches('g1', players, settings)[0].stableford).toBeUndefined();

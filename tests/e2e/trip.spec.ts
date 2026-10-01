@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { enterHole, group1Card, login, loginAdmin, newPhone, openGroup1, reseed, serviceDb } from './helpers';
+import { enterHole, group1Card, login, loginAdmin, newPhone, openEvent, openGroup1, reseed, serviceDb, unfoldEvent } from './helpers';
 
 test.beforeEach(() => reseed());
 
@@ -138,7 +138,7 @@ test('the admin can reopen a confirmed match for scoring', async ({ browser }) =
   const admin = await newPhone(browser);
   admin.on('dialog', (d) => void d.accept());
   await loginAdmin(admin);
-  await admin.goto(`/#/admin/events/${await activeEventId()}`); // Reopen lives on the event's admin page
+  await openEvent(admin, await activeEventId()); // Reopen lives on the event's admin page
   await admin.getByText('More options').click();
   await admin.getByTestId('reopen-row').filter({ hasText: /^Match 1\b/ }).getByRole('button', { name: 'Reopen' }).click();
   await expect(admin.getByText('Match 1 reopened')).toBeVisible();
@@ -254,7 +254,7 @@ test('after reopening, correcting an earlier hole changes the outcome and can be
   const admin = await newPhone(browser);
   admin.on('dialog', (d) => void d.accept());
   await loginAdmin(admin);
-  await admin.goto(`/#/admin/events/${await activeEventId()}`); // Reopen lives on the event's admin page
+  await openEvent(admin, await activeEventId()); // Reopen lives on the event's admin page
   await admin.getByText('More options').click();
   await admin.getByTestId('reopen-row').filter({ hasText: /^Match 1\b/ }).getByRole('button', { name: 'Reopen' }).click();
   await expect(admin.getByText('Match 1 reopened')).toBeVisible();
@@ -356,6 +356,7 @@ test('the admin can choose the singles line-up and it shows on the leaderboard',
   await loginAdmin(admin);
   await admin.getByRole('link', { name: /^Events/ }).click();
   await admin.getByTestId('swipe-row').first().getByRole('link').click();
+  await unfoldEvent(admin);
   const day3 = admin.locator('.round').nth(2);
   await day3.getByLabel('Singles pairings').selectOption('selected');
   await day3.getByRole('button', { name: 'Save round' }).click();
@@ -506,7 +507,7 @@ test('the Form tab is off until the admin switches it on, then ranks players', a
   await admin.getByTestId('swipe-row').first().getByRole('link').click();
   await admin.getByText('More options').click();
   await admin.getByLabel(/Show the Form tab to players/).check();
-  await admin.getByRole('button', { name: 'Save tab settings' }).click();
+  await admin.getByRole('button', { name: 'Save settings' }).click();
   await expect(admin.getByText('Event saved')).toBeVisible();
 
   // Group 1's A players make birdie 3s on hole 1 (par 4); B players make 4s.
@@ -584,7 +585,7 @@ test('a day can be played as fourball Stableford: full handicaps, best points wi
   const admin = await newPhone(browser);
   await loginAdmin(admin);
   const { data: ev } = await serviceDb().from('events').select('id').eq('is_active', true).single();
-  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await openEvent(admin, ev!.id);
   const game = admin.getByLabel('Fourball game').first();
   await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(3);
   await game.selectOption('stableford');
@@ -624,7 +625,7 @@ test('a two-v-two event is paired automatically when the teams are saved', async
 
   const admin = await newPhone(browser);
   await loginAdmin(admin);
-  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await openEvent(admin, ev!.id);
   // Step 1: who's playing. Step 2: a one-tap team switch for each of them.
   const playing = (name: string) => admin.getByLabel(`${name} playing`).check();
   const team = (name: string, t: string) => admin.getByRole('button', { name: `${name}: ${t}` }).click();
@@ -643,7 +644,7 @@ test('a two-v-two event is paired automatically when the teams are saved', async
   await expect(card).toContainText('Davies');
 
   // Swap a player: the pairing follows.
-  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await openEvent(admin, ev!.id);
   await admin.getByRole('tab', { name: /Who's playing/ }).click();
   await admin.getByLabel('Dan Davies playing').uncheck();
   await playing('Ed Evans');
@@ -669,7 +670,7 @@ test('a day has a course and tees, and a player can play off a different tee', a
   const admin = await newPhone(browser);
   await loginAdmin(admin);
   const { data: ev } = await db.from('events').select('id').eq('is_active', true).single();
-  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await openEvent(admin, ev!.id);
   await expect(admin.getByLabel('Tees').first()).toHaveValue(main!.id);
   await admin.getByText('Players on different tees').first().click();
   await admin.getByLabel('Alex Adams tee on Day 1').selectOption(red!.id);
@@ -690,8 +691,9 @@ test('a day has a course and tees, and a player can play off a different tee', a
   // Moving Day 1 to another course drops tees from the old one.
   const { data: other } = await db.from('courses').insert({ name: 'Other Links' }).select('id').single();
   await db.from('course_holes').insert(holes!.map((h) => ({ ...h, course_id: other!.id })));
-  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await openEvent(admin, ev!.id);
   await admin.reload(); // pick up the course the test just added
+  await unfoldEvent(admin);
   await admin.getByLabel('Course').first().selectOption('Other Links');
   await admin.getByRole('button', { name: 'Save round' }).first().click();
   await expect(admin.getByText('Day 1 saved')).toBeVisible();
@@ -725,10 +727,10 @@ test("an untouched score defaults to the par of the player's own tee", async ({ 
 test('the admin can hide the Leaderboard tab from players; they land on Scores', async ({ browser }) => {
   const admin = await newPhone(browser);
   await loginAdmin(admin);
-  await admin.goto(`/#/admin/events/${await activeEventId()}`);
+  await openEvent(admin, await activeEventId());
   await admin.getByText('More options').click();
   await admin.getByLabel(/Show the Leaderboard tab to players/).uncheck();
-  await admin.getByRole('button', { name: 'Save tab settings' }).click();
+  await admin.getByRole('button', { name: 'Save settings' }).click();
   await expect(admin.getByText('Event saved')).toBeVisible();
   await expect(admin.locator('nav a', { hasText: 'Leaderboard' })).toHaveCount(1); // the admin still sees it
 
@@ -761,7 +763,7 @@ test('a day can be played as a flat fourball: no shots, lower best gross wins th
 
   const admin = await newPhone(browser);
   await loginAdmin(admin);
-  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await openEvent(admin, ev!.id);
   await admin.getByLabel('Fourball game').first().selectOption('flat');
   await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1
   await admin.getByRole('button', { name: 'Save round' }).first().click();
@@ -878,7 +880,7 @@ test('a day can be a 2-man scramble: one score per team, saved for both players'
   const { data: ev } = await db.from('events').select('id').eq('is_active', true).single();
   const admin = await newPhone(browser);
   await loginAdmin(admin);
-  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await openEvent(admin, ev!.id);
   await admin.getByLabel('Fourball game').first().selectOption('scramble');
   await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1
   await admin.getByRole('button', { name: 'Save round' }).first().click();
@@ -956,7 +958,7 @@ test("the admin ticks who's playing (search, select all, clear), then puts them 
   const { data: ev } = await db.from('events').insert({ name: 'Winter League', is_active: true, team_a_name: 'Ballymena', team_b_name: 'Coleraine' }).select('id').single();
   const admin = await newPhone(browser);
   await loginAdmin(admin);
-  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await openEvent(admin, ev!.id);
   await expect(admin.getByRole('tab', { name: /Who's playing/ })).toHaveAttribute('aria-selected', 'true'); // nobody yet
   await expect(admin.getByText('0 of 12 playing')).toBeVisible();
 
@@ -995,7 +997,7 @@ test('saving teams of more than four without pairings warns (but saves), and eac
 
   const admin = await newPhone(browser);
   await loginAdmin(admin);
-  await admin.goto(`/#/admin/events/${ev!.id}`);
+  await openEvent(admin, ev!.id);
   await expect(admin.getByTestId('pairing-status')).toHaveText('Pairings not set yet');
   const names = ['Alex Adams', 'Ben Brown', 'Chris Clark', 'Dan Davies', 'Ed Evans', 'Finn Fox', 'Gus Green', 'Harry Hill'];
   for (const n of names) await admin.getByLabel(`${n} playing`).check();
@@ -1014,7 +1016,7 @@ test('saving teams of more than four without pairings warns (but saves), and eac
 test("an event's Add round form stays tucked away until '+ Add round' is pressed", async ({ browser }) => {
   const admin = await newPhone(browser);
   await loginAdmin(admin);
-  await admin.goto(`/#/admin/events/${await activeEventId()}`); // the seed event already has days
+  await openEvent(admin, await activeEventId()); // the seed event already has days
   await expect(admin.getByRole('heading', { name: 'Add round' })).toHaveCount(0);
   await admin.getByRole('button', { name: '+ Add round' }).click();
   await expect(admin.getByRole('heading', { name: 'Add round' })).toBeVisible();
@@ -1122,7 +1124,7 @@ test("an event's share link lets anyone follow and score without signing in, unt
   const admin = await newPhone(browser);
   admin.on('dialog', (d) => void d.accept());
   await loginAdmin(admin);
-  await admin.goto(`/#/admin/events/${await activeEventId()}`);
+  await openEvent(admin, await activeEventId());
   const card = admin.getByTestId('share-link');
   await card.getByRole('button', { name: 'Create share link' }).click();
   const url = (await card.getByTestId('share-url').textContent())!.trim();
@@ -1198,3 +1200,85 @@ test('Admin → Players is a compact list: search, filter to the event, tap a pl
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByRole('heading', { name: 'Add player' })).toHaveCount(0);
 });
+
+test('the admin can switch player photos off for an event; everyone then shows initials', async ({ browser }) => {
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.goto('/#/admin/players');
+  const adams = admin.getByTestId('admin-player').filter({ hasText: 'Alex Adams' });
+  await adams.getByRole('button').first().click();
+  await adams.locator('input[type=file]').setInputFiles('public/icon-512.png');
+  await expect(adams.locator('img')).toBeVisible();
+
+  const me = await newPhone(browser);
+  await login(me);
+  await expect(group1Card(me).getByRole('img', { name: 'Adams' })).toBeVisible({ timeout: 20_000 });
+
+  await openEvent(admin, await activeEventId());
+  await admin.getByText('More options').click();
+  await expect(admin.getByText('1 of 12 players have one')).toBeVisible();
+  await admin.getByLabel('Show player photos').uncheck();
+  await admin.getByRole('button', { name: 'Save settings' }).click();
+  await expect(admin.getByText('Event saved')).toBeVisible();
+
+  await me.reload();
+  await expect(group1Card(me)).toContainText('Adams');
+  await expect(group1Card(me).getByRole('img')).toHaveCount(0);
+  // Admin → Players still shows it, so photos can be managed.
+  await admin.goto('/#/admin/players');
+  await expect(admin.getByTestId('admin-player').filter({ hasText: 'Alex Adams' }).locator('img')).toBeVisible();
+});
+
+test('a scramble day can take a different % of the low and the high handicap', async ({ browser }) => {
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await openEvent(admin, await activeEventId());
+  const day1 = admin.getByTestId('round').first();
+  await day1.getByLabel('Fourball game').selectOption('scramble');
+  await expect(day1.getByLabel('Low handicap %')).toHaveValue('35'); // new rounds start at 35% / 15%
+  await expect(day1.getByLabel('High handicap %')).toHaveValue('15');
+  await expect(day1.getByTestId('scramble-example')).toContainText('team plays off 6'); // 2.8 + 3 = 5.8
+  await day1.getByLabel('High handicap %').fill('35');
+  await expect(day1.getByTestId('scramble-example')).toContainText('team plays off 10'); // 2.8 + 7 = 9.8
+  await day1.getByLabel('High handicap %').fill('15');
+  await day1.getByRole('button', { name: 'Save round' }).click();
+  await expect(admin.getByText('Day 1 saved')).toBeVisible();
+  await expect(day1.locator('summary')).toContainText('2-man scramble 35/15');
+
+  // Adams & Brown are both 10: 3.5 + 1.5 = 5 (35% each would be 7).
+  const me = await newPhone(browser);
+  await login(me);
+  await openGroup1(me);
+  await expect(me.getByTestId('row-A1')).toContainText('(5)');
+});
+
+test("a round's course guide can be previewed from the event page, as players see it", async ({ browser }) => {
+  const db = serviceDb();
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  const eventId = await activeEventId();
+  await openEvent(admin, eventId);
+  const day1 = admin.getByTestId('round').first();
+  await expect(day1).toContainText('No course guide yet'); // Seed Links has no guide…
+  // …until it has photos. The seed doesn't wipe guide photos, so the row goes again at the end.
+  const path = 'Seed Links/1/e2e.webp';
+  await db.from('guide_photos').insert({ course_name: 'Seed Links', hole: 1, path });
+  try {
+    await previewSeedGuide(admin, eventId);
+  } finally {
+    await db.from('guide_photos').delete().eq('path', path);
+  }
+});
+
+async function previewSeedGuide(admin: import('@playwright/test').Page, eventId: string) {
+  await admin.reload();
+  await expect(admin.getByRole('heading', { name: 'Rounds' })).toBeVisible();
+  await admin.getByTestId('round').first().locator('summary').click();
+  await admin.getByRole('link', { name: 'View course guide →' }).first().click();
+
+  await expect(admin.getByTestId('guide-preview')).toContainText('Preview · as players see it');
+  await expect(admin.getByRole('tab', { name: 'Seed Links' })).toBeVisible();
+  await expect(admin.getByTestId('guide-title')).toContainText('Hole 1 · Par 4');
+  await admin.getByRole('link', { name: '← Back to event' }).click();
+  await expect(admin).toHaveURL(new RegExp(`#/admin/events/${eventId}$`));
+}

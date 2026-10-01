@@ -17,6 +17,8 @@ export interface EventRow {
   show_form: boolean;
   /** Show players the Leaderboard tab (off: they land on Scores; the admin still sees it). */
   show_leaderboard: boolean;
+  /** Show players' photos (off: coloured initials for everyone, so a half-photographed field looks even). */
+  show_photos: boolean;
   /** The share link token (#/watch/<token>); null = no link. */
   watch_token: string | null;
 }
@@ -29,6 +31,8 @@ export interface RoundRow {
   singles_pairing: 'handicap' | 'random' | 'selected';
   /** The fourball game: match play off the lowest handicap, Stableford off full handicaps, or flat (no shots). */
   fourball_format: 'matchplay' | 'stableford' | 'flat' | 'scramble';
+  /** 2-man scramble: % of the lower and the higher partner's handicap that make the team handicap. */
+  scramble_low_pct: number; scramble_high_pct: number;
 }
 export interface GroupRow {
   id: string; round_id: string; group_no: number; tee_time: string | null;

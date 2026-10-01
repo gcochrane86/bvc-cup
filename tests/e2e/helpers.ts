@@ -78,3 +78,13 @@ export async function loginAdmin(page: Page) {
   await page.getByRole('button', { name: 'Enter' }).click();
   await expect(page.getByRole('heading', { name: 'Admin', exact: true })).toBeVisible();
 }
+
+/** Open an event's admin page with every round tile and the Players section unfolded (as if each were tapped). */
+export async function openEvent(page: Page, eventId: string) {
+  await page.goto(`/#/admin/events/${eventId}`);
+  await unfoldEvent(page);
+}
+export async function unfoldEvent(page: Page) {
+  await expect(page.getByRole('heading', { name: 'Rounds' })).toBeVisible();
+  await page.evaluate(() => document.querySelectorAll<HTMLDetailsElement>('details.round, details.fold').forEach((d) => (d.open = true)));
+}
