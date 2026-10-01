@@ -15,7 +15,8 @@
     "icons": "node --import tsx scripts/make-icons.ts",
     "copy-to-prod": "node --import tsx scripts/copy-to-prod.ts",
     "add-ballyliffen": "node --import tsx scripts/add-ballyliffen.ts",
-    "add-trip-tees": "node --import tsx scripts/add-trip-tees.ts"
+    "add-trip-tees": "node --import tsx scripts/add-trip-tees.ts",
+    "add-portrush": "node --import tsx scripts/add-portrush.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",
