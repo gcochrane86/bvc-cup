@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGame, computeGameState, gameFor, gameResult, gamesToSet, sixPoints, winnerIds } from './individual';
+import { buildGame, computeGameState, eventKindFor, gameFor, gameResult, gamesToSet, sixPoints, winnerIds } from './individual';
 import { indexScores } from './matchState';
 import type { HoleInfo, RoundSettings, ScoreEntry } from './types';
 
@@ -169,5 +169,16 @@ describe('gamesToSet', () => {
     expect(gamesToSet([], 3)).toEqual({ pair: false, three: true });
     expect(gamesToSet([], 5)).toEqual({ pair: true, three: true });
     expect(gamesToSet([], 0)).toEqual({ pair: true, three: true });
+  });
+});
+
+describe('eventKindFor', () => {
+  it('2 or 3 players play an individual game; 4 or more play fourballs as a team event', () => {
+    expect(eventKindFor(2)).toBe('individual');
+    expect(eventKindFor(3)).toBe('individual');
+    expect(eventKindFor(4)).toBe('team');
+    expect(eventKindFor(12)).toBe('team');
+    expect(eventKindFor(0)).toBe('team');
+    expect(eventKindFor(1)).toBe('team');
   });
 });

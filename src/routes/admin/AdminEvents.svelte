@@ -8,7 +8,6 @@
   let rounds = $state<{ event_id: string; course_id: string }[]>([]);
   let entries = $state<{ event_id: string }[]>([]);
   let name = $state('');
-  let kind = $state<'team' | 'individual'>('team');
   let adding = $state(false);
   let error = $state<string | null>(null);
   let msg = $state<string | null>(null);
@@ -44,7 +43,7 @@
   async function create(e: SubmitEvent) {
     e.preventDefault();
     try {
-      const ev = (await must(supabase.from('events').insert({ name: name.trim(), kind }).select().single())) as EventRow;
+      const ev = (await must(supabase.from('events').insert({ name: name.trim() }).select().single())) as EventRow;
       location.hash = `#/admin/events/${ev.id}`;
     } catch (err) {
       error = (err as Error).message;
@@ -83,10 +82,6 @@
 {#if adding || !events.length}
   <form class="card" onsubmit={create}>
     <div class="field"><label for="en">New event name</label><input id="en" bind:value={name} required placeholder="Portugal 2026" /></div>
-    <fieldset class="kind">
-      <label><input type="radio" name="kind" value="team" bind:group={kind} /> Team cup</label>
-      <label><input type="radio" name="kind" value="individual" bind:group={kind} /> Individual <span class="muted small">(2- and 3-player games)</span></label>
-    </fieldset>
     <div class="actions">
       <button type="submit">Create event</button>
       {#if events.length}<button type="button" class="secondary" onclick={() => (adding = false)}>Cancel</button>{/if}
@@ -110,8 +105,6 @@
   .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .head button { padding: 8px 14px; }
   .actions { display: flex; gap: 8px; }
-  .kind { border: 0; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 8px 16px; }
-  .kind label { display: flex; gap: 6px; align-items: center; }
   .tile { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 16px 40px 16px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); color: var(--text); text-decoration: none; }
   .tile .name { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; }
   .tile .sub { color: var(--muted); font-size: 0.85rem; }

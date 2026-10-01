@@ -62,43 +62,60 @@ test('confirming individual games: a flat match play 2-ball and a 2 v 1', async 
   expect(Object.keys(solo.player_points ?? {})).toHaveLength(3);
 });
 
-test("the admin creates an individual event, picks players and sets a day's games", async ({ page }) => {
+test("an event with 3 players becomes a 3-ball: no teams, its group made automatically, only the 3-player game", async ({ page }) => {
   await loginAdmin(page);
   await page.goto('/#/admin/events');
   await page.getByRole('button', { name: '+ New event' }).click();
+  await expect(page.getByLabel('Individual')).toHaveCount(0); // no team/individual choice
   await page.getByLabel('New event name').fill('Winter Swindle');
-  await page.getByLabel('Individual').check();
   await page.getByRole('button', { name: 'Create event' }).click();
   await expect(page).toHaveURL(/#\/admin\/events\/[0-9a-f-]{36}$/);
   const eventId = page.url().split('/events/')[1];
-
-  await expect(page.getByLabel('Team A name')).toHaveCount(0); // no teams
-  for (const n of ['Alex Adams', 'Ben Brown', 'Chris Clark']) await page.getByLabel(`${n} playing`).check();
-  await page.getByRole('button', { name: 'Save players' }).click();
-  await expect(page.getByText('Players saved')).toBeVisible();
 
   const form = page.locator('form.round');
   await form.getByLabel('Course').selectOption('Seed Links');
   await form.getByRole('button', { name: 'Add round' }).click();
   await expect(page.getByText('Round added')).toBeVisible();
+
+  await unfoldEvent(page);
+  for (const n of ['Alex Adams', 'Ben Brown', 'Chris Clark']) await page.getByLabel(`${n} playing`).check();
+  await page.getByRole('button', { name: 'Save players' }).click(); // 3 players: no team step
+  await expect(page.getByText(/Players saved/)).toBeVisible();
+  await expect(page.getByLabel('Team A name')).toHaveCount(0);
+
   await unfoldEvent(page);
   const day1 = page.getByTestId('round').first();
   await expect(day1.getByLabel('Fourball game')).toHaveCount(0);
-  // 3 players and no groups yet: they can only be a 3-ball, so only the 3-player game is shown.
   await expect(day1.getByLabel(/2-player game|groups of 2/)).toHaveCount(0);
-  await expect(day1.getByText('Stableford match play off the low man')).toHaveCount(0);
+  await expect(day1.locator('summary')).toContainText('1 group set');
   await day1.getByLabel('3-player game').selectOption('two_v_one');
   await day1.getByRole('button', { name: 'Save round' }).click();
   await expect(page.getByText('Day 1 saved')).toBeVisible();
-  await expect(day1.locator('summary')).toContainText('2 v 1 Stableford');
-  await expect(day1.locator('summary')).not.toContainText('match play');
 
   const db = serviceDb();
   expect((await db.from('events').select('kind').eq('id', eventId).single()).data).toEqual({ kind: 'individual' });
   const eps = (await db.from('event_players').select('team').eq('event_id', eventId)).data!;
   expect(eps).toHaveLength(3);
   expect(eps.every((e) => e.team === null)).toBe(true);
-  expect((await db.from('rounds').select('three_game').eq('event_id', eventId).single()).data).toEqual({ three_game: 'two_v_one' });
+  const round = (await db.from('rounds').select('id, three_game').eq('event_id', eventId).single()).data!;
+  expect(round.three_game).toBe('two_v_one');
+  const groups = (await db.from('groups').select('group_players(slot)').eq('round_id', round.id)).data!;
+  expect(groups).toHaveLength(1);
+  expect((groups[0].group_players as { slot: string }[]).map((g) => g.slot).sort()).toEqual(['P1', 'P2', 'P3']);
+});
+
+test('4 or more players still pick teams, as today', async ({ page }) => {
+  await loginAdmin(page);
+  await page.goto('/#/admin/events');
+  await page.getByRole('button', { name: '+ New event' }).click();
+  await page.getByLabel('New event name').fill('Big Day');
+  await page.getByRole('button', { name: 'Create event' }).click();
+  await expect(page).toHaveURL(/#\/admin\/events\/[0-9a-f-]{36}$/);
+  await unfoldEvent(page);
+  for (const n of ['Alex Adams', 'Ben Brown', 'Chris Clark', 'Dan Davies']) await page.getByLabel(`${n} playing`).check();
+  await expect(page.getByRole('button', { name: 'Save players' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Next: pick teams (4)' })).toBeVisible();
+  await expect(page.getByLabel('Team A name')).toBeVisible();
 });
 
 test('the admin builds a 2-ball and a 2 v 1 3-ball for an individual day, choosing the single', async ({ page }) => {

@@ -4,7 +4,7 @@
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
   import { courseGroups, teesOf } from '../../lib/courses';
-  import { autoFourball, gameLabel, gamesToSet, scrambleHandicap } from '../../lib/scoring';
+  import { autoFourball, eventKindFor, gameLabel, gamesToSet, scrambleHandicap } from '../../lib/scoring';
   import { courseGuide } from '../../lib/guides';
   import ResetScores from '../../components/ResetScores.svelte';
   import ConfirmedResults from '../../components/ConfirmedResults.svelte';
@@ -107,6 +107,8 @@
   const individual = $derived(event?.kind === 'individual');
   let search = $state('');
   const playingIds = $derived(db.players.filter((p) => members[p.id]?.playing).map((p) => p.id));
+  /** 2 or 3 ticked: one individual group, so players are just saved (no teams). 4 or more: teams, as before. */
+  const smallGroup = $derived(eventKindFor(playingIds.length) === 'individual');
   const savedPlaying = $derived(playingIds.filter((id) => members[id].team).length);
   const fourballs = $derived(Math.floor(savedPlaying / 4));
   const pairingStatus = (r: RoundRow) => {
@@ -163,15 +165,42 @@
       );
     }, 'Event saved');
 
-  /** Individual events: everyone ticked plays, with no team. */
+  /** 2 or 3 players: everyone ticked plays with no team, the event becomes individual, and each day gets its group. */
   const savePlayers = () =>
     act(async () => {
+      await must(supabase.from('events').update({ kind: 'individual' }).eq('id', eventId));
       const entries = Object.entries(members);
       const rows = entries.filter(([, m]) => m.playing).map(([player_id, m]) => ({ event_id: eventId, player_id, team: null, handicap: Number(m.handicap) }));
       const removed = entries.filter(([, m]) => !m.playing).map(([id]) => id);
       if (rows.length) await must(supabase.from('event_players').upsert(rows));
       if (removed.length) await must(supabase.from('event_players').delete().eq('event_id', eventId).in('player_id', removed));
+      const grouped = await groupEveryDay(rounds);
+      return grouped.length ? `Players saved · group set for ${grouped.join(', ')}` : 'Players saved';
     }, 'Players saved');
+
+  /**
+   * 2 or 3 players are one group, so make it on every day (P1, P2, P3 in name order). A day whose group already
+   * has these players (e.g. the admin chose the single) or whose game is confirmed is left alone.
+   */
+  async function groupEveryDay(days: RoundRow[]): Promise<string[]> {
+    const ids = playingIds;
+    if (eventKindFor(ids.length) !== 'individual') return [];
+    const done: string[] = [];
+    for (const r of days) {
+      const gs = (await must(
+        supabase.from('groups').select('group_no, group_players(player_id), match_results(match_type)').eq('round_id', r.id),
+      )) as { group_no: number; group_players: { player_id: string }[]; match_results: unknown[] }[];
+      if (gs.some((g) => g.match_results.length)) continue;
+      const g1 = gs.find((g) => g.group_no === 1);
+      const same = g1 && g1.group_players.length === ids.length && g1.group_players.every((gp) => ids.includes(gp.player_id));
+      if (!same) {
+        await must(supabase.rpc('save_group', { p_round_id: r.id, p_group_no: 1, p_tee_time: null, p_slots: ids.map((player_id, i) => ({ slot: `P${i + 1}`, player_id })) }));
+      }
+      if (gs.some((g) => g.group_no > 1)) await must(supabase.from('groups').delete().eq('round_id', r.id).gt('group_no', 1));
+      done.push(r.name);
+    }
+    return done;
+  }
 
   const saveMembers = async () => {
     await saveTeams();
@@ -180,6 +209,7 @@
   };
   const saveTeams = () =>
     act(async () => {
+      if (individual) await must(supabase.from('events').update({ kind: 'team' }).eq('id', eventId));
       const entries = Object.entries(members);
       const rows = entries
         .filter(([, m]) => m.playing && m.team)
@@ -232,8 +262,8 @@
           .select()
           .single(),
       )) as RoundRow;
-      const paired = await pairTwoVTwo([added]);
-      return paired.length ? `Round added · pairings set for ${added.name}` : 'Round added';
+      const paired = individual ? await groupEveryDay([added]) : await pairTwoVTwo([added]);
+      return paired.length ? `Round added · ${individual ? 'group' : 'pairings'} set for ${added.name}` : 'Round added';
     }, 'Round added').then(() => {
       newRound = { name: '', course: '', course_id: '', date: '' };
       adding = false;
@@ -304,15 +334,15 @@
 
   <details class="card fold" bind:open={playersOpen}>
     <summary class="tile">
-      {#if individual}
-        <span><h2>Players</h2><span class="sub">{playingIds.length} playing</span></span>
+      {#if individual || smallGroup}
+        <span><h2>Players</h2><span class="sub">{playingIds.length} playing{smallGroup ? ` · a ${playingIds.length}-ball` : ''}</span></span>
         <span class="pill" class:todo={playingIds.length < 2}>{playingIds.length >= 2 ? 'Players ✓' : 'Pick players'}</span>
       {:else}
         <span><h2>Players</h2><span class="sub">{savedPlaying} playing · {countA} v {countB}</span></span>
         <span class="pill" class:todo={!savedPlaying || unassigned.length > 0}>{savedPlaying && !unassigned.length ? 'Teams ✓' : 'Set teams'}</span>
       {/if}
     </summary>
-    {#if !individual}
+    {#if !smallGroup}
     <div class="steps" role="tablist">
       <button role="tab" aria-selected={teamStep === 'who'} class:on={teamStep === 'who'} onclick={() => (teamStep = 'who')}>
         1 · Who's playing{teamStep === 'teams' && playingIds.length ? ' ✓' : ''}
@@ -321,7 +351,7 @@
     </div>
     {/if}
 
-    {#if individual || teamStep === 'who'}
+    {#if smallGroup || teamStep === 'who'}
       <p class="muted small">Tick everyone taking part. Handicap indexes are set on the <a href="#/admin/players">Players</a> page.</p>
       <input class="search" type="search" placeholder="Search players" bind:value={search} />
       <div class="pickbar">
@@ -339,8 +369,9 @@
           <p class="muted small">No players match “{search}”.</p>
         {/each}
       </div>
-      {#if individual}
-        <button class="wide" disabled={!playingIds.length} onclick={savePlayers}>Save players</button>
+      {#if smallGroup}
+        <p class="muted small">2 or 3 players play one group: a 2-ball or 3-ball game. Pick 4 or more for teams and fourballs.</p>
+        <button class="wide" onclick={savePlayers}>Save players</button>
       {:else}
         <button class="wide" disabled={!playingIds.length} onclick={() => ((teamStep = 'teams'), (search = ''))}>Next: pick teams ({playingIds.length}) →</button>
       {/if}

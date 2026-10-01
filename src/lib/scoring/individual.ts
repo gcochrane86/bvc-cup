@@ -186,3 +186,6 @@ export function gamesToSet(groupSizes: number[], players: number): { pair: boole
   if (players === 3) return { pair: false, three: true };
   return { pair: true, three: true };
 }
+
+/** 2 or 3 players make one individual group (a 2-ball or a 3-ball); 4 or more play fourballs as a team event. */
+export const eventKindFor = (players: number): 'team' | 'individual' => (players === 2 || players === 3 ? 'individual' : 'team');
