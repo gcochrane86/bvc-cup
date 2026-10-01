@@ -8,3 +8,4 @@ export * from './pairings';
 export * from './courses';
 export * from './format';
 export * from './pairNet';
+export * from './individual';

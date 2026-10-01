@@ -1,7 +1,15 @@
 export type Team = 'A' | 'B';
-export type Slot = 'A1' | 'A2' | 'B1' | 'B2';
-export type MatchType = 'better_ball' | 'low_singles' | 'high_singles';
+/** A1–B2: a fourball's positions. P1–P3: an individual group's (in a 2 v 1, P1 plays alone). */
+export type Slot = 'A1' | 'A2' | 'B1' | 'B2' | 'P1' | 'P2' | 'P3';
+export type MatchType = 'better_ball' | 'low_singles' | 'high_singles' | 'individual';
 export type Outcome = Team | 'halved';
+/** A result's winner: a side, halved, or (six pointer) a position. */
+export type Winner = Outcome | 'P1' | 'P2' | 'P3';
+export type PairGame = 'stableford' | 'flat_match' | 'stableford_match';
+export type ThreeGame = 'six_stableford' | 'six_flat' | 'two_v_one';
+export type IndividualGame = PairGame | ThreeGame;
+/** A player's figures from a confirmed individual game: game points and Stableford total. */
+export interface PlayerPoints { points: number; stableford: number }
 
 export interface HoleInfo {
   hole: number;
@@ -20,6 +28,15 @@ export interface RoundSettings {
   /** 2-man scramble: % of the lower and the higher partner's course handicap that make the team handicap (default 35 each). */
   scrambleLowPct?: number;
   scrambleHighPct?: number;
+  /** Individual events: the 2-player game, the 3-player game, and handicap settings. */
+  pairGame?: PairGame;
+  threeGame?: ThreeGame;
+  /** % of course handicap in the Stableford games (default 100). */
+  stablefordPct?: number;
+  /** Stableford match play off the low man: % of the difference (default 85). */
+  matchPct?: number;
+  /** Stableford match play: off the low man (default) or full handicaps. */
+  matchOffLow?: boolean;
 }
 
 export interface SlotPlayer {
@@ -53,6 +70,12 @@ export interface MatchDef {
   teamHandicap?: Record<string, number>;
   /** Players on a tee other than the day's main tee: that tee's holes (own par and stroke index). */
   teeHoles?: Record<string, HoleInfo[]>;
+  /** Individual events: the game this group plays. */
+  game?: IndividualGame;
+  /** Individual events: the players in position order (P1, P2, P3). */
+  players?: string[];
+  /** Individual events: each player's strokes off full handicap × the Stableford % (for Stableford totals). */
+  stablefordStrokes?: Record<string, number>;
 }
 
 export interface MatchState {
@@ -66,7 +89,7 @@ export interface MatchState {
   running: (number | null)[];
   decided: boolean;
   dormie: boolean;
-  winner: Outcome | null;
+  winner: Winner | null;
   finalHole: number | null;
   /** '4&3', '2 UP', 'Halved' — only when decided. */
   resultText: string | null;
@@ -74,14 +97,20 @@ export interface MatchState {
   statusText: string;
   projectedA: number;
   projectedB: number;
+  /** Individual totals games: each player's points so far (six pointer points, or Stableford points). */
+  totals?: Record<string, number>;
+  /** Individual games: each player's Stableford total off full handicap × the Stableford %, over the holes scored. */
+  stableford?: Record<string, number>;
 }
 
 export interface ConfirmedResult {
   groupId: string;
   matchType: MatchType;
-  winner: Outcome;
+  winner: Winner;
   pointsA: number;
   pointsB: number;
   resultText: string;
   finalHole: number;
+  /** Individual games: each player's game points and Stableford total. */
+  playerPoints?: Record<string, PlayerPoints>;
 }

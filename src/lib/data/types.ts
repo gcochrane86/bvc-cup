@@ -1,4 +1,4 @@
-import type { MatchType, Outcome, Slot, Team } from '../scoring';
+import type { MatchType, PlayerPoints, Slot, Team, Winner } from '../scoring';
 
 export interface PlayerRow { id: string; name: string; short_name: string; default_handicap: number; photo_path: string | null }
 /** A course record is one tee of a course: records sharing a name are that course's tees (tee null = one unnamed tee). */
@@ -51,8 +51,10 @@ export interface ScoreRow {
   updated_at?: string;
 }
 export interface MatchResultRow {
-  group_id: string; match_type: MatchType; winner: Outcome;
+  group_id: string; match_type: MatchType; winner: Winner;
   points_a: number; points_b: number; result_text: string; final_hole: number; confirmed_at: string;
+  /** Individual games: each player's game points and Stableford total. */
+  player_points?: Record<string, PlayerPoints> | null;
 }
 
 /** Everything the app displays for the active event. */

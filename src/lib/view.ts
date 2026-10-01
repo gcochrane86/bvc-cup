@@ -185,6 +185,7 @@ const LABELS: Record<MatchType, string> = {
   better_ball: 'Fourball',
   low_singles: 'Singles 1',
   high_singles: 'Singles 2',
+  individual: 'Game',
 };
 export const matchLabel = (type: MatchType) => LABELS[type];
 
