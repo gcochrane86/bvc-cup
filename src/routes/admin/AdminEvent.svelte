@@ -4,7 +4,7 @@
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
   import { courseGroups, teesOf } from '../../lib/courses';
-  import { autoFourball, scrambleHandicap } from '../../lib/scoring';
+  import { autoFourball, gameLabel, scrambleHandicap } from '../../lib/scoring';
   import { courseGuide } from '../../lib/guides';
   import ResetScores from '../../components/ResetScores.svelte';
   import ConfirmedResults from '../../components/ConfirmedResults.svelte';
@@ -64,8 +64,9 @@
         >,
       ]);
       roundTees = tees;
-      // Fourballs with all four players, per day (for each day's pairing status).
-      paired = Object.fromEntries(ids.map((id) => [id, gs.filter((g) => g.round_id === id && g.group_players.length === 4).length]));
+      // Full groups per day (for each day's pairing status): fourballs of four, or individual groups of 2–3.
+      const full = ev.kind === 'individual' ? 2 : 4;
+      paired = Object.fromEntries(ids.map((id) => [id, gs.filter((g) => g.round_id === id && g.group_players.length >= full).length]));
       locked = new Set(gs.filter((g) => g.match_results.length).flatMap((g) => g.group_players.map((gp) => `${g.round_id}:${gp.player_id}`)));
     }
     members = Object.fromEntries(
@@ -99,12 +100,15 @@
 
   // Step 1 (who's playing, with search) and step 2 (a one-tap team switch for each of them).
   let teamStep = $state<'who' | 'teams'>('teams');
+  /** Individual events: no teams, so players are just ticked and each day has 2- and 3-player games. */
+  const individual = $derived(event?.kind === 'individual');
   let search = $state('');
   const playingIds = $derived(db.players.filter((p) => members[p.id]?.playing).map((p) => p.id));
   const savedPlaying = $derived(playingIds.filter((id) => members[id].team).length);
   const fourballs = $derived(Math.floor(savedPlaying / 4));
   const pairingStatus = (r: RoundRow) => {
     const done = paired[r.id] ?? 0;
+    if (individual) return done > 0 ? `${done} group${done === 1 ? '' : 's'} set ✓` : 'Groups not set yet';
     if (fourballs > 0 && done >= fourballs) return 'Pairings set ✓';
     if (done > 0) return `${done} of ${fourballs} fourballs paired`;
     return 'Pairings not set yet';
@@ -113,7 +117,8 @@
   const roundDate = (d: string | null) =>
     d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'No date';
   const roundGame = (r: RoundRow) =>
-    r.fourball_format === 'matchplay' ? `${GAMES.matchplay} ${Number(r.allowance_pct)}%`
+    individual ? `${gameLabel(r.pair_game)} · ${gameLabel(r.three_game)}`
+    : r.fourball_format === 'matchplay' ? `${GAMES.matchplay} ${Number(r.allowance_pct)}%`
     : r.fourball_format === 'scramble' ? `${GAMES.scramble} ${Number(r.scramble_low_pct)}/${Number(r.scramble_high_pct)}`
     : GAMES[r.fourball_format];
   const guideFor = (r: RoundRow) => courseGuide(courseName(r.course_id), photoCourses());
@@ -152,6 +157,16 @@
       );
     }, 'Event saved');
 
+  /** Individual events: everyone ticked plays, with no team. */
+  const savePlayers = () =>
+    act(async () => {
+      const entries = Object.entries(members);
+      const rows = entries.filter(([, m]) => m.playing).map(([player_id, m]) => ({ event_id: eventId, player_id, team: null, handicap: Number(m.handicap) }));
+      const removed = entries.filter(([, m]) => !m.playing).map(([id]) => id);
+      if (rows.length) await must(supabase.from('event_players').upsert(rows));
+      if (removed.length) await must(supabase.from('event_players').delete().eq('event_id', eventId).in('player_id', removed));
+    }, 'Players saved');
+
   const saveMembers = async () => {
     await saveTeams();
     // More than one fourball can't be paired automatically: point at any day still needing pairings.
@@ -175,6 +190,7 @@
    * change of teams). Days whose match is confirmed are left alone. Returns the names of the days paired.
    */
   async function pairTwoVTwo(days: RoundRow[]): Promise<string[]> {
+    if (individual) return [];
     const slots = autoFourball(
       Object.entries(members)
         .filter(([, m]) => m.playing && m.team)
@@ -235,6 +251,11 @@
               singles_allowance_pct: Number(r.singles_allowance_pct),
               singles_pairing: r.singles_pairing,
               fourball_format: r.fourball_format,
+              pair_game: r.pair_game,
+              three_game: r.three_game,
+              stableford_pct: Number(r.stableford_pct),
+              match_pct: Number(r.match_pct),
+              match_off_low: r.match_off_low,
               scramble_low_pct: Number(r.scramble_low_pct),
               scramble_high_pct: Number(r.scramble_high_pct),
             })
@@ -257,6 +278,7 @@
   <section class="card">
     <h2>Event</h2>
     <div class="field"><label for="evn">Name</label><input id="evn" bind:value={event.name} /></div>
+    {#if !individual}
     <div class="teams">
       <div class="field">
         <label for="ta">Team A name</label>
@@ -267,6 +289,7 @@
         <span class="team"><input id="tb" bind:value={event.team_b_name} /><input aria-label="Team B colour" type="color" bind:value={event.team_b_colour} /></span>
       </div>
     </div>
+    {/if}
     <label class="setting"><span>Active event<span class="sub">Shown on the leaderboard</span></span><input class="switch" type="checkbox" bind:checked={event.is_active} /></label>
     <button onclick={saveDetails}>Save event</button>
   </section>
@@ -275,17 +298,24 @@
 
   <details class="card fold" bind:open={playersOpen}>
     <summary class="tile">
-      <span><h2>Players</h2><span class="sub">{savedPlaying} playing · {countA} v {countB}</span></span>
-      <span class="pill" class:todo={!savedPlaying || unassigned.length > 0}>{savedPlaying && !unassigned.length ? 'Teams ✓' : 'Set teams'}</span>
+      {#if individual}
+        <span><h2>Players</h2><span class="sub">{playingIds.length} playing</span></span>
+        <span class="pill" class:todo={playingIds.length < 2}>{playingIds.length >= 2 ? 'Players ✓' : 'Pick players'}</span>
+      {:else}
+        <span><h2>Players</h2><span class="sub">{savedPlaying} playing · {countA} v {countB}</span></span>
+        <span class="pill" class:todo={!savedPlaying || unassigned.length > 0}>{savedPlaying && !unassigned.length ? 'Teams ✓' : 'Set teams'}</span>
+      {/if}
     </summary>
+    {#if !individual}
     <div class="steps" role="tablist">
       <button role="tab" aria-selected={teamStep === 'who'} class:on={teamStep === 'who'} onclick={() => (teamStep = 'who')}>
         1 · Who's playing{teamStep === 'teams' && playingIds.length ? ' ✓' : ''}
       </button>
       <button role="tab" aria-selected={teamStep === 'teams'} class:on={teamStep === 'teams'} onclick={() => (teamStep = 'teams')}>2 · Teams</button>
     </div>
+    {/if}
 
-    {#if teamStep === 'who'}
+    {#if individual || teamStep === 'who'}
       <p class="muted small">Tick everyone taking part. Handicap indexes are set on the <a href="#/admin/players">Players</a> page.</p>
       <input class="search" type="search" placeholder="Search players" bind:value={search} />
       <div class="pickbar">
@@ -303,7 +333,11 @@
           <p class="muted small">No players match “{search}”.</p>
         {/each}
       </div>
-      <button class="wide" disabled={!playingIds.length} onclick={() => ((teamStep = 'teams'), (search = ''))}>Next: pick teams ({playingIds.length}) →</button>
+      {#if individual}
+        <button class="wide" disabled={!playingIds.length} onclick={savePlayers}>Save players</button>
+      {:else}
+        <button class="wide" disabled={!playingIds.length} onclick={() => ((teamStep = 'teams'), (search = ''))}>Next: pick teams ({playingIds.length}) →</button>
+      {/if}
     {:else}
       <div class="totals">
         <div class="tot" style="background:{event.team_a_colour}" data-testid="team-count-A"><span>{event.team_a_name}</span><strong>{countA}</strong><span>avg index {avg(onTeam('A'))}</span></div>
@@ -357,7 +391,7 @@
           <details class="player-tees">
             <summary>Players on different tees</summary>
             <p class="muted small">Everyone plays the tees above unless picked here. Save the round first if you changed its course or tees.</p>
-            {#each Object.entries(members).filter(([, m]) => m.playing && m.team) as [pid] (pid)}
+            {#each Object.entries(members).filter(([, m]) => m.playing && (m.team || individual)) as [pid] (pid)}
               {@const p = db.players.find((x) => x.id === pid)}
               <div class="member">
                 <span class="pname">{p?.name}</span>
@@ -379,6 +413,34 @@
         {:else}
           <p class="muted small">No course guide yet · <a href="#/admin/guide/{r.course_id}">add photos</a></p>
         {/if}
+        {#if individual}
+          <div class="field">
+            <label for="rpg-{r.id}">2-player game</label>
+            <select id="rpg-{r.id}" bind:value={r.pair_game}>
+              <option value="stableford_match">Stableford match play</option>
+              <option value="stableford">Stableford</option>
+              <option value="flat_match">Flat match play (no shots)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="rtg-{r.id}">3-player game</label>
+            <select id="rtg-{r.id}" bind:value={r.three_game}>
+              <option value="six_stableford">Six pointer (Stableford)</option>
+              <option value="six_flat">Six pointer (flat, no shots)</option>
+              <option value="two_v_one">2 v 1 Stableford</option>
+            </select>
+          </div>
+          {#if r.three_game === 'two_v_one'}
+            <p class="muted small">2 v 1: the single's Stableford points against the pair's better ball. Choose who plays alone on the groups page.</p>
+          {/if}
+          {#if r.pair_game === 'stableford_match'}
+            <label class="row"><input type="checkbox" bind:checked={r.match_off_low} /> Stableford match play off the low man</label>
+            {#if r.match_off_low}
+              <div class="field"><label for="rmp-{r.id}">Low man %</label><input id="rmp-{r.id}" type="number" min="0" max="100" bind:value={r.match_pct} /></div>
+            {/if}
+          {/if}
+          <div class="field"><label for="rspc-{r.id}">Stableford %</label><input id="rspc-{r.id}" type="number" min="0" max="100" bind:value={r.stableford_pct} /></div>
+        {:else}
         <div class="field">
           <label for="rf-{r.id}">Fourball game</label>
           <select id="rf-{r.id}" bind:value={r.fourball_format}>
@@ -425,10 +487,11 @@
             </select>
           </div>
         {/if}
+        {/if}
         <button onclick={() => saveRound(r)}>Save round</button>
         <!-- Pairings: who plays with whom in each fourball (scores and the leaderboard need them). -->
         <div class="pairing">
-          <a class="pairbtn" href="#/admin/pairings/{r.id}">Set pairings →</a>
+          <a class="pairbtn" href="#/admin/pairings/{r.id}">{individual ? 'Set groups →' : 'Set pairings →'}</a>
           <span class="pstatus" class:ok={pairingStatus(r).endsWith('✓')} data-testid="pairing-status">{pairingStatus(r)}</span>
         </div>
       </details>

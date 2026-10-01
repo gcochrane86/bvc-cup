@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { enterIndividualHole, login, reseed, seedIndividual, serviceDb } from './helpers';
+import { enterIndividualHole, login, loginAdmin, reseed, seedIndividual, serviceDb, unfoldEvent } from './helpers';
 
 test.beforeEach(() => reseed());
 
@@ -60,4 +60,43 @@ test('confirming individual games: a flat match play 2-ball and a 2 v 1', async 
   const solo = results.find((r) => r.group_id === threeBall)!;
   expect(solo.winner).toBe('A');
   expect(Object.keys(solo.player_points ?? {})).toHaveLength(3);
+});
+
+test("the admin creates an individual event, picks players and sets a day's games", async ({ page }) => {
+  await loginAdmin(page);
+  await page.goto('/#/admin/events');
+  await page.getByRole('button', { name: '+ New event' }).click();
+  await page.getByLabel('New event name').fill('Winter Swindle');
+  await page.getByLabel('Individual').check();
+  await page.getByRole('button', { name: 'Create event' }).click();
+  await expect(page).toHaveURL(/#\/admin\/events\/[0-9a-f-]{36}$/);
+  const eventId = page.url().split('/events/')[1];
+
+  await expect(page.getByLabel('Team A name')).toHaveCount(0); // no teams
+  for (const n of ['Alex Adams', 'Ben Brown', 'Chris Clark']) await page.getByLabel(`${n} playing`).check();
+  await page.getByRole('button', { name: 'Save players' }).click();
+  await expect(page.getByText('Players saved')).toBeVisible();
+
+  const form = page.locator('form.round');
+  await form.getByLabel('Course').selectOption('Seed Links');
+  await form.getByRole('button', { name: 'Add round' }).click();
+  await expect(page.getByText('Round added')).toBeVisible();
+  await unfoldEvent(page);
+  const day1 = page.getByTestId('round').first();
+  await expect(day1.getByLabel('Fourball game')).toHaveCount(0);
+  await day1.getByLabel('2-player game').selectOption('flat_match');
+  await day1.getByLabel('3-player game').selectOption('two_v_one');
+  await day1.getByRole('button', { name: 'Save round' }).click();
+  await expect(page.getByText('Day 1 saved')).toBeVisible();
+  await expect(day1.locator('summary')).toContainText('Flat match play · 2 v 1 Stableford');
+
+  const db = serviceDb();
+  expect((await db.from('events').select('kind').eq('id', eventId).single()).data).toEqual({ kind: 'individual' });
+  const eps = (await db.from('event_players').select('team').eq('event_id', eventId)).data!;
+  expect(eps).toHaveLength(3);
+  expect(eps.every((e) => e.team === null)).toBe(true);
+  expect((await db.from('rounds').select('pair_game, three_game').eq('event_id', eventId).single()).data).toEqual({
+    pair_game: 'flat_match',
+    three_game: 'two_v_one',
+  });
 });
