@@ -303,7 +303,7 @@ describe('confirmation and locking', () => {
     const r = await as(db, 'trip', () => db.query<{ key: string; enabled: boolean }>(`select key, enabled from public.games order by key`));
     expect(r.rows.map((g) => g.key)).toEqual([
       'flat_match', 'fourball_flat', 'fourball_matchplay', 'fourball_stableford', 'scramble', 'six_flat', 'six_stableford',
-      'stableford', 'stableford_match', 'two_v_one', 'two_v_one_flat', 'two_v_one_match',
+      'stableford', 'stableford_match', 'two_v_one', 'two_v_one_best', 'two_v_one_flat', 'two_v_one_match',
     ]);
     expect(r.rows.every((g) => g.enabled)).toBe(true);
     const sc = await db.query<{ defaults: Record<string, number> }>(`select defaults from public.games where key = 'scramble'`);
@@ -334,6 +334,17 @@ describe('confirmation and locking', () => {
     await as(db, 'admin', () => db.query(`insert into public.round_players(round_id, player_id) values ($1, $2)`, [s.roundId, s.players.a1]));
     const r = await as(db, 'trip', () => db.query(`select player_id from public.round_players where round_id = $1`, [s.roundId]));
     expect(r.rows).toHaveLength(1);
+  });
+
+  it('plays all 18 holes unless a day picks its holes (any of 1–18)', async () => {
+    const r = await db.query<{ holes: number[] | null }>(`select holes from public.rounds where id = $1`, [s.roundId]);
+    expect(r.rows[0].holes).toBeNull();
+    await db.query(`update public.rounds set holes = '{1,2,3,4,5,6,7,8,9,14,18}' where id = $1`, [s.roundId]);
+    await expect(db.query(`update public.rounds set holes = '{0,1}' where id = $1`, [s.roundId])).rejects.toThrow(/check constraint/);
+    await expect(db.query(`update public.rounds set holes = '{}' where id = $1`, [s.roundId])).rejects.toThrow(/check constraint/);
+    await db.query(`update public.rounds set three_game = 'two_v_one_best' where id = $1`, [s.roundId]);
+    const g = await db.query(`select key from public.games where key = 'two_v_one_best'`);
+    expect(g.rows).toHaveLength(1);
   });
 
   it('defaults rounds to match-play fourballs and only accepts match play or Stableford', async () => {

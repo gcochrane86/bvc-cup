@@ -24,7 +24,7 @@ await run(db.from('courses').delete().neq('id', NONE));
 // The games list back to its built-in state (all on, default settings).
 const GAME_DEFAULTS: Record<string, object> = {
   stableford_match: { match_off_low: true, match_pct: 85 }, stableford: { stableford_pct: 100 }, flat_match: {},
-  two_v_one: { stableford_pct: 100 }, two_v_one_match: { stableford_pct: 100 }, two_v_one_flat: {},
+  two_v_one: { stableford_pct: 100 }, two_v_one_match: { stableford_pct: 100 }, two_v_one_flat: {}, two_v_one_best: { stableford_pct: 100 },
   six_stableford: { stableford_pct: 100 }, six_flat: {},
   fourball_matchplay: { allowance_pct: 90 }, fourball_stableford: {}, fourball_flat: {}, scramble: { scramble_low_pct: 35, scramble_high_pct: 15 },
 };
