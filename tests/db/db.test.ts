@@ -299,6 +299,43 @@ describe('confirmation and locking', () => {
     expect(r.rows[0].r).toBe('ok');
   });
 
+  it('seeds the games list, readable by members and editable only by the admin', async () => {
+    const r = await as(db, 'trip', () => db.query<{ key: string; enabled: boolean }>(`select key, enabled from public.games order by key`));
+    expect(r.rows.map((g) => g.key)).toEqual([
+      'flat_match', 'fourball_flat', 'fourball_matchplay', 'fourball_stableford', 'scramble', 'six_flat', 'six_stableford',
+      'stableford', 'stableford_match', 'two_v_one', 'two_v_one_flat', 'two_v_one_match',
+    ]);
+    expect(r.rows.every((g) => g.enabled)).toBe(true);
+    const sc = await db.query<{ defaults: Record<string, number> }>(`select defaults from public.games where key = 'scramble'`);
+    expect(sc.rows[0].defaults).toEqual({ scramble_low_pct: 35, scramble_high_pct: 15 });
+    await expect(as(db, 'trip', () => db.query(`update public.games set enabled = false where key = 'stableford'`))).resolves.toBeDefined();
+    const still = await db.query<{ enabled: boolean }>(`select enabled from public.games where key = 'stableford'`);
+    expect(still.rows[0].enabled).toBe(true); // RLS: a member's update changes nothing
+    await as(db, 'admin', () => db.query(`update public.games set enabled = false where key = 'stableford'`));
+    expect((await db.query<{ enabled: boolean }>(`select enabled from public.games where key = 'stableford'`)).rows[0].enabled).toBe(false);
+  });
+
+  it('defaults events to non-season with the season points, and accepts the new 2 v 1 games', async () => {
+    const e = await db.query<{ season: boolean; points: Record<string, { win: number; halve: number }> }>(
+      `select season, points from public.events where id = $1`, [s.eventId],
+    );
+    expect(e.rows[0].season).toBe(false);
+    expect(e.rows[0].points).toEqual({
+      fourball: { win: 2, halve: 1 }, singles: { win: 1, halve: 0.5 }, one_v_one: { win: 1, halve: 0.5 },
+      two_v_one_single: { win: 2, halve: 1 }, two_v_one_pair: { win: 1, halve: 0.5 },
+    });
+    for (const g of ['two_v_one_match', 'two_v_one_flat']) await db.query(`update public.rounds set three_game = $2 where id = $1`, [s.roundId, g]);
+  });
+
+  it("keeps each day's golfers, readable by members and set only by the admin", async () => {
+    await expect(
+      as(db, 'trip', () => db.query(`insert into public.round_players(round_id, player_id) values ($1, $2)`, [s.roundId, s.players.a1])),
+    ).rejects.toThrow(/row-level security/);
+    await as(db, 'admin', () => db.query(`insert into public.round_players(round_id, player_id) values ($1, $2)`, [s.roundId, s.players.a1]));
+    const r = await as(db, 'trip', () => db.query(`select player_id from public.round_players where round_id = $1`, [s.roundId]));
+    expect(r.rows).toHaveLength(1);
+  });
+
   it('defaults rounds to match-play fourballs and only accepts match play or Stableford', async () => {
     const r = await db.query<{ fourball_format: string }>(`select fourball_format from public.rounds where id = $1`, [s.roundId]);
     expect(r.rows[0]).toEqual({ fourball_format: 'matchplay' });
