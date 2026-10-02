@@ -170,14 +170,25 @@
   const slotOf = (pid: string) => SLOTS.find((s) => found?.group.slots[s] === pid)!;
   const rowSlots = $derived<Slot[]>(scramble ? ['A1', 'B1'] : teeOrder ? teeOrder.map(slotOf) : SLOTS);
 
-  /** Wolf: after a hole's scores are saved, ask who played on their own (null: not asking). */
-  let wolfAsk = $state<{ hole: number; lone: string | null } | null>(null);
+  /**
+   * Wolf: on Save hole, ask who played on their own first; the scores and the answer are then saved together
+   * (one save per player, so nothing races). rows: the scores as entered. Null: not asking.
+   */
+  let wolfAsk = $state<{ hole: number; lone: string | null; rows: Record<string, { gross: number; pickedUp: boolean }> } | null>(null);
   const askInfo = $derived(wolfAsk && found ? found.round.holes.find((h) => h.hole === wolfAsk!.hole) ?? null : null);
-  const askResult = $derived(wolf && wolfAsk?.lone && askInfo && found ? wolfHole(wolf.def, askInfo, found.group.scores, wolfAsk.lone) : null);
+  /** The group's scores with the hole being asked about as entered (not yet saved). */
+  const askIndex = $derived.by(() => {
+    if (!wolfAsk || !found) return null;
+    const idx = new Map(found.group.scores);
+    for (const [pid, r] of Object.entries(wolfAsk.rows))
+      idx.set(scoreKey(pid, wolfAsk.hole), { playerId: pid, hole: wolfAsk.hole, gross: r.pickedUp ? null : r.gross, pickedUp: r.pickedUp });
+    return idx;
+  });
+  const askResult = $derived(wolf && wolfAsk?.lone && askInfo && askIndex ? wolfHole(wolf.def, askInfo, askIndex, wolfAsk.lone) : null);
   const nextHole = (h: number) => found?.round.holes.find((x) => x.hole > h)?.hole ?? null;
   /** What each player did on the hole being asked about: Stableford points, or gross for scratch. */
   function holeFigure(pid: string): string {
-    const e = found && wolfAsk ? found.group.scores.get(scoreKey(pid, wolfAsk.hole)) : undefined;
+    const e = wolfAsk && askIndex ? askIndex.get(scoreKey(pid, wolfAsk.hole)) : undefined;
     if (!e || !wolf || !askInfo || !found) return '';
     if (wolf.def.game === 'wolf_flat') return e.pickedUp ? 'picked up' : `${e.gross}`;
     if (e.pickedUp || e.gross === null) return '0 pts';
@@ -185,15 +196,14 @@
     const pts = Math.max(0, 2 + own.par - (e.gross - strokesOnHole(wolf.def.strokes[pid] ?? 0, own.strokeIndex, own.of)));
     return `${pts} pt${pts === 1 ? '' : 's'}`;
   }
-  /** Save who was on their own (on all three players' scores for the hole), then on to the next hole. */
+  /** Save the hole's scores with who was on their own, then on to the next hole. */
   async function saveLone() {
-    if (!found || !wolfAsk?.lone || !teeOrder) return;
-    const { hole: h, lone } = wolfAsk;
+    if (!found || !wolfAsk?.lone) return;
+    const { hole: h, lone, rows } = wolfAsk;
     const at = new Date().toISOString();
-    for (const pid of wolf!.def.players ?? []) {
-      const e = found.group.scores.get(scoreKey(pid, h));
-      if (!e || locked(pid, h)) continue;
-      await enterScore({ roundId: found.round.round.id, playerId: pid, hole: h, gross: e.gross, pickedUp: e.pickedUp, clientUpdatedAt: at, lone: pid === lone });
+    for (const [pid, r] of Object.entries(rows)) {
+      if (locked(pid, h)) continue;
+      await enterScore({ roundId: found.round.round.id, playerId: pid, hole: h, gross: r.pickedUp ? null : r.gross, pickedUp: r.pickedUp, clientUpdatedAt: at, lone: pid === lone });
     }
     wolfAsk = null;
     pickedHole = nextHole(h) ?? h;
@@ -218,6 +228,17 @@
     // The rows as they are now: saving a score updates rows live, and a scramble partner must be saved
     // from the team row as it was, not as it becomes once the first partner's score lands.
     const rows = Object.fromEntries(Object.entries(draft).map(([id, d]) => [id, { ...d }]));
+    // Wolf: ask who played on their own first; the scores are saved with the answer (the one already saved is picked to start with).
+    const wolfIds = wolf?.def.players ?? [];
+    if (wolf && wolfIds.every((id) => !locked(id, saving) && rows[id])) {
+      pickedHole = saving; // stay on this hole while asking
+      wolfAsk = {
+        hole: saving,
+        lone: wolfIds.find((id) => group.scores.get(scoreKey(id, saving))?.lone) ?? null,
+        rows: Object.fromEntries(wolfIds.map((id) => [id, { gross: rows[id].gross, pickedUp: rows[id].pickedUp }])),
+      };
+      return;
+    }
     for (const slot of SLOTS) {
       const pid = group.slots[slot];
       // Scramble: the team's row (A1/B1) is the score for both partners.
@@ -236,13 +257,6 @@
         // An untouched row is only a par default: it must never overwrite someone's real score.
         ifAbsent: !d.edited,
       });
-    }
-    // Wolf: ask who played on their own first (the answer already saved is picked to start with).
-    const ids = wolf?.def.players ?? [];
-    if (wolf && ids.every((id) => !locked(id, saving))) {
-      pickedHole = saving; // stay on this hole while asking
-      wolfAsk = { hole: saving, lone: ids.find((id) => found!.group.scores.get(scoreKey(id, saving))?.lone) ?? null };
-      return;
     }
     // On to the next hole being played (a day may skip some).
     pickedHole = found.round.holes.find((h) => h.hole > saving)?.hole ?? saving;
