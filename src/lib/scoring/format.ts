@@ -7,9 +7,9 @@ export function formatPoints(n: number): string {
   return `${whole === 0 ? '' : whole}${frac}`;
 }
 
-/** Label for a player's shots on a hole: better-ball count, plus singles when it differs. */
+/** Label for a player's shots on a hole: the fourball count, plus the singles when it differs. */
 export function shotLabel(bb: number, singles: number | null): string | null {
-  if (singles !== null && singles !== bb) return `BB ${bb} · Singles ${singles}`;
+  if (singles !== null && singles !== bb) return `Fourball ${bb} · Singles ${singles}`;
   if (bb === 0) return null;
   return bb === 1 ? '1 shot' : `${bb} shots`;
 }

@@ -22,8 +22,8 @@ describe('shotLabel', () => {
     expect(shotLabel(2, 2)).toBe('2 shots');
   });
   it('shows both counts when better-ball and singles differ', () => {
-    expect(shotLabel(1, 0)).toBe('BB 1 · Singles 0');
-    expect(shotLabel(0, 1)).toBe('BB 0 · Singles 1');
+    expect(shotLabel(1, 0)).toBe('Fourball 1 · Singles 0');
+    expect(shotLabel(0, 1)).toBe('Fourball 0 · Singles 1');
   });
 });
 
