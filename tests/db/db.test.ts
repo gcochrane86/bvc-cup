@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
-import { as, makeDb, PENDING_ID, seed, STRANGER_ID, TRIP_ID, type Seed, type Who } from './harness';
+import { ADMIN_ID, as, makeDb, PENDING_ID, seed, STRANGER_ID, TRIP_ID, type Seed, type Who } from './harness';
 
 let db: PGlite;
 let s: Seed;
@@ -334,6 +334,24 @@ describe('confirmation and locking', () => {
     await as(db, 'admin', () => db.query(`insert into public.round_players(round_id, player_id) values ($1, $2)`, [s.roundId, s.players.a1]));
     const r = await as(db, 'trip', () => db.query(`select player_id from public.round_players where round_id = $1`, [s.roundId]));
     expect(r.rows).toHaveLength(1);
+  });
+
+  it("keeps each admin's own favourite players: only theirs, and only admins", async () => {
+    await as(db, 'admin', () => db.query(`insert into public.player_favourites(player_id) values ($1)`, [s.players.a1]));
+    // Another admin's star (set directly) isn't this admin's.
+    await db.query(`insert into public.player_favourites(user_id, player_id) values ($1, $2)`, [TRIP_ID, s.players.a2]);
+    const mine = await as(db, 'admin', () => db.query<{ player_id: string; user_id: string }>(`select player_id, user_id from public.player_favourites`));
+    expect(mine.rows).toEqual([{ player_id: s.players.a1, user_id: ADMIN_ID }]);
+    await expect(
+      as(db, 'admin', () => db.query(`insert into public.player_favourites(user_id, player_id) values ($1, $2)`, [TRIP_ID, s.players.b1])),
+    ).rejects.toThrow(/row-level security/);
+    await expect(
+      as(db, 'trip', () => db.query(`insert into public.player_favourites(player_id) values ($1)`, [s.players.b1])),
+    ).rejects.toThrow(/row-level security/);
+    const theirs = await as(db, 'trip', () => db.query(`select player_id from public.player_favourites`));
+    expect(theirs.rows).toHaveLength(0);
+    await as(db, 'admin', () => db.query(`delete from public.player_favourites where player_id = $1`, [s.players.a1]));
+    expect((await db.query(`select 1 from public.player_favourites`)).rows).toHaveLength(1);
   });
 
   it('plays all 18 holes unless a day picks its holes (any of 1–18)', async () => {

@@ -1289,3 +1289,44 @@ async function previewSeedGuide(admin: import('@playwright/test').Page, eventId:
   await admin.getByRole('link', { name: '← Back to event' }).click();
   await expect(admin).toHaveURL(new RegExp(`#/admin/events/${eventId}$`));
 }
+
+test("favourite players sit at the top of Who's playing (each admin's own); saving folds the section away", async ({ page }) => {
+  await loginAdmin(page);
+  const eventId = await activeEventId();
+  await openEvent(page, eventId);
+  await page.getByRole('tab', { name: /Who's playing/ }).click();
+
+  // The button is above the list, and the list scrolls in its own box.
+  const next = page.getByRole('button', { name: /^Next: pick teams/ });
+  const list = page.getByTestId('picklist');
+  expect((await next.boundingBox())!.y).toBeLessThan((await list.boundingBox())!.y);
+  await expect(list).toHaveCSS('overflow-y', 'auto');
+
+  // Star Ed Evans: he moves to the top under Favourites, and stays starred after a reload.
+  await expect(page.getByText('Favourites (1)')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Favourite Ed Evans' }).click();
+  await expect(page.getByText('Favourites (1)')).toBeVisible();
+  await expect(page.getByTestId('pick-row').first()).toContainText('Ed Evans');
+  await expect.poll(async () => (await serviceDb().from('player_favourites').select('player_id')).data?.length).toBe(1);
+  await page.reload();
+  await openEvent(page, eventId);
+  await page.getByRole('tab', { name: /Who's playing/ }).click();
+  await expect(page.getByTestId('pick-row').first()).toContainText('Ed Evans');
+  await page.getByRole('button', { name: 'Unfavourite Ed Evans' }).click();
+  await expect(page.getByText('Favourites (1)')).toHaveCount(0);
+
+  // Save teams: the Players section folds away and says it saved.
+  await page.getByRole('tab', { name: /Teams/ }).click();
+  const save = page.getByRole('button', { name: 'Save teams' });
+  expect((await save.boundingBox())!.y).toBeLessThan((await page.getByTestId('team-row').first().boundingBox())!.y);
+  await save.click();
+  await expect(page.getByText(/^Teams saved/)).toBeVisible();
+  await expect(save).toBeHidden();
+
+  // Save round: the day folds away too.
+  await unfoldEvent(page);
+  const day1 = page.getByTestId('round').first();
+  await day1.getByRole('button', { name: 'Save round' }).click();
+  await expect(page.getByText('Day 1 saved')).toBeVisible();
+  await expect(day1.getByRole('button', { name: 'Save round' })).toBeHidden();
+});

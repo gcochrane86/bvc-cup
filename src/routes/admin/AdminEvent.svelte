@@ -3,6 +3,7 @@
   import SeasonGolfers from '../../components/SeasonGolfers.svelte';
   import AddRound, { type AddRoundPayload } from '../../components/AddRound.svelte';
   import { db, loadAll, photoCourses } from '../../lib/data/store.svelte';
+  import { favouritesFirst } from '../../lib/favourites';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
   import { courseGroups, teesOf } from '../../lib/courses';
@@ -20,6 +21,10 @@
   let members = $state<Record<string, Member>>({});
   let rounds = $state<RoundRow[]>([]);
   let msg = $state<string | null>(null);
+  /** Where the last message shows: next to the section that was saved ('players', 'event', 'points', 'more', 'round:<id>'), or (null) at the top. */
+  let msgAt = $state<string | null>(null);
+  /** This admin's favourite players: first in the Who's playing list. */
+  let favs = $state<string[]>([]);
   /** The Add round form only shows after '+ Add round' is pressed (always for an event with no rounds yet). */
   let adding = $state(false);
   let roundTees = $state<RoundTeeRow[]>([]);
@@ -40,6 +45,7 @@
   let openRounds = $state<Record<string, boolean>>({});
   /** The Players section opens by itself while teams still need sorting. */
   let playersOpen = $state(false);
+  let moreOpen = $state(false);
 
   const courseName = (id: string) => db.courses.find((c) => c.id === id)?.name ?? '';
   const teeOfPlayer = (roundId: string, pid: string) => roundTees.find((t) => t.round_id === roundId && t.player_id === pid)?.course_id ?? '';
@@ -58,11 +64,13 @@
 
   async function load() {
     const id = eventId;
-    const [ev, eps, rs] = await Promise.all([
+    const [ev, eps, rs, fs] = await Promise.all([
       must(supabase.from('events').select('*').eq('id', id).single()) as Promise<EventRow>,
       must(supabase.from('event_players').select('*').eq('event_id', id)) as Promise<EventPlayerRow[]>,
       must(supabase.from('rounds').select('*').eq('event_id', id).order('round_no')) as Promise<RoundRow[]>,
+      must(supabase.from('player_favourites').select('player_id')) as Promise<{ player_id: string }[]>,
     ]);
+    favs = fs.map((f) => f.player_id);
     if (!rs.length) adding = true; // a new event: straight to adding its first day
     const ids = rs.map((r) => r.id);
     if (ids.length) {
@@ -100,15 +108,19 @@
   });
 
   /** fn may return a fuller message to show instead of ok. */
-  async function act(fn: () => Promise<unknown>, ok: string) {
+  /** Returns true when it saved. at: where its message shows (see msgAt). */
+  async function act(fn: () => Promise<unknown>, ok: string, at: string | null = null): Promise<boolean> {
     msg = null;
+    msgAt = at;
     try {
       const said = await fn();
       await load();
       await loadAll();
       msg = typeof said === 'string' ? said : ok;
+      return true;
     } catch (e) {
       msg = `Error: ${(e as Error).message}`;
+      return false;
     }
   }
 
@@ -164,6 +176,21 @@
   /** Players in this event with a photo, for the photo switch. */
   const withPhotos = $derived(playingIds.filter((id) => db.players.find((p) => p.id === id)?.photo_path).length);
   const shown = $derived(db.players.filter((p) => members[p.id] && p.name.toLowerCase().includes(search.trim().toLowerCase())));
+  const shownGroups = $derived(favouritesFirst(shown, favs));
+  /** Star or unstar a player for this admin (shown at once; put back if the save fails). */
+  async function toggleFav(id: string) {
+    const was = favs;
+    const on = !was.includes(id);
+    favs = on ? [...was, id] : was.filter((x) => x !== id);
+    try {
+      if (on) await must(supabase.from('player_favourites').insert({ player_id: id }));
+      else await must(supabase.from('player_favourites').delete().eq('player_id', id));
+    } catch (e) {
+      favs = was;
+      msg = `Error: ${(e as Error).message}`;
+      msgAt = null;
+    }
+  }
   const onTeam = (t: 'A' | 'B') => playingIds.filter((id) => members[id].team === t);
   const countA = $derived(onTeam('A').length);
   const countB = $derived(onTeam('B').length);
@@ -173,7 +200,7 @@
     for (const m of Object.values(members)) m.playing = on;
   };
 
-  const saveDetails = () =>
+  const saveDetails = (at: 'event' | 'more') =>
     act(async () => {
       const ev = event!;
       // Only one active event is allowed (unique index): deactivate the others first.
@@ -194,7 +221,7 @@
           })
           .eq('id', ev.id),
       );
-    }, 'Event saved');
+    }, 'Event saved', at);
 
   /** 2 or 3 players: everyone ticked plays with no team, the event becomes individual, and each day gets its group. */
   const savePlayers = () =>
@@ -207,7 +234,7 @@
       if (removed.length) await must(supabase.from('event_players').delete().eq('event_id', eventId).in('player_id', removed));
       const grouped = await groupEveryDay(rounds);
       return grouped.length ? `Players saved · group set for ${grouped.join(', ')}` : 'Players saved';
-    }, 'Players saved');
+    }, 'Players saved', 'players').then((ok) => ok && (playersOpen = false));
 
   /**
    * 2 or 3 players are one group, so make it on every day (P1, P2, P3 in name order). A day whose group already
@@ -234,7 +261,7 @@
   }
 
   const saveMembers = async () => {
-    await saveTeams();
+    if (await saveTeams()) playersOpen = false; // saved: fold the section away
     // More than one fourball can't be paired automatically: point at any day still needing pairings.
     if (!msg?.startsWith('Error') && savedPlaying > 4) nudge = rounds.find((r) => (paired[r.id] ?? 0) < fourballs) ?? null;
   };
@@ -250,7 +277,7 @@
       if (removed.length) await must(supabase.from('event_players').delete().eq('event_id', eventId).in('player_id', removed));
       const paired = await pairTwoVTwo(rounds);
       return paired.length ? `Teams saved · pairings set for ${paired.join(', ')}` : 'Teams saved';
-    }, 'Teams saved');
+    }, 'Teams saved', 'players');
 
   /**
    * Two players a side means only one possible fourball, so pair it on every day (the pairing then follows any
@@ -325,7 +352,7 @@
     return act(async () => {
       await seasonGroup(r, ids, seasonDayCheck(ids, seasonTeamOf));
       delete editGolfers[r.id];
-    }, `${r.name} golfers saved`);
+    }, `${r.name} golfers saved`, `round:${r.id}`).then((ok) => ok && (openRounds[r.id] = false));
   };
 
   /** Season events: the event's points for each format (a win and a halve each). */
@@ -342,7 +369,7 @@
         POINT_ROWS.map(({ key }) => [key, { win: Number(event!.points[key].win), halve: Number(event!.points[key].halve) }]),
       );
       await must(supabase.from('events').update({ points: pts }).eq('id', eventId));
-    }, 'Points saved');
+    }, 'Points saved', 'points');
 
   /** Holes played: all 18 (null), the front 9, 1–13, or a chosen set (e.g. winter: 1–9, 14 and 18). */
   const ALL_HOLES = Array.from({ length: 18 }, (_, i) => i + 1);
@@ -404,11 +431,12 @@
           if (r.singles_pairing === 'handicap') await must(supabase.from('groups').update({ singles_crossed: false }).eq('round_id', r.id));
         }),
       `${r.name} saved`,
-    );
+      `round:${r.id}`,
+    ).then((ok) => ok && (openRounds[r.id] = false)); // saved: fold the day away
 </script>
 
 <p><a href="#/admin/events">← Events</a></p>
-{#if msg}<p class:error={msg.startsWith('Error')}>{msg}</p>{/if}
+{#if msg && !msgAt}<p class:error={msg.startsWith('Error')}>{msg}</p>{/if}
 
 {#if event}
   <section class="card">
@@ -427,7 +455,8 @@
     </div>
     {/if}
     <label class="setting"><span>Active event<span class="sub">Shown on the leaderboard</span></span><input class="switch" type="checkbox" bind:checked={event.is_active} /></label>
-    <button onclick={saveDetails}>Save event</button>
+    <button onclick={() => saveDetails('event')}>Save event</button>
+    {#if msg && msgAt === 'event'}<p class="saved" class:error={msg.startsWith('Error')}>{msg}</p>{/if}
   </section>
 
   {#if season}
@@ -443,6 +472,7 @@
         {/each}
       </div>
       <button onclick={savePoints}>Save points</button>
+      {#if msg && msgAt === 'points'}<p class="saved" class:error={msg.startsWith('Error')}>{msg}</p>{/if}
     </section>
   {/if}
 
@@ -474,29 +504,38 @@
         <strong>{playingIds.length} of {db.players.length} playing</strong>
         <span><button class="linkbtn" onclick={() => setAll(true)}>Select all</button><button class="linkbtn" onclick={() => setAll(false)}>Clear</button></span>
       </div>
-      <div class="picklist">
-        {#each shown as p (p.id)}
-          <label class="pick" class:sel={members[p.id].playing} data-testid="pick-row">
-            <input type="checkbox" aria-label="{p.name} playing" bind:checked={members[p.id].playing} />
-            <span class="pname">{p.name}</span>
-            <span class="hcp">{members[p.id].handicap}</span>
-          </label>
-        {:else}
-          <p class="muted small">No players match “{search}”.</p>
-        {/each}
-      </div>
       {#if smallGroup}
         <p class="muted small">2 or 3 players play one group: a 2-ball or 3-ball game. Pick 4 or more for teams and fourballs.</p>
-        <button class="wide" onclick={savePlayers}>Save players</button>
+        <button class="wide top" onclick={savePlayers}>Save players</button>
       {:else}
-        <button class="wide" disabled={!playingIds.length} onclick={() => ((teamStep = 'teams'), (search = ''))}>Next: pick teams ({playingIds.length}) →</button>
+        <button class="wide top" disabled={!playingIds.length} onclick={() => ((teamStep = 'teams'), (search = ''))}>Next: pick teams ({playingIds.length}) →</button>
       {/if}
+      <!-- Favourites first; scrolls inside its box (about 9 rows), headings pinned. -->
+      <div class="picklist" data-testid="picklist">
+        {#each [['Favourites', shownGroups.favourites], [shownGroups.favourites.length ? 'Everyone else' : '', shownGroups.others]] as const as [heading, list] (heading)}
+          {#if heading && list.length}<div class="pickhead">{heading}{heading === 'Favourites' ? ` (${list.length})` : ''}</div>{/if}
+          {#each list as p (p.id)}
+            {@const fav = favs.includes(p.id)}
+            <div class="pick" class:sel={members[p.id].playing} data-testid="pick-row">
+              <label class="pickhit">
+                <input type="checkbox" aria-label="{p.name} playing" bind:checked={members[p.id].playing} />
+                <span class="pname">{p.name}</span>
+                <span class="hcp">{members[p.id].handicap}</span>
+              </label>
+              <button class="star" class:on={fav} aria-label="{fav ? 'Unfavourite' : 'Favourite'} {p.name}" aria-pressed={fav} onclick={() => toggleFav(p.id)}>{fav ? '★' : '☆'}</button>
+            </div>
+          {/each}
+        {/each}
+        {#if !shown.length}<p class="muted small empty">No players match “{search}”.</p>{/if}
+      </div>
     {:else}
       <div class="totals">
         <div class="tot" style="background:{event.team_a_colour}" data-testid="team-count-A"><span>{event.team_a_name}</span><strong>{countA}</strong><span>avg index {avg(onTeam('A'))}</span></div>
         <div class="tot" style="background:{event.team_b_colour}" data-testid="team-count-B"><span>{event.team_b_name}</span><strong>{countB}</strong><span>avg index {avg(onTeam('B'))}</span></div>
       </div>
       {#if countA === 2 && countB === 2}<p class="muted small">One fourball: it's paired automatically when you save.</p>{/if}
+      <button class="wide top" disabled={unassigned.length > 0} onclick={saveMembers}>Save teams</button>
+
       {#if unassigned.length}<p class="warn">{unassigned.length} {unassigned.length === 1 ? 'player' : 'players'} not on a team yet</p>{/if}
       {#if !playingIds.length}<p class="muted">Nobody's playing yet — tick players in step 1.</p>{/if}
       <!-- In name order, fixed: rows don't move as teams are picked. -->
@@ -510,9 +549,9 @@
           </span>
         </div>
       {/each}
-      <button class="wide" disabled={unassigned.length > 0} onclick={saveMembers}>Save teams</button>
     {/if}
   </details>
+  {#if msg && msgAt === 'players'}<p class="saved" class:error={msg.startsWith('Error')}>{msg}</p>{/if}
 
   <section class="card">
     <div class="rhead">
@@ -682,6 +721,7 @@
           <span class="pstatus" class:ok={pairingStatus(r).endsWith('✓')} data-testid="pairing-status">{pairingStatus(r)}</span>
         </div>
       </details>
+      {#if msg && msgAt === `round:${r.id}`}<p class="saved" class:error={msg.startsWith('Error')}>{msg}</p>{/if}
     {/each}
 
     {#if adding}
@@ -716,20 +756,21 @@
   {/if}
 
   <!-- Occasional settings, kept out of the way of setting up the event. -->
-  <details class="more">
+  <details class="more" bind:open={moreOpen}>
     <summary>More options</summary>
     <section class="card">
       <h2>What players see</h2>
       <label class="setting"><span>Leaderboard tab<span class="sub">Off: players go straight to Scores</span></span><input class="switch" type="checkbox" aria-label="Show the Leaderboard tab to players" bind:checked={event.show_leaderboard} /></label>
       <label class="setting"><span>Form tab<span class="sub">Rankings by gross, net, points, birdies…</span></span><input class="switch" type="checkbox" aria-label="Show the Form tab to players" bind:checked={event.show_form} /></label>
       <label class="setting"><span>Player photos<span class="sub">{withPhotos} of {playingIds.length} players have one · off shows initials for everyone</span></span><input class="switch" type="checkbox" aria-label="Show player photos" bind:checked={event.show_photos} /></label>
-      <button onclick={saveDetails}>Save settings</button>
+      <button onclick={() => saveDetails('more').then((ok) => ok && (moreOpen = false))}>Save settings</button>
     </section>
     {#key event.id}<ConfirmedResults {event} />{/key}
     {#if rounds.length}
       <ResetScores {event} {rounds} onDone={load} />
     {/if}
   </details>
+  {#if msg && msgAt === 'more'}<p class="saved" class:error={msg.startsWith('Error')}>{msg}</p>{/if}
 {:else}
   <p class="center muted">Loading…</p>
 {/if}
@@ -743,12 +784,20 @@
   .steps button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   .pickbar { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 6px; }
   .linkbtn { background: none; color: var(--accent); min-height: 0; padding: 0 0 0 12px; margin-top: 0; }
-  .picklist { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
-  .pick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .picklist { border: 1px solid var(--line); border-radius: 12px; max-height: 405px; overflow-y: auto; overscroll-behavior: contain; margin-bottom: 10px; }
+  .pickhead { position: sticky; top: 0; z-index: 1; background: var(--bg); color: var(--muted); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 12px; border-bottom: 1px solid var(--line); }
+  .pick { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+  .pickhit { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 0 10px 12px; cursor: pointer; }
+  .star { background: none; color: var(--muted); min-height: 0; margin-top: 0; padding: 8px 12px; font-size: 1.2rem; line-height: 1; }
+  .star.on { color: #c58a12; }
+  .empty { padding: 10px 12px; margin: 0; }
+  .wide.top { margin: 0 0 8px; }
+  .saved { margin: 6px 2px 12px; font-weight: 600; color: var(--ok, #155d27); }
+  .saved.error { color: var(--danger, #b00020); }
   .pick:last-child { border-bottom: 0; }
   .pick.sel { background: #eef5f0; }
   .pick input { width: 22px; height: 22px; accent-color: var(--accent); }
-  .pick .pname { flex: 1; font-weight: 600; }
+  .pickhit .pname { flex: 1; font-weight: 600; }
   .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
   .tot { border-radius: 12px; padding: 8px 12px; color: #fff; display: flex; flex-direction: column; }
   .tot strong { font-size: 1.4rem; }
