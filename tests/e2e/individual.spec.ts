@@ -194,3 +194,35 @@ test("with more players than one group, both games show until the day's groups a
   await expect(page.getByTestId('round').first().getByLabel(/groups of 2|2-player game/)).toHaveCount(0);
   await expect(page.getByTestId('round').first().getByLabel(/groups of 3|3-player game/)).toBeVisible();
 });
+
+test('Admin → Games: a game switched off leaves the pickers; a changed default fills new days', async ({ page }) => {
+  const { eventId } = await seedIndividual(); // a 2-ball and a 3-ball
+  await loginAdmin(page);
+  await page.getByRole('link', { name: /^Games/ }).click();
+  await expect(page.getByRole('heading', { name: 'Games', exact: true })).toBeVisible();
+  await page.getByLabel('Stableford on', { exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Edit 2-man scramble' }).click();
+  await page.getByLabel('High handicap %').fill('35');
+  await page.getByRole('button', { name: 'Save 2-man scramble' }).click();
+  await expect(page.getByText('2-man scramble saved')).toBeVisible();
+
+  // The 2-ball's picker no longer offers Stableford (Stableford match play is still there).
+  await page.goto(`/#/admin/events/${eventId}`);
+  await unfoldEvent(page);
+  const twoPlayer = page.getByTestId('round').first().getByLabel(/2-player game|groups of 2/);
+  await expect(twoPlayer.locator('option', { hasText: /^Stableford$/ })).toHaveCount(0);
+  await expect(twoPlayer.locator('option', { hasText: 'Stableford match play' })).toHaveCount(1);
+
+  // A new day on the team event starts from the scramble default 35/35.
+  const db = serviceDb();
+  const { data: team } = await db.from('events').select('id').eq('name', 'Demo Cup').single();
+  await page.goto(`/#/admin/events/${team!.id}`);
+  await page.getByRole('button', { name: '+ Add round' }).click();
+  const form = page.locator('form.round');
+  await form.getByLabel('Course').selectOption('Seed Links');
+  await form.getByRole('button', { name: 'Add round' }).click();
+  await expect(page.getByText('Round added')).toBeVisible();
+  const { data: rounds } = await db.from('rounds').select('scramble_low_pct, scramble_high_pct, round_no').eq('event_id', team!.id).order('round_no');
+  const added = rounds!.at(-1)!;
+  expect([Number(added.scramble_low_pct), Number(added.scramble_high_pct)]).toEqual([35, 35]);
+});

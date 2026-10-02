@@ -6,6 +6,7 @@
   import { courseGroups, teesOf } from '../../lib/courses';
   import { autoFourball, eventKindFor, gameLabel, gamesToSet, scrambleHandicap } from '../../lib/scoring';
   import { courseGuide } from '../../lib/guides';
+  import { fourballKey, gamesFor, newRoundDefaults } from '../../lib/games';
   import ResetScores from '../../components/ResetScores.svelte';
   import ConfirmedResults from '../../components/ConfirmedResults.svelte';
 
@@ -258,6 +259,8 @@
             name: newRound.name.trim() || `Day ${next}`,
             course_id: newRound.course_id,
             date: newRound.date || null,
+            // A new day starts from Admin → Games: the first games switched on, with their defaults.
+            ...newRoundDefaults(db.games, !individual),
           })
           .select()
           .single(),
@@ -457,9 +460,7 @@
             <div class="field">
               <label for="rpg-{r.id}">{both ? 'Game for groups of 2' : '2-player game'}</label>
               <select id="rpg-{r.id}" bind:value={r.pair_game}>
-                <option value="stableford_match">Stableford match play</option>
-                <option value="stableford">Stableford</option>
-                <option value="flat_match">Flat match play (no shots)</option>
+                {#each gamesFor(2, { teams: !individual, rows: db.games, keep: r.pair_game }) as g (g.key)}<option value={g.key}>{g.name}</option>{/each}
               </select>
             </div>
             {#if r.pair_game === 'stableford_match'}
@@ -473,28 +474,23 @@
             <div class="field">
               <label for="rtg-{r.id}">{both ? 'Game for groups of 3' : '3-player game'}</label>
               <select id="rtg-{r.id}" bind:value={r.three_game}>
-                <option value="six_stableford">Six pointer (Stableford)</option>
-                <option value="six_flat">Six pointer (flat, no shots)</option>
-                <option value="two_v_one">2 v 1 Stableford</option>
+                {#each gamesFor(3, { teams: !individual, rows: db.games, keep: r.three_game }) as g (g.key)}<option value={g.key}>{g.name}</option>{/each}
               </select>
             </div>
-            {#if r.three_game === 'two_v_one'}
-              <p class="muted small">2 v 1: the single's Stableford points against the pair's better ball. Choose who plays alone on the groups page.</p>
+            {#if r.three_game.startsWith('two_v_one')}
+              <p class="muted small">2 v 1: the single against the pair's better ball. Choose who plays alone on the groups page.</p>
             {/if}
           {/if}
           {#if both}<p class="muted small">Groups of 2 play the first game, groups of 3 the second. Once the day's groups are set, only the games they need are shown.</p>{/if}
           <!-- Stableford % only matters to the games played off it. -->
-          {#if (games.pair && r.pair_game === 'stableford') || (games.three && r.three_game !== 'six_flat')}
+          {#if (games.pair && r.pair_game === 'stableford') || (games.three && !['six_flat', 'two_v_one_flat'].includes(r.three_game))}
             <div class="field"><label for="rspc-{r.id}">Stableford %</label><input id="rspc-{r.id}" type="number" min="0" max="100" bind:value={r.stableford_pct} /></div>
           {/if}
         {:else}
         <div class="field">
           <label for="rf-{r.id}">Fourball game</label>
           <select id="rf-{r.id}" bind:value={r.fourball_format}>
-            <option value="matchplay">Match play (off the low)</option>
-            <option value="stableford">Stableford (full handicaps)</option>
-            <option value="flat">Match play, flat (no shots)</option>
-            <option value="scramble">2-man scramble</option>
+            {#each gamesFor(4, { teams: true, rows: db.games, keep: fourballKey(r.fourball_format) }) as g (g.key)}<option value={g.fourballFormat}>{g.name}</option>{/each}
           </select>
         </div>
         <div class="row">

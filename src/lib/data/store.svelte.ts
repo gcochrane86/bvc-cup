@@ -1,3 +1,4 @@
+import type { GameRow } from '../games';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createStore, del, get, set, values } from 'idb-keyval';
 import { must, supabase } from '../supabase';
@@ -26,6 +27,8 @@ export const db = $state({
   photoUrls: {} as Record<string, string>,
   /** Guide photos uploaded in Admin, for every course (a handful of rows). */
   guidePhotos: [] as GuidePhotoRow[],
+  /** Admin → Games: which games are on and their defaults (rows only for games the admin has touched or seeded). */
+  games: [] as GameRow[],
 });
 
 // ---- offline outbox (IndexedDB) ----
@@ -152,12 +155,13 @@ async function loadWatched() {
 async function doLoad() {
   if (watching) return loadWatched();
   try {
-    const [events, players, courses, courseHoles, guidePhotos] = await Promise.all([
+    const [events, players, courses, courseHoles, guidePhotos, games] = await Promise.all([
       must(supabase.from('events').select('*').eq('is_active', true).limit(1)) as Promise<EventRow[]>,
       must(supabase.from('players').select('*').order('name')) as Promise<PlayerRow[]>,
       must(supabase.from('courses').select('*').order('name')) as Promise<CourseRow[]>,
       must(supabase.from('course_holes').select('*')) as Promise<CourseHoleRow[]>,
       must(supabase.from('guide_photos').select('*').order('created_at')) as Promise<GuidePhotoRow[]>,
+      must(supabase.from('games').select('*')) as Promise<GameRow[]>,
     ]);
     const event = events[0] ?? null;
     const { eventPlayers, rounds, groups, groupPlayers, scores, results, roundTees } = event
@@ -165,7 +169,7 @@ async function doLoad() {
       : { eventPlayers: [], rounds: [], groups: [], groupPlayers: [], scores: [], results: [], roundTees: [] };
     const pending = await outbox.pending();
     Object.assign(db, {
-      event, players, courses, courseHoles, eventPlayers, rounds, groups, groupPlayers, results, roundTees, guidePhotos,
+      event, players, courses, courseHoles, eventPlayers, rounds, groups, groupPlayers, results, roundTees, guidePhotos, games,
       scores: applyPending(scores, pending),
       pending,
       loaded: true,

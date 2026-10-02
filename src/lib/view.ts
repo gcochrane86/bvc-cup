@@ -232,7 +232,7 @@ export function pairingLabel(group: GroupView, short: (playerId: string) => stri
   if (group.slots.P1) {
     const ids = (['P1', 'P2', 'P3'] as Slot[]).map((s) => group.slots[s]).filter((x): x is string => !!x);
     // 2 v 1: the single, then the pair; otherwise everyone for themselves.
-    return group.matches[0]?.def.game === 'two_v_one' ? `${short(ids[0])} v ${ids.slice(1).map(short).join('/')}` : ids.map(short).join(' v ');
+    return group.matches[0]?.def.game?.startsWith('two_v_one') ? `${short(ids[0])} v ${ids.slice(1).map(short).join('/')}` : ids.map(short).join(' v ');
   }
   const side = (slots: Slot[]) =>
     slots

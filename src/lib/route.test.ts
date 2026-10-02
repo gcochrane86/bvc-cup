@@ -21,6 +21,7 @@ describe('parseRoute', () => {
     ['#/admin/access', { name: 'admin-access' }],
     ['#/admin/courses', { name: 'admin-courses' }],
     ['#/admin/guide/c1', { name: 'admin-guide', courseId: 'c1' }],
+    ['#/admin/games', { name: 'admin-games' }],
     ['#/admin/events/e1/guide/c1', { name: 'admin-guide-preview', eventId: 'e1', courseId: 'c1' }],
     ['#/admin/courses/new', { name: 'admin-course', courseId: 'new', copyFrom: null }],
     ['#/admin/courses/new/c1', { name: 'admin-course', courseId: 'new', copyFrom: 'c1' }],

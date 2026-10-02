@@ -1,6 +1,7 @@
 <script lang="ts">
   import { logout } from '../../lib/auth.svelte';
   import { db } from '../../lib/data/store.svelte';
+  import { GAMES } from '../../lib/games';
 </script>
 
 <h1>Admin</h1>
@@ -10,6 +11,7 @@
   <a class="tile wide" href="#/admin/events"><span class="icon" aria-hidden="true">🏆</span><strong>Events</strong><span class="sub">Teams, rounds, pairings &amp; results</span></a>
   <a class="tile" href="#/admin/players"><span class="icon" aria-hidden="true">🏌️</span><strong>Players</strong><span class="sub">Handicaps</span></a>
   <a class="tile" href="#/admin/courses"><span class="icon" aria-hidden="true">⛳</span><strong>Courses</strong><span class="sub">Tees &amp; guides</span></a>
+  <a class="tile wide" href="#/admin/games"><span class="icon" aria-hidden="true">🎯</span><strong>Games</strong><span class="sub">{GAMES.filter((g) => db.games.find((r) => r.key === g.key)?.enabled ?? true).length} of {GAMES.length} games on</span></a>
   <a class="tile wide quiet" href="#/admin/access"><span class="icon" aria-hidden="true">🔑</span><strong>Access</strong><span class="sub">Approve or remove people</span></a>
 </div>
 

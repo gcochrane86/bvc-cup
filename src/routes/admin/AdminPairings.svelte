@@ -98,7 +98,7 @@
     msg = 'Singles drawn — press Save pairings to publish them.';
   }
 
-  const twoVOne = $derived(round?.three_game === 'two_v_one');
+  const twoVOne = $derived(!!round?.three_game.startsWith('two_v_one'));
   const addGroup = () =>
     groupsDraft.push({ groupNo: Math.max(0, ...groupsDraft.map((g) => g.groupNo), ...removedNos) + 1, teeTime: '', players: ['', '', ''], single: 0, locked: false });
   function removeGroup(i: number) {

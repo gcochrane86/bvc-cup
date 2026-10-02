@@ -19,6 +19,7 @@
   import AdminCourses from './routes/admin/AdminCourses.svelte';
   import AdminCourse from './routes/admin/AdminCourse.svelte';
   import AdminGuide from './routes/admin/AdminGuide.svelte';
+  import AdminGames from './routes/admin/AdminGames.svelte';
   import ScoreEntry from './routes/ScoreEntry.svelte';
   import Match from './routes/Match.svelte';
   import Nav from './components/Nav.svelte';
@@ -135,6 +136,8 @@
         <AdminAccess />
       {:else if route.name === 'admin-courses'}
         <AdminCourses />
+      {:else if route.name === 'admin-games'}
+        <AdminGames />
       {:else if route.name === 'admin-guide'}
         {#key route.courseId}<AdminGuide courseId={route.courseId} />{/key}
       {:else if route.name === 'admin-course'}

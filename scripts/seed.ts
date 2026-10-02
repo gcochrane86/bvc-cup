@@ -21,6 +21,14 @@ const NONE = '00000000-0000-0000-0000-000000000000';
 await run(db.from('events').delete().neq('id', NONE)); // cascades rounds, groups, scores, results
 await run(db.from('players').delete().neq('id', NONE));
 await run(db.from('courses').delete().neq('id', NONE));
+// The games list back to its built-in state (all on, default settings).
+const GAME_DEFAULTS: Record<string, object> = {
+  stableford_match: { match_off_low: true, match_pct: 85 }, stableford: { stableford_pct: 100 }, flat_match: {},
+  two_v_one: { stableford_pct: 100 }, two_v_one_match: { stableford_pct: 100 }, two_v_one_flat: {},
+  six_stableford: { stableford_pct: 100 }, six_flat: {},
+  fourball_matchplay: { allowance_pct: 90 }, fourball_stableford: {}, fourball_flat: {}, scramble: { scramble_low_pct: 35, scramble_high_pct: 15 },
+};
+await run(db.from('games').upsert(Object.entries(GAME_DEFAULTS).map(([key, defaults]) => ({ key, enabled: true, defaults }))));
 
 const names = [
   'Alex Adams', 'Ben Brown', 'Chris Clark', 'Dan Davies', 'Ed Evans', 'Finn Fox',
