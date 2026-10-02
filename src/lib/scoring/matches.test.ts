@@ -36,16 +36,18 @@ describe('buildMatches', () => {
     const ms = buildMatches('g1', players, { ...settings, fourballFormat: 'stableford', singlesEnabled: true });
     expect(ms[0].strokes).toEqual({ a1: 4, a2: 18, b1: 9, b2: 14 }); // not off the low, no allowance
     expect(ms[0].stableford).toBe(true);
-    // Singles are unchanged: off the low, singles allowance, match play.
-    expect(ms[1].strokes).toEqual({ a1: 0, b1: 5 });
-    expect(ms[1].stableford).toBeUndefined();
+    // Singles play the same game: full handicaps, most Stableford points wins the hole.
+    expect(ms[1].strokes).toEqual({ a1: 4, b1: 9 });
+    expect(ms[1].stableford).toBe(true);
+    expect(ms[2].strokes).toEqual({ a2: 18, b2: 14 });
   });
 
-  it('in a flat fourball, nobody gets a shot (gross match play); singles keep their allowance', () => {
+  it('in a scratch fourball, nobody gets a shot, in the singles either', () => {
     const ms = buildMatches('g1', players, { ...settings, fourballFormat: 'flat', singlesEnabled: true });
     expect(ms[0].strokes).toEqual({ a1: 0, a2: 0, b1: 0, b2: 0 });
     expect(ms[0].stableford).toBeUndefined();
-    expect(ms[1].strokes).toEqual({ a1: 0, b1: 5 }); // singles: off the low at their allowance, as before
+    expect(ms[1].strokes).toEqual({ a1: 0, b1: 0 });
+    expect(ms[2].strokes).toEqual({ a2: 0, b2: 0 });
   });
 
   it('in a 2-man scramble, each team plays off 35% of each player added; the better team gives the difference', () => {
@@ -94,11 +96,11 @@ describe('buildMatches', () => {
     expect(ms[2].strokes).toEqual({ a2: 4, b2: 0 }); // 4*.9=3.6->4
   });
 
-  it('uses the singles allowance for singles only', () => {
-    const ms = buildMatches('g1', players, { ...settings, singlesEnabled: true, singlesAllowancePct: 100 });
-    expect(ms[0].strokes).toEqual({ a1: 0, a2: 13, b1: 5, b2: 9 });
-    expect(ms[1].strokes).toEqual({ a1: 0, b1: 5 });
-    expect(ms[2].strokes).toEqual({ a2: 4, b2: 0 });
+  it("off the low: singles use the fourball's allowance, off the lower of the two (any old singles allowance is ignored)", () => {
+    const ms = buildMatches('g1', players, { ...settings, allowancePct: 100, singlesEnabled: true, singlesAllowancePct: 50 });
+    expect(ms[0].strokes).toEqual({ a1: 0, a2: 14, b1: 5, b2: 10 });
+    expect(ms[1].strokes).toEqual({ a1: 0, b1: 5 }); // 9 - 4
+    expect(ms[2].strokes).toEqual({ a2: 4, b2: 0 }); // 18 - 14: a2 gets 14 in the fourball but 4 in his singles
   });
 
   it('returns no matches for an incomplete group', () => {

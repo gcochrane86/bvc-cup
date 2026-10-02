@@ -7,7 +7,8 @@
     id,
     enabled = $bindable(false),
     points = $bindable(0.5),
-    allowance = $bindable(90),
+    format = 'matchplay',
+    allowance = 90,
     pairing = $bindable<Pairing>('handicap'),
     fixedPoints = null,
     choose,
@@ -16,6 +17,8 @@
     id: string;
     enabled?: boolean;
     points?: number;
+    /** The fourball's game and allowance: the singles play the same. */
+    format?: 'matchplay' | 'stableford' | 'flat' | 'scramble';
     allowance?: number;
     pairing?: Pairing;
     /** Season events: singles are worth the event's points, so they're shown, not edited. */
@@ -30,6 +33,9 @@
     { value: 'selected', label: "I'll choose", hint: "Add the day and pair its fourballs, then pick each fourball's singles in the day's settings." },
   ];
   const worth = $derived(fixedPoints ?? Number(points));
+  const sameGame = $derived(
+    format === 'stableford' ? 'Stableford, full handicaps' : format === 'flat' ? 'scratch, no shots' : `off the lower of the two, ${Number(allowance)}%`,
+  );
 </script>
 
 <div class="singles" class:on={enabled}>
@@ -38,12 +44,12 @@
     <input class="switch" type="checkbox" role="switch" aria-label="Play singles" bind:checked={enabled} />
   </label>
   {#if enabled}
-    <div class="nums">
-      {#if fixedPoints === null}
+    <p class="same" data-testid="singles-game">Singles play the same game: {sameGame}.</p>
+    {#if fixedPoints === null}
+      <div class="nums">
         <span class="num"><label for="{id}-sp">Points</label><input id="{id}-sp" type="number" step="0.5" min="0" bind:value={points} /></span>
-      {/if}
-      <span class="num"><label for="{id}-sa">Singles allowance %</label><input id="{id}-sa" type="number" min="0" max="100" bind:value={allowance} /></span>
-    </div>
+      </div>
+    {/if}
     <span class="lbl">Who plays who</span>
     <div class="chips">
       {#each CHOICES as c (c.value)}
@@ -73,5 +79,6 @@
   .chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   /* The radio covers its whole chip (invisible), so a tap anywhere on it picks it. */
   .chip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .same { margin: -4px 0 0; font-size: 0.85rem; }
   .hint { margin: -4px 0 0; font-size: 0.8rem; color: var(--muted); }
 </style>

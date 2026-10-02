@@ -79,7 +79,7 @@
   let game = $state('');
   let settings = $state<Partial<Record<SettingKey, number | boolean>>>({});
   // Singles in each fourball (4+ golfers, not a scramble).
-  let singles = $state({ enabled: false, points: 0.5, allowance: 90, pairing: 'handicap' as 'handicap' | 'random' | 'selected', crossed: false });
+  let singles = $state({ enabled: false, points: 0.5, pairing: 'handicap' as 'handicap' | 'random' | 'selected', crossed: false });
   const lineupText = (fb: { a: string[]; b: string[] }, crossed: boolean) =>
     singlesLineup(fb, crossed).map(([a, b]) => `${nameOf(a)} v ${nameOf(b)}`).join(' · ');
 
@@ -135,7 +135,7 @@
       for (const [k, v] of Object.entries(settings)) (round as Record<string, unknown>)[k] = typeof v === 'boolean' ? v : Number(v);
       const withSingles = chosen.size === 4 && chosen.key !== 'scramble' && singles.enabled;
       round.singles_enabled = withSingles;
-      if (withSingles) Object.assign(round, { singles_points: Number(singles.points), singles_allowance_pct: Number(singles.allowance), singles_pairing: singles.pairing });
+      if (withSingles) Object.assign(round, { singles_points: Number(singles.points), singles_allowance_pct: Number(settings.allowance_pct ?? 90), singles_pairing: singles.pairing });
     }
     const singlesCrossed = !!(round.singles_enabled && singles.pairing === 'selected' && sole && singles.crossed);
     onAdd({ name: title, date: date || null, course_id: courseId, golfers, day, round, singlesCrossed });
@@ -241,7 +241,8 @@
             id="nr-singles"
             bind:enabled={singles.enabled}
             bind:points={singles.points}
-            bind:allowance={singles.allowance}
+            format={chosen?.fourballFormat}
+            allowance={Number(settings.allowance_pct ?? 90)}
             bind:pairing={singles.pairing}
             fixedPoints={season && points ? points.singles.win : null}
             choose={sole ? lineups : undefined}

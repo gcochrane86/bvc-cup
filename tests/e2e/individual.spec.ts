@@ -230,6 +230,7 @@ test('Admin → Games: a game switched off leaves the pickers; a changed default
   await form.getByLabel('Course').selectOption('Seed Links');
   // Singles are set up in the form too: on, a random draw.
   await form.getByRole('switch', { name: 'Play singles' }).check();
+  await expect(form.getByTestId('singles-game')).toHaveText('Singles play the same game: off the lower of the two, 90%.');
   await form.getByLabel('Random draw').check();
   await expect(form.getByText('Drawn for each fourball when the pairings are saved.')).toBeVisible();
   await form.getByRole('button', { name: /^Add Day/ }).click();

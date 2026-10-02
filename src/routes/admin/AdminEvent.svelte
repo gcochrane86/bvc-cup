@@ -457,7 +457,7 @@
               better_ball_points: Number(r.better_ball_points),
               singles_enabled: r.singles_enabled,
               singles_points: Number(r.singles_points),
-              singles_allowance_pct: Number(r.singles_allowance_pct),
+              singles_allowance_pct: Number(r.allowance_pct), // singles play the fourball's game, at its allowance
               singles_pairing: r.singles_pairing,
               fourball_format: r.fourball_format,
               holes: r.holes?.length && r.holes.length < 18 ? r.holes : null,
@@ -753,7 +753,8 @@
             id="rs-{r.id}"
             bind:enabled={r.singles_enabled}
             bind:points={r.singles_points}
-            bind:allowance={r.singles_allowance_pct}
+            format={r.fourball_format}
+            allowance={r.allowance_pct}
             bind:pairing={r.singles_pairing}
             fixedPoints={season ? event.points.singles.win : null}
           >

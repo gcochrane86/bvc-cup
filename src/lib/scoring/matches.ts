@@ -61,8 +61,11 @@ function scramble(groupId: string, sideA: SlotPlayer[], sideB: SlotPlayer[], s: 
   };
 }
 
+/** Singles play the fourball's game: off the lower of the two at the day's allowance, full-handicap Stableford, or scratch. */
 function singles(groupId: string, type: MatchType, a: SlotPlayer, b: SlotPlayer, s: RoundSettings): MatchDef {
   const lowest = Math.min(a.handicap, b.handicap);
+  const stableford = s.fourballFormat === 'stableford';
+  const shots = (p: SlotPlayer) => (s.fourballFormat === 'flat' ? 0 : stableford ? p.handicap : playingStrokes(p.handicap - lowest, s.allowancePct));
   return {
     id: `${groupId}:${type}`,
     groupId,
@@ -70,9 +73,7 @@ function singles(groupId: string, type: MatchType, a: SlotPlayer, b: SlotPlayer,
     sideA: [a.playerId],
     sideB: [b.playerId],
     points: s.singlesPoints,
-    strokes: {
-      [a.playerId]: playingStrokes(a.handicap - lowest, s.singlesAllowancePct),
-      [b.playerId]: playingStrokes(b.handicap - lowest, s.singlesAllowancePct),
-    },
+    strokes: { [a.playerId]: shots(a), [b.playerId]: shots(b) },
+    ...(stableford ? { stableford: true } : {}),
   };
 }
