@@ -978,10 +978,14 @@ test("the admin ticks who's playing (search, select all, clear), then puts them 
   // Teams: one tap each; nobody can be left off a team when saving.
   await expect(admin.getByText('4 players not on a team yet')).toBeVisible();
   await expect(admin.getByRole('button', { name: 'Save teams' })).toBeDisabled();
-  await admin.getByRole('button', { name: 'Alex Adams: Ballymena' }).click();
-  await admin.getByRole('button', { name: 'Ben Brown: Coleraine' }).click();
-  await admin.getByRole('button', { name: 'Chris Clark: Coleraine' }).click();
-  await admin.getByRole('button', { name: 'Dan Davies: Coleraine' }).click();
+  // Rows stay put while teams are picked (no jumping as players are assigned).
+  const order = () => admin.getByTestId('team-row').allTextContents();
+  const before = (await order()).map((t) => t.slice(0, 8));
+  for (const [n, t] of [['Alex Adams', 'Ballymena'], ['Ben Brown', 'Coleraine'], ['Chris Clark', 'Coleraine'], ['Dan Davies', 'Coleraine']]) {
+    await admin.getByRole('button', { name: `${n}: ${t}` }).click();
+    expect((await order()).map((x) => x.slice(0, 8))).toEqual(before);
+  }
+  expect(before[0]).toContain('Alex'); // alphabetical
   await expect(admin.getByTestId('team-count-A')).toContainText('1');
   await expect(admin.getByTestId('team-count-B')).toContainText('3');
   await admin.getByRole('button', { name: 'Save teams' }).click();

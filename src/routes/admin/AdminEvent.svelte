@@ -515,9 +515,10 @@
       {#if countA === 2 && countB === 2}<p class="muted small">One fourball: it's paired automatically when you save.</p>{/if}
       {#if unassigned.length}<p class="warn">{unassigned.length} {unassigned.length === 1 ? 'player' : 'players'} not on a team yet</p>{/if}
       {#if !playingIds.length}<p class="muted">Nobody's playing yet — tick players in step 1.</p>{/if}
-      {#each [...unassigned, ...onTeam('A'), ...onTeam('B')] as id (id)}
+      <!-- In name order, fixed: rows don't move as teams are picked. -->
+      {#each playingIds as id (id)}
         {@const p = db.players.find((x) => x.id === id)}
-        <div class="teamrow">
+        <div class="teamrow" data-testid="team-row">
           <span class="pname">{p?.name}<br /><span class="hcp small">{members[id].handicap}</span></span>
           <span class="seg">
             <button aria-label="{p?.name}: {event.team_a_name}" aria-pressed={members[id].team === 'A'} style={members[id].team === 'A' ? `background:${event.team_a_colour};color:#fff` : ''} onclick={() => (members[id].team = 'A')}>{event.team_a_name}</button>
