@@ -161,6 +161,10 @@ test('a confirmed 2 v 1 adds its points to the single\'s team; a player added la
   await expect(day2.getByTestId('day-format')).toContainText('5 golfers · fourballs');
   await day2.getByRole('button', { name: 'Save golfers' }).click();
   await expect(admin.getByText('Day 2 golfers saved')).toBeVisible();
+  // The day stays open (its game may need choosing for the new golfer count); only the golfers list folds.
+  await expect(day2.getByText('Day 2 golfers saved')).toBeVisible();
+  await expect(day2.getByRole('button', { name: 'Save round' })).toBeVisible();
+  await expect(day2.getByRole('button', { name: 'Change golfers' })).toBeHidden();
   await expect.poll(async () => (await db.from('groups').select('id').eq('round_id', r2!.id)).data?.length).toBe(0);
   await expect.poll(async () => (await db.from('round_players').select('player_id').eq('round_id', r2!.id)).data?.length).toBe(5);
 });

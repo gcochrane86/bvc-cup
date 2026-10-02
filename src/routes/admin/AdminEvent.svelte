@@ -43,6 +43,7 @@
   let locked = $state<Set<string>>(new Set());
   /** Rounds show as one-line tiles; these are the ones opened for editing (kept open across saves). */
   let openRounds = $state<Record<string, boolean>>({});
+  let openGolfers = $state<Record<string, boolean>>({});
   /** The Players section opens by itself while teams still need sorting. */
   let playersOpen = $state(false);
   let moreOpen = $state(false);
@@ -352,7 +353,7 @@
     return act(async () => {
       await seasonGroup(r, ids, seasonDayCheck(ids, seasonTeamOf));
       delete editGolfers[r.id];
-    }, `${r.name} golfers saved`, `round:${r.id}`).then((ok) => ok && (openRounds[r.id] = false));
+    }, `${r.name} golfers saved`, `golfers:${r.id}`).then((ok) => ok && (openGolfers[r.id] = false)); // the day stays open: its game may need choosing
   };
 
   /** Season events: the event's points for each format (a win and a halve each). */
@@ -625,7 +626,7 @@
           <p class="muted small">No course guide yet · <a href="#/admin/guide/{r.course_id}">add photos</a></p>
         {/if}
         {#if season}
-          <details class="player-tees" data-testid="day-golfers">
+          <details class="player-tees" data-testid="day-golfers" bind:open={openGolfers[r.id]}>
             <summary>Golfers ({golfersOf(r).length})</summary>
             {#if editGolfers[r.id]}
               <SeasonGolfers players={seasonPlayers} {teamName} bind:selected={editGolfers[r.id]} />
@@ -635,6 +636,7 @@
               <button class="secondary" disabled={golfersOf(r).some((id) => lockedIn(r.id, id))} onclick={() => (editGolfers[r.id] = [...golfersOf(r)])}>Change golfers</button>
             {/if}
           </details>
+          {#if msg && msgAt === `golfers:${r.id}`}<p class="saved" class:error={msg.startsWith('Error')}>{msg}</p>{/if}
         {/if}
         {#if individual || seasonGameDay(r)}
           {@const games = gamesOf(r)}
