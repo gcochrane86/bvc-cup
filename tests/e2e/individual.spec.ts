@@ -228,11 +228,20 @@ test('Admin → Games: a game switched off leaves the pickers; a changed default
   await page.getByRole('button', { name: '+ Add round' }).click();
   const form = page.locator('form.round');
   await form.getByLabel('Course').selectOption('Seed Links');
+  // Singles are set up in the form too: on, a random draw.
+  await form.getByRole('switch', { name: 'Play singles' }).check();
+  await form.getByLabel('Random draw').check();
+  await expect(form.getByText('Drawn for each fourball when the pairings are saved.')).toBeVisible();
   await form.getByRole('button', { name: /^Add Day/ }).click();
   await expect(page.getByText('Round added')).toBeVisible();
-  const { data: rounds } = await db.from('rounds').select('scramble_low_pct, scramble_high_pct, round_no').eq('event_id', team!.id).order('round_no');
+  const { data: rounds } = await db
+    .from('rounds')
+    .select('scramble_low_pct, scramble_high_pct, singles_enabled, singles_pairing, round_no')
+    .eq('event_id', team!.id)
+    .order('round_no');
   const added = rounds!.at(-1)!;
   expect([Number(added.scramble_low_pct), Number(added.scramble_high_pct)]).toEqual([35, 35]);
+  expect([added.singles_enabled, added.singles_pairing]).toEqual([true, 'random']);
 });
 
 test('a day can play only some holes (winter: 1–9, 14 and 18); score entry skips the rest', async ({ page }) => {

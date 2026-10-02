@@ -16,6 +16,7 @@
   // Add a day, filling in as you go: when and where → tees and holes → who's playing (season events) → the
   // game for that many golfers and its settings. The day is fully set before it's added.
   import SeasonGolfers from './SeasonGolfers.svelte';
+  import SinglesSettings from './SinglesSettings.svelte';
   import { courseGroups, defaultTee, teesOf } from '../lib/courses';
   import { defaultsFor, gameInfo, gamesFor, newRoundDefaults, type GameRow, type SettingKey } from '../lib/games';
   import { holesFor, type HolesMode } from '../lib/holes';
@@ -68,7 +69,9 @@
   let golferMode = $state<'same' | 'different'>('same');
   let newGolfers = $state<string[]>([]);
   let game = $state('');
-  let settings = $state<Partial<Record<SettingKey | 'singles_enabled', number | boolean>>>({});
+  let settings = $state<Partial<Record<SettingKey, number | boolean>>>({});
+  // Singles in each fourball (4+ golfers, not a scramble).
+  let singles = $state({ enabled: false, points: 0.5, allowance: 90, pairing: 'handicap' as 'handicap' | 'random' | 'selected' });
 
   const tees = $derived(teesOf(courses, course));
   function pickCourse(c: string) {
@@ -92,7 +95,7 @@
   });
   function chooseGame(key: string) {
     game = key;
-    settings = { ...defaultsFor(key, rows), singles_enabled: false };
+    settings = { ...defaultsFor(key, rows) };
   }
   const chosen = $derived(gameInfo(game));
   const uses = (k: SettingKey) => chosen?.defaults[k] !== undefined;
@@ -103,7 +106,7 @@
     if (size === 2) return `Worth: ${formatPoints(points.one_v_one.win)} for a win (halve ${formatPoints(points.one_v_one.halve)})`;
     if (size === 3)
       return `Worth: single wins ${formatPoints(points.two_v_one_single.win)} (halve ${formatPoints(points.two_v_one_single.halve)}) · the pair wins ${formatPoints(points.two_v_one_pair.win)} (halve ${formatPoints(points.two_v_one_pair.halve)})`;
-    return `Worth: ${formatPoints(points.fourball.win)} a fourball${settings.singles_enabled ? `, ${formatPoints(points.singles.win)} a singles` : ''}`;
+    return `Worth: ${formatPoints(points.fourball.win)} a fourball${singles.enabled ? `, ${formatPoints(points.singles.win)} a singles` : ''}`;
   });
 
   const ready = $derived(!!courseId && (holes === null || holes.length > 0) && (!season || (!!day && 'format' in day)));
@@ -118,6 +121,9 @@
       else if (chosen.size === 3) round.three_game = chosen.key as RoundRow['three_game'];
       else round.fourball_format = chosen.fourballFormat!;
       for (const [k, v] of Object.entries(settings)) (round as Record<string, unknown>)[k] = typeof v === 'boolean' ? v : Number(v);
+      const withSingles = chosen.size === 4 && chosen.key !== 'scramble' && singles.enabled;
+      round.singles_enabled = withSingles;
+      if (withSingles) Object.assign(round, { singles_points: Number(singles.points), singles_allowance_pct: Number(singles.allowance), singles_pairing: singles.pairing });
     }
     onAdd({ name: title, date: date || null, course_id: courseId, golfers, day, round });
   }
@@ -218,7 +224,14 @@
           <div class="set"><label for="nr-sh">High handicap %</label><input id="nr-sh" type="number" min="0" max="100" bind:value={settings.scramble_high_pct as number} /></div>
         {/if}
         {#if size === 4 && game !== 'scramble'}
-          <label class="row setting"><input type="checkbox" bind:checked={settings.singles_enabled as boolean} /> Also play 2 singles in each fourball</label>
+          <SinglesSettings
+            id="nr-singles"
+            bind:enabled={singles.enabled}
+            bind:points={singles.points}
+            bind:allowance={singles.allowance}
+            bind:pairing={singles.pairing}
+            fixedPoints={season && points ? points.singles.win : null}
+          />
         {/if}
         {#if worth}<p class="muted small">{worth}</p>{/if}
       {/if}

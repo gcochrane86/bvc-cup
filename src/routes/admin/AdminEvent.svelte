@@ -4,6 +4,7 @@
   import AddRound, { type AddRoundPayload } from '../../components/AddRound.svelte';
   import { db, loadAll, photoCourses } from '../../lib/data/store.svelte';
   import { favouritesFirst } from '../../lib/favourites';
+  import SinglesSettings from '../../components/SinglesSettings.svelte';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
   import { courseGroups, teesOf } from '../../lib/courses';
@@ -699,21 +700,14 @@
         {/if}
         <!-- A scramble is one ball per team, so there are no singles that day. -->
         {#if r.fourball_format !== 'scramble'}
-          <label class="row"><input type="checkbox" bind:checked={r.singles_enabled} /> Also play 2 singles in each fourball</label>
-        {/if}
-        {#if r.singles_enabled && r.fourball_format !== 'scramble'}
-          <div class="row">
-            <div class="field"><label for="rsp-{r.id}">Singles pts</label><input id="rsp-{r.id}" type="number" step="0.5" bind:value={r.singles_points} /></div>
-            <div class="field"><label for="rsa-{r.id}">Singles allowance %</label><input id="rsa-{r.id}" type="number" min="0" max="100" bind:value={r.singles_allowance_pct} /></div>
-          </div>
-          <div class="field">
-            <label for="rsm-{r.id}">Singles pairings</label>
-            <select id="rsm-{r.id}" bind:value={r.singles_pairing}>
-              <option value="handicap">By handicap (low v low, high v high)</option>
-              <option value="random">Random draw</option>
-              <option value="selected">Chosen by admin</option>
-            </select>
-          </div>
+          <SinglesSettings
+            id="rs-{r.id}"
+            bind:enabled={r.singles_enabled}
+            bind:points={r.singles_points}
+            bind:allowance={r.singles_allowance_pct}
+            bind:pairing={r.singles_pairing}
+            fixedPoints={season ? event.points.singles.win : null}
+          />
         {/if}
         {/if}
         <button disabled={holesMode(r) === 'custom' && !r.holes?.length} onclick={() => saveRound(r)}>Save round</button>
@@ -723,7 +717,15 @@
           <span class="pstatus" class:ok={pairingStatus(r).endsWith('✓')} data-testid="pairing-status">{pairingStatus(r)}</span>
         </div>
       </details>
-      {#if msg && msgAt === `round:${r.id}`}<p class="saved" class:error={msg.startsWith('Error')}>{msg}</p>{/if}
+      {#if msg && msgAt === `round:${r.id}`}
+        <!-- Saved and folded: the next step (pairings) stays one tap away. -->
+        <p class="saved" class:error={msg.startsWith('Error')} data-testid="saved-next">
+          <span>{msg}</span>
+          {#if !msg.startsWith('Error') && !seasonGameDay(r) && (!pairingStatus(r).endsWith('✓') || (r.singles_enabled && r.singles_pairing === 'selected'))}
+            <a class="nextbtn" href="#/admin/pairings/{r.id}">{individual ? 'Set groups →' : 'Set pairings →'}</a>
+          {/if}
+        </p>
+      {/if}
     {/each}
 
     {#if adding}
@@ -794,7 +796,8 @@
   .star.on { color: #c58a12; }
   .empty { padding: 10px 12px; margin: 0; }
   .wide.top { margin: 0 0 8px; }
-  .saved { margin: 6px 2px 12px; font-weight: 600; color: var(--ok, #155d27); }
+  .saved { margin: 6px 2px 12px; font-weight: 600; color: var(--ok, #155d27); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .nextbtn { border: 1px solid var(--accent); border-radius: 8px; padding: 5px 10px; color: var(--accent); text-decoration: none; font-weight: 700; }
   .saved.error { color: var(--danger, #b00020); }
   .pick:last-child { border-bottom: 0; }
   .pick.sel { background: #eef5f0; }
