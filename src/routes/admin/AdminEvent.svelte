@@ -10,7 +10,7 @@
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
   import { courseGroups, teesOf } from '../../lib/courses';
-  import { autoFourball, eventKindFor, gameLabel, gamesToSet, scrambleHandicap, seasonDayCheck, type SeasonDay, type Team } from '../../lib/scoring';
+  import { autoFourball, eventKindFor, formatPoints, gameLabel, gamesToSet, scrambleHandicap, seasonDayCheck, type SeasonDay, type Team } from '../../lib/scoring';
   import { courseGuide } from '../../lib/guides';
   import { fourballKey, gamesFor } from '../../lib/games';
   import ResetScores from '../../components/ResetScores.svelte';
@@ -733,7 +733,12 @@
           {#if r.fourball_format === 'matchplay'}
             <div class="field"><label for="ra-{r.id}">Fourball allowance %</label><input id="ra-{r.id}" type="number" min="0" max="100" bind:value={r.allowance_pct} /></div>
           {/if}
-          <div class="field"><label for="rp-{r.id}">Fourball pts</label><input id="rp-{r.id}" type="number" step="0.5" bind:value={r.better_ball_points} /></div>
+          <!-- Season events: the fourball is worth the event's points (the day's own value isn't used). -->
+          {#if season}
+            <p class="muted small worth" data-testid="fourball-worth">Fourball worth {formatPoints(event.points.fourball.win)} (from the event's points)</p>
+          {:else}
+            <div class="field"><label for="rp-{r.id}">Fourball pts</label><input id="rp-{r.id}" type="number" step="0.5" bind:value={r.better_ball_points} /></div>
+          {/if}
         </div>
         {#if r.fourball_format === 'scramble'}
           <!-- Team handicap: this % of the lower partner's handicap plus this % of the higher. -->

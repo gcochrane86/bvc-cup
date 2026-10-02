@@ -50,6 +50,12 @@ test('a season team event: points per format, golfers per day, 2 v 1 from the te
   await expect(page.getByText(/Round added/)).toBeVisible();
   const { data: d1 } = await serviceDb().from('rounds').select('id, events!inner(season)').eq('name', 'Day 1').eq('events.season', true).single();
   await expect.poll(async () => (await serviceDb().from('groups').select('singles_crossed').eq('round_id', d1!.id).single()).data?.singles_crossed).toBe(true);
+  // Day 1's settings show the event's points: the fourball is worth 2, the singles 1 each (2 in total).
+  await unfoldEvent(page);
+  const day1 = page.getByTestId('round').first();
+  await expect(day1.getByTestId('fourball-worth')).toHaveText("Fourball worth 2 (from the event's points)");
+  await expect(day1.getByLabel('Fourball pts')).toHaveCount(0);
+  await expect(day1.locator('.singles')).toContainText('2 in each fourball · 1 each, 2 in total');
 
   // Day 2: different golfers — two from Team A only is blocked; with Clark it's a 2 v 1, Clark alone.
   await page.getByRole('button', { name: '+ Add round' }).click();

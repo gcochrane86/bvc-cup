@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { formatPoints } from '../lib/scoring';
   // Singles in each fourball: one switch, and when on, points, allowance and who plays who right here.
   // Used by a day's settings and the Add round form.
   type Pairing = 'handicap' | 'random' | 'selected';
@@ -40,7 +41,7 @@
 
 <div class="singles" class:on={enabled}>
   <label class="shead">
-    <span><strong>Singles</strong><span class="sub">{enabled ? `2 in each fourball · worth ${worth} each` : 'Off · fourballs only'}</span></span>
+    <span><strong>Singles</strong><span class="sub">{enabled ? `2 in each fourball · ${formatPoints(worth)} each, ${formatPoints(worth * 2)} in total` : 'Off · fourballs only'}</span></span>
     <input class="switch" type="checkbox" role="switch" aria-label="Play singles" bind:checked={enabled} />
   </label>
   {#if enabled}
