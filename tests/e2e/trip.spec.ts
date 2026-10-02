@@ -930,11 +930,12 @@ test('adding a day to a new event picks the course, then its tees', async ({ bro
   const eventId = admin.url().split('/events/')[1];
 
   const form = admin.locator('form.round');
-  await expect(form.getByLabel('Tees')).toHaveCount(0); // no course chosen yet
+  await expect(form.getByLabel('White tees')).toHaveCount(0); // no course chosen yet: no tees
   await form.getByLabel('Course').selectOption('Tee Links');
-  await expect(form.getByLabel('Tees')).toHaveValue(ids.Gold); // longest tee first
-  await form.getByLabel('Tees').selectOption(ids.White);
-  await form.getByRole('button', { name: 'Add round' }).click();
+  await expect(form.getByLabel('White tees')).toBeChecked(); // White by default
+  await form.getByLabel('Gold tees').check();
+  await form.getByLabel('White tees').check();
+  await form.getByRole('button', { name: /^Add Day/ }).click();
   await expect(admin.getByText('Round added')).toBeVisible();
   const { data: added } = await db.from('rounds').select('name, course_id').eq('event_id', eventId);
   expect(added).toEqual([{ name: 'Day 1', course_id: ids.White }]);
@@ -1023,11 +1024,11 @@ test("an event's Add round form stays tucked away until '+ Add round' is pressed
   const admin = await newPhone(browser);
   await loginAdmin(admin);
   await openEvent(admin, await activeEventId()); // the seed event already has days
-  await expect(admin.getByRole('heading', { name: 'Add round' })).toHaveCount(0);
+  await expect(admin.getByRole('heading', { name: /^Add Day/ })).toHaveCount(0);
   await admin.getByRole('button', { name: '+ Add round' }).click();
-  await expect(admin.getByRole('heading', { name: 'Add round' })).toBeVisible();
+  await expect(admin.getByRole('heading', { name: /^Add Day/ })).toBeVisible();
   await admin.getByRole('button', { name: 'Cancel' }).click();
-  await expect(admin.getByRole('heading', { name: 'Add round' })).toHaveCount(0);
+  await expect(admin.getByRole('heading', { name: /^Add Day/ })).toHaveCount(0);
   await expect(admin.getByRole('button', { name: '+ Add round' })).toBeVisible();
 });
 

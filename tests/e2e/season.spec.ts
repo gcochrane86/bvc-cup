@@ -39,7 +39,7 @@ test('a season team event: points per format, golfers per day, 2 v 1 from the te
   await form.getByLabel('Course').selectOption('Seed Links');
   await expect(form.getByLabel(/Everyone/)).toBeChecked();
   await expect(form.getByTestId('day-format')).toContainText('4 golfers · fourballs');
-  await form.getByRole('button', { name: 'Add round' }).click();
+  await form.getByRole('button', { name: /^Add Day/ }).click();
   await expect(page.getByText(/Round added/)).toBeVisible();
 
   // Day 2: different golfers — two from Team A only is blocked; with Clark it's a 2 v 1, Clark alone.
@@ -52,16 +52,21 @@ test('a season team event: points per format, golfers per day, 2 v 1 from the te
   await form.getByLabel('Chris Clark golfer').uncheck();
   await form.getByLabel('Dan Davies golfer').uncheck();
   await expect(form.getByTestId('day-format')).toContainText('both on Team A');
-  await expect(form.getByRole('button', { name: 'Add round' })).toBeDisabled();
+  await expect(form.getByRole('button', { name: /^Add Day/ })).toBeDisabled();
   await form.getByLabel('Chris Clark golfer').check();
   await expect(form.getByTestId('day-format')).toContainText('3 golfers · 2 v 1 · Clark plays alone');
-  await form.getByRole('button', { name: 'Add round' }).click();
+  // The game is chosen here: 2 v 1 games only, best individual first and picked.
+  await expect(form.getByLabel('2 v 1 Stableford (best individual)')).toBeChecked();
+  await expect(form.getByLabel('Six pointer (Stableford)')).toHaveCount(0);
+  await expect(form.getByText('single wins 2')).toBeVisible();
+  await form.getByRole('button', { name: 'Add Day 2 · 2 v 1 Stableford (best individual)' }).click();
   await expect(page.getByText(/Round added/)).toBeVisible();
 
   const db = serviceDb();
   const id = await ids();
   const { data: rounds } = await db.from('rounds').select('id, round_no').eq('event_id', eventId).order('round_no');
   const day2 = rounds![1].id;
+  expect((await db.from('rounds').select('three_game').eq('id', day2).single()).data).toEqual({ three_game: 'two_v_one_best' });
   const rp = (await db.from('round_players').select('player_id').eq('round_id', day2)).data!.map((r) => r.player_id).sort();
   expect(rp).toEqual([id('Alex Adams'), id('Ben Brown'), id('Chris Clark')].sort());
   const g = (await db.from('groups').select('group_players(slot, player_id)').eq('round_id', day2)).data!;
@@ -129,6 +134,7 @@ test('a confirmed 2 v 1 adds its points to the single\'s team; a player added la
   await admin.getByRole('tab', { name: /Who's playing/ }).click();
   await admin.getByLabel('Ed Evans playing').check();
   await admin.getByRole('button', { name: '+ Add round' }).click();
+  await admin.locator('form.round').getByLabel('Course').selectOption('Seed Links');
   await admin.locator('form.round').getByLabel('Different golfers').check();
   await expect(admin.locator('form.round').getByLabel('Ed Evans golfer')).toHaveCount(0);
   await admin.locator('form.round').getByRole('button', { name: 'Cancel' }).click();
@@ -138,6 +144,7 @@ test('a confirmed 2 v 1 adds its points to the single\'s team; a player added la
   await expect(admin.getByText(/Teams saved/)).toBeVisible();
   await admin.getByRole('button', { name: '+ Add round' }).click();
   const form = admin.locator('form.round');
+  await form.getByLabel('Course').selectOption('Seed Links');
   await form.getByLabel('Different golfers').check();
   await expect(form.getByLabel('Ed Evans golfer')).toBeVisible();
   const day1 = (await db.from('round_players').select('player_id').eq('round_id', round!.id)).data!;

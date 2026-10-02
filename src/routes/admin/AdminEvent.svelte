@@ -1,13 +1,14 @@
 <script lang="ts">
   import ShareLink from '../../components/ShareLink.svelte';
   import SeasonGolfers from '../../components/SeasonGolfers.svelte';
+  import AddRound, { type AddRoundPayload } from '../../components/AddRound.svelte';
   import { db, loadAll, photoCourses } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
   import { courseGroups, teesOf } from '../../lib/courses';
   import { autoFourball, eventKindFor, gameLabel, gamesToSet, scrambleHandicap, seasonDayCheck, type SeasonDay, type Team } from '../../lib/scoring';
   import { courseGuide } from '../../lib/guides';
-  import { fourballKey, gamesFor, newRoundDefaults } from '../../lib/games';
+  import { fourballKey, gamesFor } from '../../lib/games';
   import ResetScores from '../../components/ResetScores.svelte';
   import ConfirmedResults from '../../components/ConfirmedResults.svelte';
 
@@ -19,8 +20,6 @@
   let members = $state<Record<string, Member>>({});
   let rounds = $state<RoundRow[]>([]);
   let msg = $state<string | null>(null);
-  // course: the course name picked first; course_id: its tee (the longest tee until another is picked).
-  let newRound = $state({ name: '', course: '', course_id: '', date: '' });
   /** The Add round form only shows after '+ Add round' is pressed (always for an event with no rounds yet). */
   let adding = $state(false);
   let roundTees = $state<RoundTeeRow[]>([]);
@@ -29,9 +28,6 @@
   let groupSizes = $state<Record<string, number[]>>({});
   /** Season events: each day's golfers. */
   let roundGolfers = $state<Record<string, string[]>>({});
-  /** Season events, adding a day: the previous day's golfers, or a different set. */
-  let golferMode = $state<'same' | 'different'>('same');
-  let newGolfers = $state<string[]>([]);
   /** Season events, changing a day's golfers: the list being edited, per day. */
   let editGolfers = $state<Record<string, string[]>>({});
   /** The event's saved players (the day pickers only offer players already saved with a team). */
@@ -140,8 +136,6 @@
   const lastRound = $derived(rounds.at(-1));
   /** "Same as Day N": the last day's golfers (everyone for the first day). */
   const sameGolfers = $derived(lastRound ? golfersOf(lastRound) : seasonPlayers.map((p) => p.id));
-  const chosenGolfers = $derived(golferMode === 'same' ? sameGolfers : newGolfers);
-  const chosenDay = $derived(seasonDayCheck(chosenGolfers, seasonTeamOf));
   /** Season days of 2 or 3 golfers play an individual game (1 v 1 or 2 v 1); 4+ play fourballs. */
   const seasonGameDay = (r: RoundRow) => season && golfersOf(r).length <= 3;
   const savedPlaying = $derived(playingIds.filter((id) => members[id].team).length);
@@ -283,35 +277,25 @@
     return paired;
   }
 
-  const addRound = (e: SubmitEvent) => {
-    e.preventDefault();
+  /** Add a day from the form (fully set: course, tees, holes, golfers and game), then its group where it has one. */
+  const addRound = (p: AddRoundPayload) => {
     const next = Math.max(0, ...rounds.map((r) => r.round_no)) + 1;
     void act(async () => {
       const added = (await must(
         supabase
           .from('rounds')
-          .insert({
-            event_id: eventId,
-            round_no: next,
-            name: newRound.name.trim() || `Day ${next}`,
-            course_id: newRound.course_id,
-            date: newRound.date || null,
-            // A new day starts from Admin → Games: the first games switched on, with their defaults.
-            ...newRoundDefaults(db.games, season),
-          })
+          .insert({ ...p.round, event_id: eventId, round_no: next, name: p.name, course_id: p.course_id, date: p.date })
           .select()
           .single(),
       )) as RoundRow;
-      if (season) return seasonGroup(added, chosenGolfers, chosenDay);
+      if (season && p.golfers && p.day) return seasonGroup(added, p.golfers, p.day);
       const paired = individual ? await groupEveryDay([added]) : await pairTwoVTwo([added]);
       return paired.length ? `Round added · ${individual ? 'group' : 'pairings'} set for ${added.name}` : 'Round added';
     }, 'Round added').then(() => {
-      newRound = { name: '', course: '', course_id: '', date: '' };
       adding = false;
-      golferMode = 'same';
-      newGolfers = [];
     });
   };
+
 
   /**
    * Season events: save a day's golfers, then its group — a 1 v 1 or 2 v 1 (the single first) is one group;
@@ -701,52 +685,21 @@
     {/each}
 
     {#if adding}
-    <form class="round" onsubmit={addRound}>
-      <h3>Add round</h3>
-      <div class="row">
-        <div class="field"><label for="nrn">Name</label><input id="nrn" bind:value={newRound.name} placeholder="Day {rounds.length + 1}" /></div>
-        <div class="field"><label for="nrd">Date</label><input id="nrd" type="date" bind:value={newRound.date} /></div>
-      </div>
-      <div class="field">
-        <label for="nrc">Course</label>
-        <select
-          id="nrc"
-          value={newRound.course}
-          required
-          onchange={(e) => {
-            newRound.course = (e.currentTarget as HTMLSelectElement).value;
-            newRound.course_id = teesOf(db.courses, newRound.course)[0]?.id ?? '';
-          }}
-        >
-          <option value="" disabled>Choose a course</option>
-          {#each courseGroups(db.courses) as g (g.name)}<option value={g.name}>{g.name}</option>{/each}
-        </select>
-      </div>
-      {#if teesOf(db.courses, newRound.course).some((t) => t.tee)}
-        <div class="field">
-          <label for="nrt">Tees</label>
-          <select id="nrt" bind:value={newRound.course_id}>
-            {#each teesOf(db.courses, newRound.course) as t (t.id)}<option value={t.id}>{t.tee ?? 'Main'} tees</option>{/each}
-          </select>
-        </div>
-      {/if}
-      {#if season}
-        <div class="field">
-          <span class="lbl">Golfers</span>
-          <label class="choice"><input type="radio" name="golfers" value="same" bind:group={golferMode} /> {lastRound ? `Same as ${lastRound.name}` : `Everyone (${seasonPlayers.length})`}</label>
-          <label class="choice"><input type="radio" name="golfers" value="different" bind:group={golferMode} onchange={() => (newGolfers = [...sameGolfers])} /> Different golfers</label>
-          {#if golferMode === 'different'}
-            <SeasonGolfers players={seasonPlayers} {teamName} bind:selected={newGolfers} />
-          {:else}
-            <SeasonGolfers players={seasonPlayers} {teamName} selected={sameGolfers} picking={false} />
-          {/if}
-        </div>
-      {/if}
-      <div class="row">
-        <button type="submit" disabled={season && !('format' in chosenDay)}>Add round</button>
-        <button type="button" class="secondary" onclick={() => (adding = false)}>Cancel</button>
-      </div>
-    </form>
+      <AddRound
+        nextName="Day {Math.max(0, ...rounds.map((r) => r.round_no)) + 1}"
+        courses={db.courses}
+        rows={db.games}
+        {season}
+        players={savedPlayers.length}
+        {seasonPlayers}
+        {sameGolfers}
+        sameLabel={lastRound ? `Same as ${lastRound.name}` : `Everyone (${seasonPlayers.length})`}
+        {teamName}
+        points={season ? event.points : null}
+        canCancel={rounds.length > 0}
+        onAdd={addRound}
+        onCancel={() => (adding = false)}
+      />
     {/if}
   </section>
 
@@ -853,7 +806,6 @@
   .ptable .fmt { font-weight: 600; font-size: 0.9rem; }
   .choice { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
   .choice input { width: 18px; height: 18px; margin: 0; }
-  .lbl { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 4px; }
   .calc { background: #e3efe7; border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; margin: 0 0 12px; font-variant-numeric: tabular-nums; }
   .player-tees summary { cursor: pointer; font-weight: 600; margin: 4px 0 8px; }
   .more summary { cursor: pointer; font-weight: 700; padding: 12px 0; color: var(--muted); }

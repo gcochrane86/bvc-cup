@@ -74,8 +74,14 @@ test("an event with 3 players becomes a 3-ball: no teams, its group made automat
 
   const form = page.locator('form.round');
   await form.getByLabel('Course').selectOption('Seed Links');
-  await form.getByRole('button', { name: 'Add round' }).click();
+  // Holes 1 to N: set the day to finish on the 12th.
+  await form.getByLabel('Holes 1 to…').check();
+  await expect(form.getByTestId('holes-to')).toHaveText('13');
+  await form.getByRole('button', { name: 'Fewer holes' }).click();
+  await expect(form.getByText('12 holes')).toBeVisible();
+  await form.getByRole('button', { name: /^Add Day/ }).click();
   await expect(page.getByText('Round added')).toBeVisible();
+  expect((await serviceDb().from('rounds').select('holes').eq('event_id', page.url().split('/events/')[1]).single()).data?.holes).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 
   await unfoldEvent(page);
   for (const n of ['Alex Adams', 'Ben Brown', 'Chris Clark']) await page.getByLabel(`${n} playing`).check();
@@ -202,6 +208,7 @@ test('Admin → Games: a game switched off leaves the pickers; a changed default
   await page.getByRole('link', { name: /^Games/ }).click();
   await expect(page.getByRole('heading', { name: 'Games', exact: true })).toBeVisible();
   await page.getByLabel('Stableford on', { exact: true }).uncheck();
+  await expect(page.getByText('Stableford off', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Edit 2-man scramble' }).click();
   await page.getByLabel('High handicap %').fill('35');
   await page.getByRole('button', { name: 'Save 2-man scramble' }).click();
@@ -221,7 +228,7 @@ test('Admin → Games: a game switched off leaves the pickers; a changed default
   await page.getByRole('button', { name: '+ Add round' }).click();
   const form = page.locator('form.round');
   await form.getByLabel('Course').selectOption('Seed Links');
-  await form.getByRole('button', { name: 'Add round' }).click();
+  await form.getByRole('button', { name: /^Add Day/ }).click();
   await expect(page.getByText('Round added')).toBeVisible();
   const { data: rounds } = await db.from('rounds').select('scramble_low_pct, scramble_high_pct, round_no').eq('event_id', team!.id).order('round_no');
   const added = rounds!.at(-1)!;
