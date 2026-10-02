@@ -1,4 +1,4 @@
-import { gameResult } from './individual';
+import { gameResult, type TeamContext } from './individual';
 import type { ConfirmedResult, MatchDef, MatchState, RoundSettings } from './types';
 
 export interface Tracker {
@@ -56,11 +56,11 @@ export function roundPointsAvailable(s: RoundSettings, groupCount: number): numb
   return groupCount * (s.betterBallPoints + (s.singlesEnabled ? 2 * s.singlesPoints : 0));
 }
 
-export function resultFromState(def: MatchDef, state: MatchState): ConfirmedResult | null {
-  if (def.game) return gameResult(def, state); // individual events: no team points, each player's points
+export function resultFromState(def: MatchDef, state: MatchState, team?: TeamContext): ConfirmedResult | null {
+  if (def.game) return gameResult(def, state, team); // individual games: team points in season events, each player's points
   if (!state.decided || !state.winner || state.finalHole === null || !state.resultText) return null;
   const [pointsA, pointsB] =
-    state.winner === 'A' ? [def.points, 0] : state.winner === 'B' ? [0, def.points] : [def.points / 2, def.points / 2];
+    state.winner === 'A' ? [def.points, 0] : state.winner === 'B' ? [0, def.points] : [def.halvePoints ?? def.points / 2, def.halvePoints ?? def.points / 2];
   return {
     groupId: def.groupId,
     matchType: def.type,

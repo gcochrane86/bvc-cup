@@ -3,12 +3,15 @@
 // six pointer) add up points over all 18 holes.
 import { computeMatchState, playerHole, scoreKey, type ScoreIndex } from './matchState';
 import { playingStrokes, strokesOnHole } from './strokes';
-import type { ConfirmedResult, HoleInfo, IndividualGame, MatchDef, MatchState, Outcome, PlayerPoints, RoundSettings, Slot, Winner } from './types';
+import type { ConfirmedResult, HoleInfo, IndividualGame, MatchDef, MatchState, Outcome, PlayerPoints, RoundSettings, SeasonPoints, Slot, Team, Winner } from './types';
 
 export interface GamePlayer { slot: Slot; playerId: string; handicap: number }
 
 const POSITIONS: Slot[] = ['P1', 'P2', 'P3'];
-const STABLEFORD_GAMES: IndividualGame[] = ['stableford', 'stableford_match', 'six_stableford', 'two_v_one'];
+const STABLEFORD_GAMES: IndividualGame[] = ['stableford', 'stableford_match', 'six_stableford', 'two_v_one', 'two_v_one_match'];
+/** Games scored as match play (hole by hole): the fourball match maths, sides P1 v the rest. */
+const MATCH_GAMES: IndividualGame[] = ['flat_match', 'stableford_match', 'two_v_one_match', 'two_v_one_flat'];
+const isTwoVOne = (g: IndividualGame | undefined) => g === 'two_v_one' || g === 'two_v_one_match' || g === 'two_v_one_flat';
 const isSix = (g: IndividualGame | undefined) => g === 'six_stableford' || g === 'six_flat';
 
 const LABELS: Record<IndividualGame, string> = {
@@ -18,6 +21,8 @@ const LABELS: Record<IndividualGame, string> = {
   six_stableford: 'Six pointer (Stableford)',
   six_flat: 'Six pointer (flat)',
   two_v_one: '2 v 1 Stableford',
+  two_v_one_match: '2 v 1 Stableford match play',
+  two_v_one_flat: '2 v 1 flat match play',
 };
 export const gameLabel = (game: IndividualGame) => LABELS[game];
 
@@ -29,15 +34,17 @@ export function gameFor(size: number, s: RoundSettings): IndividualGame | null {
 }
 
 /** players: each player's course handicap for the day, by position. Null for a group that isn't 2 or 3 players. */
-export function buildGame(groupId: string, players: GamePlayer[], s: RoundSettings): MatchDef | null {
-  const ps = POSITIONS.map((slot) => players.find((p) => p.slot === slot)).filter((p): p is GamePlayer => !!p);
+export function buildGame(groupId: string, players: GamePlayer[], s: RoundSettings, opts: { single?: string } = {}): MatchDef | null {
+  let ps = POSITIONS.map((slot) => players.find((p) => p.slot === slot)).filter((p): p is GamePlayer => !!p);
+  // Season events: the golfer on their own team plays alone, whatever position they were saved in.
+  if (opts.single && ps.some((p) => p.playerId === opts.single)) ps = [ps.find((p) => p.playerId === opts.single)!, ...ps.filter((p) => p.playerId !== opts.single)];
   const game = gameFor(ps.length, s);
   if (!game) return null;
   const ids = ps.map((p) => p.playerId);
   const each = (f: (p: GamePlayer) => number) => Object.fromEntries(ps.map((p) => [p.playerId, f(p)]));
   const stablefordStrokes = each((p) => playingStrokes(p.handicap, s.stablefordPct ?? 100));
   let strokes: Record<string, number>;
-  if (game === 'flat_match' || game === 'six_flat') strokes = each(() => 0);
+  if (game === 'flat_match' || game === 'six_flat' || game === 'two_v_one_flat') strokes = each(() => 0);
   else if (game === 'stableford_match' && (s.matchOffLow ?? true)) {
     const low = Math.min(...ps.map((p) => p.handicap));
     strokes = each((p) => playingStrokes(p.handicap - low, s.matchPct ?? 85));
@@ -98,7 +105,7 @@ function stablefordTotals(def: MatchDef, holes: HoleInfo[], idx: ScoreIndex): Re
 
 export function computeGameState(def: MatchDef, holes: HoleInfo[], idx: ScoreIndex): MatchState {
   const stableford = stablefordTotals(def, holes, idx);
-  if (def.game === 'flat_match' || def.game === 'stableford_match') return { ...computeMatchState(def, holes, idx), stableford };
+  if (MATCH_GAMES.includes(def.game!)) return { ...computeMatchState(def, holes, idx), stableford };
 
   const sorted = [...holes].sort((x, y) => x.hole - y.hole);
   const ids = def.players ?? [...def.sideA, ...def.sideB];
@@ -154,15 +161,19 @@ export function computeGameState(def: MatchDef, holes: HoleInfo[], idx: ScoreInd
   };
 }
 
-/** A decided individual game as a result to confirm: no team points, each player's points for the record. */
-export function gameResult(def: MatchDef, state: MatchState): ConfirmedResult | null {
+/** Season team events: each golfer's team and the event's points for each format. */
+export interface TeamContext { teamOf: Record<string, Team>; points: SeasonPoints }
+
+/** A decided individual game as a result to confirm: team points in a season event, each player's points for the record. */
+export function gameResult(def: MatchDef, state: MatchState, team?: TeamContext): ConfirmedResult | null {
   if (!state.decided || !state.winner || state.finalHole === null || !state.resultText) return null;
   const ids = def.players ?? [...def.sideA, ...def.sideB];
   const playerPoints: Record<string, PlayerPoints> = Object.fromEntries(
     ids.map((id) => [id, { points: state.totals?.[id] ?? 0, stableford: state.stableford?.[id] ?? 0 }]),
   );
   return {
-    groupId: def.groupId, matchType: def.type, winner: state.winner, pointsA: 0, pointsB: 0,
+    groupId: def.groupId, matchType: def.type, winner: state.winner,
+    ...(team ? (({ A, B }) => ({ pointsA: A, pointsB: B }))(teamPoints(def, state.winner, team.teamOf, team.points)) : { pointsA: 0, pointsB: 0 }),
     resultText: state.resultText, finalHole: state.finalHole, playerPoints,
   };
 }
@@ -189,3 +200,30 @@ export function gamesToSet(groupSizes: number[], players: number): { pair: boole
 
 /** 2 or 3 players make one individual group (a 2-ball or a 3-ball); 4 or more play fourballs as a team event. */
 export const eventKindFor = (players: number): 'team' | 'individual' => (players === 2 || players === 3 ? 'individual' : 'team');
+
+/**
+ * Season team events: what a 1 v 1 or 2 v 1 result is worth to each team. 1 v 1: the winner's team gets the
+ * win, or each golfer's team the halve. 2 v 1: the single's team gets the single's points; each of the pair
+ * earns the pair's points for their team. (Six pointers aren't played in team events.)
+ */
+export function teamPoints(def: MatchDef, winner: Winner, teamOf: Record<string, Team>, points: SeasonPoints): { A: number; B: number } {
+  const out = { A: 0, B: 0 };
+  const add = (id: string, n: number) => {
+    const t = teamOf[id];
+    if (t) out[t] += n;
+  };
+  const [aPts, bPts] = isTwoVOne(def.game) ? [points.two_v_one_single, points.two_v_one_pair] : [points.one_v_one, points.one_v_one];
+  if (winner === 'A') def.sideA.forEach((id) => add(id, aPts.win));
+  else if (winner === 'B') def.sideB.forEach((id) => add(id, bPts.win));
+  else if (winner === 'halved') {
+    def.sideA.forEach((id) => add(id, aPts.halve));
+    def.sideB.forEach((id) => add(id, bPts.halve));
+  }
+  return out;
+}
+
+/** A live season game's team points if it finished as it stands (nothing before it starts). */
+export function projectedTeamPoints(def: MatchDef, state: MatchState, teamOf: Record<string, Team>, points: SeasonPoints): { A: number; B: number } {
+  if (!state.started) return { A: 0, B: 0 };
+  return teamPoints(def, state.lead > 0 ? 'A' : state.lead < 0 ? 'B' : 'halved', teamOf, points);
+}

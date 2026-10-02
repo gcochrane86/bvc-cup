@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGame, computeGameState, eventKindFor, gameFor, gameResult, gamesToSet, sixPoints, winnerIds } from './individual';
+import { buildGame, computeGameState, eventKindFor, gameFor, gameResult, gamesToSet, projectedTeamPoints, sixPoints, teamPoints, winnerIds } from './individual';
 import { indexScores } from './matchState';
 import type { HoleInfo, RoundSettings, ScoreEntry } from './types';
 
@@ -180,5 +180,52 @@ describe('eventKindFor', () => {
     expect(eventKindFor(12)).toBe('team');
     expect(eventKindFor(0)).toBe('team');
     expect(eventKindFor(1)).toBe('team');
+  });
+});
+
+describe('2 v 1 match play games', () => {
+  it('Stableford match play: the single against the pair\'s best points, hole by hole', () => {
+    const def = buildGame('g', three(0, 0, 0), { ...base, threeGame: 'two_v_one_match' })!;
+    expect(def.stableford).toBe(true);
+    // Single pars, p2 bogeys, p3 birdies the 1st: the pair's best wins the 1st, halves the 2nd.
+    const st = computeGameState(def, holes, indexScores(card({ p1: [4, 4], p2: [5, 5], p3: [3, 4] })));
+    expect(st.statusText).toBe('1 UP');
+    expect(st.lead).toBe(-1);
+  });
+  it('flat match play: gross, no shots', () => {
+    const def = buildGame('g', three(0, 20, 20), { ...base, threeGame: 'two_v_one_flat' })!;
+    expect(def.strokes).toEqual({ p1: 0, p2: 0, p3: 0 });
+    const st = computeGameState(def, holes, indexScores(card({ p1: [3], p2: [4], p3: [5] })));
+    expect(st.lead).toBe(1);
+  });
+  it('puts the given single first', () => {
+    const def = buildGame('g', three(0, 0, 0), twoVOne, { single: 'p3' })!;
+    expect(def.sideA).toEqual(['p3']);
+    expect(def.sideB).toEqual(['p1', 'p2']);
+  });
+});
+
+describe('teamPoints', () => {
+  const pts = { fourball: { win: 2, halve: 1 }, singles: { win: 1, halve: 0.5 }, one_v_one: { win: 1, halve: 0.5 }, two_v_one_single: { win: 2, halve: 1 }, two_v_one_pair: { win: 1, halve: 0.5 } };
+  const one = buildGame('g', two(0, 0), base)!;
+  const solo = buildGame('g', three(0, 0, 0), twoVOne)!;
+  const teamOf = { p1: 'B' as const, p2: 'A' as const, p3: 'A' as const };
+  it('1 v 1: the winner\'s team gets the win; a halve gives each team its halve', () => {
+    expect(teamPoints(one, 'A', teamOf, pts)).toEqual({ A: 0, B: 1 });
+    expect(teamPoints(one, 'halved', teamOf, pts)).toEqual({ A: 0.5, B: 0.5 });
+  });
+  it("2 v 1: the single's win for their team; the pair's each for theirs", () => {
+    expect(teamPoints(solo, 'A', teamOf, pts)).toEqual({ A: 0, B: 2 });
+    expect(teamPoints(solo, 'B', teamOf, pts)).toEqual({ A: 2, B: 0 });
+    expect(teamPoints(solo, 'halved', teamOf, pts)).toEqual({ A: 1, B: 1 });
+  });
+  it('projects from who is ahead', () => {
+    const st = computeGameState(solo, holes, indexScores(card({ p1: [3], p2: [4], p3: [5] })));
+    expect(projectedTeamPoints(solo, st, teamOf, pts)).toEqual({ A: 0, B: 2 });
+    expect(projectedTeamPoints(solo, computeGameState(solo, holes, indexScores([])), teamOf, pts)).toEqual({ A: 0, B: 0 });
+  });
+  it('gameResult in a season event carries team points', () => {
+    const st = computeGameState(one, holes, indexScores(card({ p1: all(4), p2: all(5) })));
+    expect(gameResult(one, st, { teamOf, points: pts })).toMatchObject({ winner: 'A', pointsA: 0, pointsB: 1 });
   });
 });

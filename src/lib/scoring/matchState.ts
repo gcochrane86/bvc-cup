@@ -97,7 +97,7 @@ export function computeMatchState(match: MatchDef, holes: HoleInfo[], idx: Score
       ? [match.points, 0]
       : lead < 0
         ? [0, match.points]
-        : [match.points / 2, match.points / 2];
+        : [match.halvePoints ?? match.points / 2, match.halvePoints ?? match.points / 2];
 
   return { started, thru, lead, holeWinners, running, decided, dormie, winner, finalHole, resultText, statusText, projectedA, projectedB };
 }

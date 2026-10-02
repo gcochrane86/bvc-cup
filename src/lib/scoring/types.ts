@@ -6,10 +6,13 @@ export type Outcome = Team | 'halved';
 /** A result's winner: a side, halved, or (six pointer) a position. */
 export type Winner = Outcome | 'P1' | 'P2' | 'P3';
 export type PairGame = 'stableford' | 'flat_match' | 'stableford_match';
-export type ThreeGame = 'six_stableford' | 'six_flat' | 'two_v_one';
+export type ThreeGame = 'six_stableford' | 'six_flat' | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat';
 export type IndividualGame = PairGame | ThreeGame;
 /** A player's figures from a confirmed individual game: game points and Stableford total. */
 export interface PlayerPoints { points: number; stableford: number }
+/** Season team events: points for each format, a win and a halve. */
+export interface WinHalve { win: number; halve: number }
+export interface SeasonPoints { fourball: WinHalve; singles: WinHalve; one_v_one: WinHalve; two_v_one_single: WinHalve; two_v_one_pair: WinHalve }
 
 export interface HoleInfo {
   hole: number;
@@ -76,6 +79,8 @@ export interface MatchDef {
   players?: string[];
   /** Individual events: each player's strokes off full handicap × the Stableford % (for Stableford totals). */
   stablefordStrokes?: Record<string, number>;
+  /** Points each side gets for a halve (default half the match's points). */
+  halvePoints?: number;
 }
 
 export interface MatchState {
