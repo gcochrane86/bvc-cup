@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildEventView, defaultRoundId, onlyGroupId, findGroup, firstIncompleteHole, leaderboardRoundId, matchLabel, matchesLabel, pairingLabel, resumeGroupId, scoringList } from './view';
+import { buildEventView, defaultRoundId, onlyGroupId, findGroup, firstIncompleteHole, leaderboardRoundId, matchLabel, matchName, matchesLabel, pairingLabel, resumeGroupId, scoringList } from './view';
 import type { RoundRow, ScoreRow, Snapshot } from './data/types';
 import type { GroupView } from './view';
 import type { Slot, Team } from './scoring';
@@ -115,6 +115,11 @@ describe('buildEventView', () => {
 });
 
 describe('singles', () => {
+  it('a singles is named by its players; the fourball keeps its label', () => {
+    const short = (id: string) => ({ a: 'Adams', d: 'Davies' })[id] ?? id;
+    expect(matchName({ type: 'low_singles', sideA: ['a'], sideB: ['d'] }, short)).toBe('Adams v Davies');
+    expect(matchName({ type: 'better_ball', sideA: ['a', 'b'], sideB: ['c', 'd'] }, short)).toBe('Fourball');
+  });
   it('are labelled Singles 1 and Singles 2', () => {
     expect([matchLabel('better_ball'), matchLabel('low_singles'), matchLabel('high_singles')]).toEqual(['Fourball', 'Singles 1', 'Singles 2']);
   });

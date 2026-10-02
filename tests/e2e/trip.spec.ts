@@ -374,11 +374,12 @@ test('the admin can choose the singles line-up and it shows on the leaderboard',
   const trip = await newPhone(browser);
   await login(trip);
   await trip.getByRole('tab', { name: 'Day 3' }).click();
-  const card = (label: string) => trip.getByTestId('match-card').filter({ hasText: label }).first();
-  await expect(card('Singles 1')).toContainText('Adams');
-  await expect(card('Singles 1')).toContainText('Hill');
-  await expect(card('Singles 2')).toContainText('Brown');
-  await expect(card('Singles 2')).toContainText('Green');
+  // Singles cards show the players (no "Singles 1 / 2" label): Adams v Hill and Brown v Green.
+  const singles = (a: string, b: string, not: string) =>
+    trip.getByTestId('match-card').filter({ hasText: a }).filter({ hasText: b }).filter({ hasNotText: not });
+  await expect(singles('Adams', 'Hill', 'Brown')).toHaveCount(1);
+  await expect(singles('Brown', 'Green', 'Adams')).toHaveCount(1);
+  await expect(trip.getByText(/^Singles [12]$/)).toHaveCount(0);
 });
 
 test('two phones scoring the same hole: an untouched par default never overwrites a real score', async ({ browser }) => {

@@ -245,6 +245,10 @@ const LABELS: Record<MatchType, string> = {
   individual: 'Game',
 };
 export const matchLabel = (type: MatchType) => LABELS[type];
+/** A singles is named by its players ("Adams v Davies"); other matches by their label. */
+export function matchName(def: { type: MatchType; sideA: string[]; sideB: string[] }, short: (id: string) => string): string {
+  return def.type === 'low_singles' || def.type === 'high_singles' ? `${short(def.sideA[0])} v ${short(def.sideB[0])}` : LABELS[def.type];
+}
 
 export const today = () => new Date().toLocaleDateString('en-CA');
 

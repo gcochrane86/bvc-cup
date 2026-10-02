@@ -1,7 +1,7 @@
 <script lang="ts">
   import Avatar from './Avatar.svelte';
   import { db, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
-  import { matchLabel, type MatchView } from '../lib/view';
+  import type { MatchView } from '../lib/view';
   import { formatToPar, gameLabel, type PairNet } from '../lib/scoring';
 
   let { mv, teeTime = null, link = true }: { mv: MatchView; teeTime?: string | null; link?: boolean } = $props();
@@ -36,8 +36,8 @@
     <span class="slot">{#if badge && lead >= 0}<span class="badge" style="background:{colour}">{badge}</span>{/if}</span>
     <span class="title">
       <strong>Match {mv.number}</strong>
-      {#if mv.def.game}<small class="muted">{gameLabel(mv.def.game)}</small>
-      {:else if mv.def.type !== 'better_ball'}<small class="muted">{matchLabel(mv.def.type)}</small>{/if}
+      <!-- Singles need no label: the card shows the two players. -->
+      {#if mv.def.game}<small class="muted">{gameLabel(mv.def.game)}</small>{/if}
     </span>
     <span class="slot right">{#if badge && lead < 0}<span class="badge" style="background:{colour}">{badge}</span>{/if}</span>
   </header>

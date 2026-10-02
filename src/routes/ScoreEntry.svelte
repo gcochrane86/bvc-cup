@@ -2,7 +2,7 @@
   import { readScoringGroup, rememberScoringGroup } from '../lib/scoringMemory';
   import { untrack } from 'svelte';
   import { db, enterScore, loadAll, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
-  import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchLabel, onlyGroupId, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
+  import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchName, onlyGroupId, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
   import { gameLabel, isScoreLocked, playerHole, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
   import HoleGrid from '../components/HoleGrid.svelte';
@@ -250,7 +250,7 @@
     {#each found.group.matches as m (m.def.id)}
       {@const lead = m.result ? (m.result.winner === 'A' ? 1 : m.result.winner === 'B' ? -1 : 0) : m.state.lead}
       <span>
-        <small class="muted">{m.def.scramble ? 'Scramble' : m.def.game ? gameLabel(m.def.game) : matchLabel(m.def.type)}</small>
+        <small class="muted">{m.def.scramble ? 'Scramble' : m.def.game ? gameLabel(m.def.game) : matchName(m.def, playerShort)}</small>
         <strong style="color:{lead > 0 ? 'var(--team-a)' : lead < 0 ? 'var(--team-b)' : 'var(--muted)'}">
           {m.result?.resultText ?? m.state.statusText}
         </strong>
