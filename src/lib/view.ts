@@ -207,7 +207,7 @@ export function buildEventView(s: Snapshot): EventView | null {
   /** What a season match is worth to the side that wins it. */
   function seasonPointsAt(def: MatchDef): number {
     if (!def.game) return def.points;
-    if (def.game.startsWith('two_v_one')) return Math.max(pts.two_v_one_single.win, 2 * pts.two_v_one_pair.win);
+    if (def.game.startsWith('two_v_one')) return Math.max(pts.two_v_one_single.win, pts.two_v_one_pair.win);
     return def.game.startsWith('six') ? 0 : pts.one_v_one.win;
   }
 }

@@ -49,7 +49,7 @@ Every game lives in one catalogue, grouped by how many golfers play it. Every da
   | Singles (in a fourball) | 1 | ½ |
   | 1 v 1 | 1 | ½ |
   | 2 v 1, the single | 2 | 1 |
-  | 2 v 1, each of the pair | 1 | ½ |
+  | 2 v 1, the pair (together) | 1 | ½ |
 
   Days use these points, and the round's own fourball and singles point fields are ignored in season events.
 - **Players per day** (new `round_players` table):

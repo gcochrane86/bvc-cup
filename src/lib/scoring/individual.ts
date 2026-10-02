@@ -211,8 +211,8 @@ export const eventKindFor = (players: number): 'team' | 'individual' => (players
 
 /**
  * Season team events: what a 1 v 1 or 2 v 1 result is worth to each team. 1 v 1: the winner's team gets the
- * win, or each golfer's team the halve. 2 v 1: the single's team gets the single's points; each of the pair
- * earns the pair's points for their team. (Six pointers aren't played in team events.)
+ * win, or each golfer's team the halve. 2 v 1: the single's team gets the single's points (double); the pair's
+ * team gets the pair's points. (Six pointers aren't played in team events.)
  */
 export function teamPoints(def: MatchDef, winner: Winner, teamOf: Record<string, Team>, points: SeasonPoints): { A: number; B: number } {
   const out = { A: 0, B: 0 };
@@ -223,12 +223,16 @@ export function teamPoints(def: MatchDef, winner: Winner, teamOf: Record<string,
   return out;
 }
 
-/** What each golfer earns from a season 1 v 1 or 2 v 1 result (the single's points, or each of the pair's). */
+/**
+ * What each golfer earns from a season 1 v 1 or 2 v 1 result. 2 v 1: the single earns the single's points; the
+ * pair's points are for the pair together, so each of the pair earns half (the single's win counts double).
+ */
 export function playerSeasonPoints(def: MatchDef, winner: Winner, points: SeasonPoints): Record<string, number> {
   const out: Record<string, number> = {};
   const [aPts, bPts] = isTwoVOne(def.game) ? [points.two_v_one_single, points.two_v_one_pair] : [points.one_v_one, points.one_v_one];
+  const bShare = def.sideB.length || 1;
   for (const id of def.sideA) out[id] = winner === 'A' ? aPts.win : winner === 'halved' ? aPts.halve : 0;
-  for (const id of def.sideB) out[id] = winner === 'B' ? bPts.win : winner === 'halved' ? bPts.halve : 0;
+  for (const id of def.sideB) out[id] = (winner === 'B' ? bPts.win : winner === 'halved' ? bPts.halve : 0) / (isTwoVOne(def.game) ? bShare : 1);
   return out;
 }
 

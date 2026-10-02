@@ -350,7 +350,7 @@
     { key: 'singles', label: 'Singles' },
     { key: 'one_v_one', label: '1 v 1' },
     { key: 'two_v_one_single', label: '2 v 1 single' },
-    { key: 'two_v_one_pair', label: 'Each of the pair' },
+    { key: 'two_v_one_pair', label: 'The pair' },
   ] as const;
   const savePoints = () =>
     act(async () => {

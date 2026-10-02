@@ -388,7 +388,7 @@ describe('season team events', () => {
 
   it("points available: each group at its winning side's value", () => {
     const v = buildEventView(season())!;
-    expect(v.rounds[0].pointsAvailable).toBe(3); // 2 v 1: 2, 1 v 1: 1
+    expect(v.rounds[0].pointsAvailable).toBe(3); // 2 v 1: 2 (the single's), 1 v 1: 1
     expect(v.tracker.total).toBe(3);
   });
 

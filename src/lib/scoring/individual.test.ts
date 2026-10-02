@@ -214,10 +214,10 @@ describe('teamPoints', () => {
     expect(teamPoints(one, 'A', teamOf, pts)).toEqual({ A: 0, B: 1 });
     expect(teamPoints(one, 'halved', teamOf, pts)).toEqual({ A: 0.5, B: 0.5 });
   });
-  it("2 v 1: the single's win for their team; the pair's each for theirs", () => {
+  it("2 v 1: the single's win (double) for their team; the pair's win is for the pair together", () => {
     expect(teamPoints(solo, 'A', teamOf, pts)).toEqual({ A: 0, B: 2 });
-    expect(teamPoints(solo, 'B', teamOf, pts)).toEqual({ A: 2, B: 0 });
-    expect(teamPoints(solo, 'halved', teamOf, pts)).toEqual({ A: 1, B: 1 });
+    expect(teamPoints(solo, 'B', teamOf, pts)).toEqual({ A: 1, B: 0 });
+    expect(teamPoints(solo, 'halved', teamOf, pts)).toEqual({ A: 0.5, B: 1 });
   });
   it('projects from who is ahead', () => {
     const st = computeGameState(solo, holes, indexScores(card({ p1: [3], p2: [4], p3: [5] })));

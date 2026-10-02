@@ -183,3 +183,22 @@ describe('season events', () => {
     expect(pts).toMatchObject({ b1: 2, a1: 0, a2: 0 });
   });
 });
+
+describe('season events: the pair', () => {
+  it("splits the pair's points between its two golfers", () => {
+    const s = snapshot({
+      event: { ...snapshot().event!, season: true },
+      rounds: [{ ...round('r1', 1), three_game: 'two_v_one' }],
+      groups: [{ id: 'g1', round_id: 'r1', group_no: 1, tee_time: null, singles_crossed: false }],
+      groupPlayers: [
+        { group_id: 'g1', slot: 'P1', player_id: 'b1', handicap: null },
+        { group_id: 'g1', slot: 'P2', player_id: 'a1', handicap: null },
+        { group_id: 'g1', slot: 'P3', player_id: 'a2', handicap: null },
+      ],
+      scores: [],
+      results: [{ group_id: 'g1', match_type: 'individual', winner: 'B', points_a: 1, points_b: 0, result_text: 'By 2 pts', final_hole: 18, confirmed_at: 'x' }],
+    });
+    const pts = Object.fromEntries(computeForm(buildEventView(s)!, null).map((r) => [r.playerId, r.points]));
+    expect(pts).toMatchObject({ b1: 0, a1: 0.5, a2: 0.5 });
+  });
+});
