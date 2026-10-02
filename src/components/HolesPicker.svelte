@@ -15,7 +15,12 @@
   function update() {
     holes = mode === 'custom' ? (chosen.length >= 18 ? null : chosen) : holesFor(mode, to);
   }
-  const pick = (m: HolesMode) => ((mode = m), update());
+  function pick(m: HolesMode) {
+    // Choosing holes starts from the day's current holes (e.g. the front 9, then add the 14th and 18th).
+    if (m === 'custom' && mode !== 'custom') chosen = holes?.length ? [...holes] : [...ALL];
+    mode = m;
+    update();
+  }
   const step = (d: number) => ((to = Math.min(17, Math.max(1, to + d))), update());
   const toggle = (h: number, on: boolean) => ((chosen = on ? [...new Set([...chosen, h])].sort((a, b) => a - b) : chosen.filter((x) => x !== h)), update());
 </script>
