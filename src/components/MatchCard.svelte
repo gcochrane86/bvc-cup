@@ -1,14 +1,21 @@
 <script lang="ts">
   import Avatar from './Avatar.svelte';
-  import { photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
+  import { db, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
   import { matchLabel, type MatchView } from '../lib/view';
   import { formatToPar, gameLabel, type PairNet } from '../lib/scoring';
 
   let { mv, teeTime = null, link = true }: { mv: MatchView; teeTime?: string | null; link?: boolean } = $props();
 
   const s = $derived(mv.state);
+  /** A side's colour: Team A/B — in a season 1 v 1 or 2 v 1, the team its golfers are actually on. */
+  function sideColour(ids: string[], fallback: 'a' | 'b'): string {
+    const team = db.event?.season && mv.def.game ? db.eventPlayers.find((p) => p.player_id === ids[0])?.team : null;
+    return `var(--team-${team ? team.toLowerCase() : fallback})`;
+  }
+  const colourA = $derived(sideColour(mv.def.sideA, 'a'));
+  const colourB = $derived(sideColour(mv.def.sideB, 'b'));
   const lead = $derived(mv.result ? (mv.result.winner === 'A' ? 1 : mv.result.winner === 'B' ? -1 : 0) : s.lead);
-  const colour = $derived(lead > 0 ? 'var(--team-a)' : lead < 0 ? 'var(--team-b)' : 'var(--muted)');
+  const colour = $derived(lead > 0 ? colourA : lead < 0 ? colourB : 'var(--muted)');
   const status = $derived(mv.result ? mv.result.resultText : s.statusText);
   const sub = $derived(
     mv.result ? '' : s.decided ? 'Awaiting confirmation' : s.started ? `THRU ${s.thru}${s.dormie ? ' · DORMIE' : ''}` : teeTime ? `Tee ${teeTime.slice(0, 5)}` : '',
@@ -50,7 +57,7 @@
   <div class="body">
     <div class="side">
       <div class="faces">
-        {#each mv.def.sideA as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour="var(--team-a)" size={44} />{/each}
+        {#each mv.def.sideA as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour={colourA} size={44} />{/each}
       </div>
       {#each mv.def.sideA as id (id)}<div class="name">{playerShort(id)}</div>{/each}
       {#if mv.net?.a}<div class="net" data-testid="net-a">{netText(mv.net.a)}</div>{/if}
@@ -61,7 +68,7 @@
     </div>
     <div class="side right">
       <div class="faces">
-        {#each mv.def.sideB as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour="var(--team-b)" size={44} />{/each}
+        {#each mv.def.sideB as id (id)}<Avatar name={playerName(id)} url={photoUrl(id)} colour={colourB} size={44} />{/each}
       </div>
       {#each mv.def.sideB as id (id)}<div class="name">{playerShort(id)}</div>{/each}
       {#if mv.net?.b}<div class="net" data-testid="net-b">{netText(mv.net.b)}</div>{/if}

@@ -13,7 +13,7 @@ const baseRound: RoundRow = {
 
 function snapshot(over: Partial<Snapshot> = {}): Snapshot {
   return {
-    event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: false, show_leaderboard: true, show_photos: true, watch_token: null, kind: 'team' },
+    event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: false, show_leaderboard: true, show_photos: true, watch_token: null, kind: 'team', season: false, points: { fourball: { win: 2, halve: 1 }, singles: { win: 1, halve: 0.5 }, one_v_one: { win: 1, halve: 0.5 }, two_v_one_single: { win: 2, halve: 1 }, two_v_one_pair: { win: 1, halve: 0.5 } } },
     players: [],
     courses: [{ id: 'c', name: 'Links', tee: null, slope_rating: null, course_rating: null }],
     courseHoles: Array.from({ length: 18 }, (_, i) => ({ course_id: 'c', hole: i + 1, par: 4, stroke_index: i + 1 })),
@@ -351,5 +351,74 @@ describe('individual events', () => {
     expect(pairingLabel(six.rounds[0].groups[0], short)).toBe('A1 v A2 v B1');
     const pair = buildEventView(ind([['P1', 'a1'], ['P2', 'a2']]))!;
     expect(pairingLabel(pair.rounds[0].groups[0], short)).toBe('A1 v A2');
+  });
+});
+
+describe('season team events', () => {
+  const POINTS = {
+    fourball: { win: 2, halve: 1 }, singles: { win: 1, halve: 0.5 }, one_v_one: { win: 1, halve: 0.5 },
+    two_v_one_single: { win: 2, halve: 1 }, two_v_one_pair: { win: 1, halve: 0.5 },
+  };
+  // Teams: a1, a2 on A; b1, b2 on B. Group g1 is a 3-ball (a1, a2, b1); group g2 a 2-ball (a1? no: a2 v b2 in round 2).
+  const season = (over: Partial<Snapshot> = {}, teams: Record<string, Team> = { a1: 'A', a2: 'A', b1: 'B', b2: 'B' }) =>
+    snapshot({
+      event: { ...snapshot().event!, season: true, points: POINTS },
+      eventPlayers: Object.entries(teams).map(([id, team]) => ({ event_id: 'e', player_id: id, team, handicap: 10 })),
+      groups: [
+        { id: 'g1', round_id: 'r1', group_no: 1, tee_time: null, singles_crossed: false },
+        { id: 'g2', round_id: 'r1', group_no: 2, tee_time: null, singles_crossed: false },
+      ],
+      groupPlayers: [
+        { group_id: 'g1', slot: 'P1', player_id: 'a1', handicap: null },
+        { group_id: 'g1', slot: 'P2', player_id: 'a2', handicap: null },
+        { group_id: 'g1', slot: 'P3', player_id: 'b1', handicap: null },
+        { group_id: 'g2', slot: 'P1', player_id: 'a2', handicap: null },
+        { group_id: 'g2', slot: 'P2', player_id: 'b2', handicap: null },
+      ],
+      ...over,
+    });
+
+  it('a 3-ball is a 2 v 1 with the golfer on their own team playing alone (never a six pointer)', () => {
+    const v = buildEventView(season())!;
+    const m = v.rounds[0].groups[0].matches[0];
+    expect(m.def.game).toBe('two_v_one'); // the round's three_game is six_stableford, not allowed in season events
+    expect(m.def.sideA).toEqual(['b1']);
+    expect(m.def.sideB).toEqual(['a1', 'a2']);
+  });
+
+  it("points available: each group at its winning side's value", () => {
+    const v = buildEventView(season())!;
+    expect(v.rounds[0].pointsAvailable).toBe(3); // 2 v 1: 2, 1 v 1: 1
+    expect(v.tracker.total).toBe(3);
+  });
+
+  it("a live game projects the leader's points to their team", () => {
+    const at = '2026-10-01T09:10:00Z';
+    const scores: ScoreRow[] = [
+      { round_id: 'r1', player_id: 'b1', hole: 1, gross: 3, picked_up: false, client_updated_at: at },
+      { round_id: 'r1', player_id: 'a1', hole: 1, gross: 5, picked_up: false, client_updated_at: at },
+      { round_id: 'r1', player_id: 'a2', hole: 1, gross: 5, picked_up: false, client_updated_at: at },
+    ];
+    const v = buildEventView(season({ scores }))!;
+    expect(v.tracker.projectedB).toBe(2); // the single (Team B) leads the 2 v 1
+    expect(v.tracker.projectedA).toBe(0);
+  });
+
+  it('confirmed points stay with the team they were earned for, even after a player switches team', () => {
+    const results = [{ group_id: 'g1', match_type: 'individual' as const, winner: 'A' as const, points_a: 0, points_b: 2, result_text: 'By 3 pts', final_hole: 18, confirmed_at: '2026-10-01T15:00:00Z' }];
+    expect(buildEventView(season({ results }))!.tracker.confirmedB).toBe(2);
+    const switched = buildEventView(season({ results }, { a1: 'A', a2: 'A', b1: 'A', b2: 'B' }))!;
+    expect(switched.tracker.confirmedB).toBe(2);
+    expect(switched.tracker.confirmedA).toBe(0);
+  });
+
+  it("fourballs use the event's points, halves included", () => {
+    const v = buildEventView(
+      snapshot({ event: { ...snapshot().event!, season: true, points: { ...POINTS, fourball: { win: 2, halve: 0.5 } } } }),
+    )!;
+    const fb = v.rounds[0].groups[0].matches[0];
+    expect(fb.def.points).toBe(2);
+    expect(fb.def.halvePoints).toBe(0.5);
+    expect(v.rounds[0].pointsAvailable).toBe(2);
   });
 });

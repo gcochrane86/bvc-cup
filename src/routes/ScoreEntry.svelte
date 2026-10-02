@@ -11,7 +11,12 @@
 
   const SLOTS: Slot[] = ['A1', 'A2', 'B1', 'B2', 'P1', 'P2', 'P3'];
   /** A row's colour: team A/B, or in an individual game P1 (the single / first player) against the rest. */
-  const sideColour = (slot: Slot) => (slot.startsWith('A') || slot === 'P1' ? 'var(--team-a)' : 'var(--team-b)');
+  const sideColour = (slot: Slot) => {
+    // Season team events: each golfer in their own team's colour.
+    const team = db.event?.season && found ? db.eventPlayers.find((p) => p.player_id === found!.group.slots[slot])?.team : null;
+    if (team) return `var(--team-${team.toLowerCase()})`;
+    return slot.startsWith('A') || slot === 'P1' ? 'var(--team-a)' : 'var(--team-b)';
+  };
 
   const view = $derived(buildEventView(db));
   const found = $derived(view && groupId ? findGroup(view, groupId) : null);

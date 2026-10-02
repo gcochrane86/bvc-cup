@@ -2,6 +2,8 @@ import {
   buildGame,
   buildMatches,
   computeGameState,
+  projectedTeamPoints,
+  stepOf,
   computeMatchState,
   computeTracker,
   pointsStep,
@@ -72,7 +74,10 @@ export function buildEventView(s: Snapshot): EventView | null {
   if (!s.event) return null;
   const handicapOf = Object.fromEntries(s.eventPlayers.map((p) => [p.player_id, Number(p.handicap)]));
   // Individual events: no teams; everyone takes side A's colour (App gives individual events neutral colours).
-  const individual = s.event.kind === 'individual';
+  const individual = s.event.kind === 'individual' && !s.event.season;
+  // Season team events: golfers change day to day; 1 v 1 and 2 v 1 days count for the teams at the event's points.
+  const season = !!s.event.season;
+  const pts = s.event.points;
   const teamOf = Object.fromEntries(s.eventPlayers.map((p) => [p.player_id, p.team ?? 'A'])) as Record<string, Team>;
   const groupCount = Math.floor(s.eventPlayers.length / 4);
   const everyMatch: MatchView[] = [];
@@ -83,8 +88,7 @@ export function buildEventView(s: Snapshot): EventView | null {
     .sort((a, b) => a.round_no - b.round_no)
     .map((round): RoundView => {
       const settings = settingsOf(round);
-      const pointsAvailable = individual ? 0 : roundPointsAvailable(settings, groupCount);
-      total += pointsAvailable;
+      let pointsAvailable = individual ? 0 : roundPointsAvailable(settings, groupCount);
       const holesOf = (courseId: string): HoleInfo[] =>
         s.courseHoles
           .filter((h) => h.course_id === courseId)
@@ -126,9 +130,22 @@ export function buildEventView(s: Snapshot): EventView | null {
           );
           const onOtherTees = Object.keys(teeOf).length > 0;
           const players = members.map((gp) => ({ slot: gp.slot, playerId: gp.player_id, handicap: playingHcp[gp.player_id] }));
-          const built = individual
-            ? [buildGame(group.id, players, settings)].filter((d): d is MatchDef => d !== null)
-            : buildMatches(group.id, players, settings, !!group.singles_crossed);
+          const isGame = members.some((gp) => gp.slot.startsWith('P'));
+          let built: MatchDef[];
+          if (season && isGame) {
+            // The golfer on their own team plays alone; team events never play the six pointer.
+            const ids = members.map((gp) => gp.player_id);
+            const single = ids.length === 3 ? ids.find((id) => ids.filter((x) => teamOf[x] === teamOf[id]).length === 1) : undefined;
+            const threeGame = settings.threeGame?.startsWith('six') ? 'two_v_one' : settings.threeGame;
+            built = [buildGame(group.id, players, { ...settings, threeGame }, { single })].filter((d): d is MatchDef => d !== null);
+          } else if (individual) {
+            built = [buildGame(group.id, players, settings)].filter((d): d is MatchDef => d !== null);
+          } else if (season) {
+            const fourballs = buildMatches(group.id, players, { ...settings, betterBallPoints: pts.fourball.win, singlesPoints: pts.singles.win }, !!group.singles_crossed);
+            built = fourballs.map((d) => ({ ...d, halvePoints: d.type === 'better_ball' ? pts.fourball.halve : pts.singles.halve }));
+          } else {
+            built = buildMatches(group.id, players, settings, !!group.singles_crossed);
+          }
           const defs = built.map((def) => (onOtherTees ? { ...def, teeHoles } : def));
           const matches = defs.map((def): MatchView => {
             const row = s.results.find((r) => r.group_id === group.id && r.match_type === def.type);
@@ -152,17 +169,35 @@ export function buildEventView(s: Snapshot): EventView | null {
                     b: pairNet(def.sideB, holes, scores, def.teamHandicap ?? playingHcp, teeHoles),
                   }
                 : undefined;
-            const state = def.game ? computeGameState(def, holes, scores) : computeMatchState(def, holes, scores);
+            let state = def.game ? computeGameState(def, holes, scores) : computeMatchState(def, holes, scores);
+            if (season && def.game) {
+              // A live 1 v 1 or 2 v 1 projects its points to the leader's team.
+              const p = projectedTeamPoints(def, state, teamOf, pts);
+              state = { ...state, projectedA: p.A, projectedB: p.B };
+            }
             return { def, state, result, number: ++matchNo, net };
           });
           everyMatch.push(...matches);
           return { group, slots, matches, scores, playingHcp, teeHoles, teeOf };
         });
       const ms = groups.flatMap((g) => g.matches);
+      // Season days: each group at its winning side's value (fourballs: the fourball plus any singles).
+      if (season) pointsAvailable = ms.reduce((sum, m) => sum + seasonPointsAt(m.def), 0);
+      total += pointsAvailable;
       return { round, settings, holes, groups, completed: ms.filter((m) => m.result).length, totalMatches: ms.length, pointsAvailable };
     });
 
-  return { event: s.event, rounds, tracker: computeTracker(everyMatch, total, pointsStep(rounds.map((r) => r.settings))), teamOf, handicapOf };
+  const step = season
+    ? stepOf([pts.fourball.halve, pts.singles.halve, pts.one_v_one.halve, pts.two_v_one_single.halve, pts.two_v_one_pair.halve])
+    : pointsStep(rounds.map((r) => r.settings));
+  return { event: s.event, rounds, tracker: computeTracker(everyMatch, total, step), teamOf, handicapOf };
+
+  /** What a season match is worth to the side that wins it. */
+  function seasonPointsAt(def: MatchDef): number {
+    if (!def.game) return def.points;
+    if (def.game.startsWith('two_v_one')) return Math.max(pts.two_v_one_single.win, 2 * pts.two_v_one_pair.win);
+    return def.game.startsWith('six') ? 0 : pts.one_v_one.win;
+  }
 }
 
 export function defaultRoundId(rounds: RoundRow[], todayIso: string): string | null {

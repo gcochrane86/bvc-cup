@@ -20,7 +20,9 @@
 
   async function confirmResult() {
     if (!mv || !found) return;
-    const preview = resultFromState(mv.def, mv.state);
+    // Season team events: a 1 v 1 or 2 v 1 result is confirmed as the points each team earns.
+    const team = view?.event.season ? { teamOf: view.teamOf, points: view.event.points } : undefined;
+    const preview = resultFromState(mv.def, mv.state, team);
     if (!preview) return;
     const label = mv.def.game ? gameLabel(mv.def.game) : matchLabel(mv.def.type);
     if (!confirm(`Confirm ${label}: ${preview.resultText}? This locks the scores for this match.`)) return;
@@ -32,7 +34,7 @@
         alert("Some scores for this match are still waiting to send. Try again when you've got signal.");
         return;
       }
-      const snap = resultFromState(mv.def, mv.state); // recompute with anything that just synced
+      const snap = resultFromState(mv.def, mv.state, team); // recompute with anything that just synced
       if (!snap) {
         alert('The result changed while syncing — please check the scores.');
         return;

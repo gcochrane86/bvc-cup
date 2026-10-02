@@ -16,7 +16,7 @@ const score = (round_id: string, player_id: string, hole: number, gross: number 
 // Par 4 everywhere, SI = hole; everyone off 10 (no slope/rating), so 1 shot on holes 1–10.
 function snapshot(over: Partial<Snapshot> = {}): Snapshot {
   return {
-    event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: true, show_leaderboard: true, show_photos: true, watch_token: null, kind: 'team', },
+    event: { id: 'e', name: 'Cup', team_a_name: 'Blue', team_a_colour: '#00f', team_b_name: 'Red', team_b_colour: '#f00', is_active: true, show_form: true, show_leaderboard: true, show_photos: true, watch_token: null, kind: 'team', season: false, points: { fourball: { win: 2, halve: 1 }, singles: { win: 1, halve: 0.5 }, one_v_one: { win: 1, halve: 0.5 }, two_v_one_single: { win: 2, halve: 1 }, two_v_one_pair: { win: 1, halve: 0.5 } }, },
     players: [],
     courses: [{ id: 'c', name: 'Links', tee: null, slope_rating: null, course_rating: null }],
     courseHoles: Array.from({ length: 18 }, (_, i) => ({ course_id: 'c', hole: i + 1, par: 4, stroke_index: i + 1 })),

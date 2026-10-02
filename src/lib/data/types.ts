@@ -1,4 +1,4 @@
-import type { MatchType, PlayerPoints, Slot, Team, Winner } from '../scoring';
+import type { MatchType, PlayerPoints, SeasonPoints, Slot, Team, Winner } from '../scoring';
 
 export interface PlayerRow { id: string; name: string; short_name: string; default_handicap: number; photo_path: string | null }
 /** A course record is one tee of a course: records sharing a name are that course's tees (tee null = one unnamed tee). */
@@ -23,6 +23,9 @@ export interface EventRow {
   watch_token: string | null;
   /** Team cup (A v B) or individual (2- and 3-player games, no teams). */
   kind: 'team' | 'individual';
+  /** Season team event: Team A v Team B, golfers change day to day, points per format from `points`. */
+  season: boolean;
+  points: SeasonPoints;
 }
 /** team: null in individual events. */
 export interface EventPlayerRow { event_id: string; player_id: string; team: Team | null; handicap: number }

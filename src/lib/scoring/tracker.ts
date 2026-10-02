@@ -20,7 +20,11 @@ export interface TrackedMatch {
  * E.g. 1-point fourballs only -> ½; add ½-point singles -> ¼.
  */
 export function pointsStep(rounds: RoundSettings[]): number {
-  const halves = rounds.flatMap((r) => [r.betterBallPoints / 2, ...(r.singlesEnabled ? [r.singlesPoints / 2] : [])]);
+  return stepOf(rounds.flatMap((r) => [r.betterBallPoints / 2, ...(r.singlesEnabled ? [r.singlesPoints / 2] : [])]));
+}
+
+/** The smallest amount a total can move by, given every result's halve. */
+export function stepOf(halves: number[]): number {
   const units = halves.map((h) => Math.round(h * 100)).filter((u) => u > 0);
   if (units.length === 0) return 0.5;
   const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
