@@ -11,7 +11,7 @@ describe('games list', () => {
   });
 
   it('team events never offer the six pointer', () => {
-    expect(gamesFor(3, { teams: true, rows: [] }).map((g) => g.key)).toEqual(['two_v_one', 'two_v_one_match', 'two_v_one_best', 'two_v_one_flat']);
+    expect(gamesFor(3, { teams: true, rows: [] }).map((g) => g.key)).toEqual(['two_v_one_best', 'two_v_one', 'two_v_one_match', 'two_v_one_flat']);
     expect(gamesFor(3, { teams: false, rows: [] }).map((g) => g.key)).toContain('six_stableford');
   });
 
@@ -47,6 +47,6 @@ describe('newRoundDefaults', () => {
       pair_game: 'stableford', three_game: 'six_stableford', fourball_format: 'matchplay',
       allowance_pct: 90, scramble_low_pct: 35, scramble_high_pct: 35, stableford_pct: 95, match_pct: 85, match_off_low: true,
     });
-    expect(newRoundDefaults(rows, true).three_game).toBe('two_v_one'); // team events: no six pointer
+    expect(newRoundDefaults(rows, true).three_game).toBe('two_v_one_best'); // team events: no six pointer; best individual first
   });
 });

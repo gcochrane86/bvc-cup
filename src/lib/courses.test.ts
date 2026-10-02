@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { courseGroups, courseLabel, teesOf } from './courses';
+import { courseGroups, courseLabel, defaultTee, teesOf } from './courses';
 import type { CourseRow } from './data/types';
 
 const c = (id: string, name: string, tee: string | null, course_rating: number | null = null): CourseRow => ({ id, name, tee, slope_rating: null, course_rating });
@@ -16,5 +16,17 @@ describe('courses and tees', () => {
       ['Glashedy Links', ['b', 'g', 'w']],
     ]);
     expect(teesOf(all, 'Glashedy Links').map((t) => t.tee)).toEqual(['Black', 'Gold', 'White']);
+  });
+});
+
+describe('defaultTee', () => {
+  const tee = (id: string, t: string | null, rating: number | null = null): CourseRow => ({ id, name: 'X', tee: t, slope_rating: 120, course_rating: rating });
+  it('picks the White tee where there is one', () => {
+    expect(defaultTee([tee('c', 'Championship', 76), tee('w', 'White', 72), tee('b', 'Black', 69)])?.id).toBe('w');
+    expect(defaultTee([tee('w', 'white tees', 72), tee('g', 'Gold', 70)])?.id).toBe('w');
+  });
+  it('otherwise the first tee', () => {
+    expect(defaultTee([tee('g', 'Gold', 73), tee('r', 'Red', 68)])?.id).toBe('g');
+    expect(defaultTee([])).toBeUndefined();
   });
 });

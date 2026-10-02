@@ -14,3 +14,8 @@ export function teesOf(courses: CourseRow[], name: string): CourseRow[] {
 export function courseGroups(courses: CourseRow[]): { name: string; tees: CourseRow[] }[] {
   return [...new Set(courses.map((c) => c.name))].sort((a, b) => a.localeCompare(b)).map((name) => ({ name, tees: teesOf(courses, name) }));
 }
+
+/** The tee a new day starts on: the White tee where the course has one, else its first (longest) tee. */
+export function defaultTee(tees: CourseRow[]): CourseRow | undefined {
+  return tees.find((t) => /\bwhite\b/i.test(t.tee ?? '')) ?? tees[0];
+}
