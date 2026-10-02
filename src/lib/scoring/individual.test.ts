@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGame, computeGameState, eventKindFor, gameFor, gameResult, gamesToSet, projectedTeamPoints, sixPoints, teamPoints, winnerIds } from './individual';
+import { buildGame, computeGameState, eventKindFor, gameFor, gameResult, gamesToSet, projectedTeamPoints, seasonDayCheck, sixPoints, teamPoints, winnerIds } from './individual';
 import { indexScores } from './matchState';
 import type { HoleInfo, RoundSettings, ScoreEntry } from './types';
 
@@ -227,5 +227,26 @@ describe('teamPoints', () => {
   it('gameResult in a season event carries team points', () => {
     const st = computeGameState(one, holes, indexScores(card({ p1: all(4), p2: all(5) })));
     expect(gameResult(one, st, { teamOf, points: pts })).toMatchObject({ winner: 'A', pointsA: 0, pointsB: 1 });
+  });
+});
+
+describe('seasonDayCheck', () => {
+  const teamOf = { a1: 'A' as const, a2: 'A' as const, a3: 'A' as const, b1: 'B' as const, b2: 'B' as const };
+  it('2 golfers from different teams: a 1 v 1', () => {
+    expect(seasonDayCheck(['a1', 'b1'], teamOf)).toEqual({ format: 'one_v_one' });
+  });
+  it('3 golfers split 2–1: a 2 v 1, the one on their own playing alone', () => {
+    expect(seasonDayCheck(['a1', 'a2', 'b1'], teamOf)).toEqual({ format: 'two_v_one', single: 'b1' });
+  });
+  it('4 or more: fourballs', () => {
+    expect(seasonDayCheck(['a1', 'a2', 'b1', 'b2'], teamOf)).toEqual({ format: 'fourballs' });
+  });
+  it('golfers all from one team are not allowed', () => {
+    expect(seasonDayCheck(['a1', 'a2'], teamOf)).toEqual({ error: 'same_team', team: 'A' });
+    expect(seasonDayCheck(['a1', 'a2', 'a3'], teamOf)).toEqual({ error: 'same_team', team: 'A' });
+  });
+  it('needs at least 2 golfers, all on a team', () => {
+    expect(seasonDayCheck(['a1'], teamOf)).toEqual({ error: 'too_few' });
+    expect(seasonDayCheck(['a1', 'x9'], teamOf)).toEqual({ error: 'no_team' });
   });
 });

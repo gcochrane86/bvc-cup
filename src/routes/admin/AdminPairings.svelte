@@ -31,9 +31,13 @@
         (GroupRow & { group_players: GroupPlayerRow[]; match_results: { match_type: string }[] })[]
       >,
     ]);
-    const ev = (await must(supabase.from('events').select('kind').eq('id', r.event_id).single())) as { kind: string };
+    const ev = (await must(supabase.from('events').select('kind, season').eq('id', r.event_id).single())) as { kind: string; season: boolean };
+    // Season events: only the day's golfers can be paired.
+    const golfers = ev.season
+      ? ((await must(supabase.from('round_players').select('player_id').eq('round_id', id))) as { player_id: string }[]).map((x) => x.player_id)
+      : [];
     round = r;
-    members = eps;
+    members = golfers.length ? eps.filter((m) => golfers.includes(m.player_id)) : eps;
     individual = ev.kind === 'individual';
     if (individual) {
       // Each group's players by position; in a 2 v 1 the single is P1.

@@ -227,3 +227,24 @@ export function projectedTeamPoints(def: MatchDef, state: MatchState, teamOf: Re
   if (!state.started) return { A: 0, B: 0 };
   return teamPoints(def, state.lead > 0 ? 'A' : state.lead < 0 ? 'B' : 'halved', teamOf, points);
 }
+
+export type SeasonDay =
+  | { format: 'one_v_one' }
+  | { format: 'two_v_one'; single: string }
+  | { format: 'fourballs' }
+  | { error: 'too_few' | 'no_team' }
+  | { error: 'same_team'; team: Team };
+
+/**
+ * A season day's golfers decide its format: 2 → 1 v 1, 3 → 2 v 1 (the one on their own team plays alone),
+ * 4+ → fourballs. Groups from one team only can't play for the cup, so they're not allowed.
+ */
+export function seasonDayCheck(ids: string[], teamOf: Record<string, Team>): SeasonDay {
+  if (ids.length < 2) return { error: 'too_few' };
+  if (ids.some((id) => !teamOf[id])) return { error: 'no_team' };
+  if (ids.length >= 4) return { format: 'fourballs' };
+  const teams = new Set(ids.map((id) => teamOf[id]));
+  if (teams.size === 1) return { error: 'same_team', team: teamOf[ids[0]] };
+  if (ids.length === 2) return { format: 'one_v_one' };
+  return { format: 'two_v_one', single: ids.find((id) => ids.filter((x) => teamOf[x] === teamOf[id]).length === 1)! };
+}

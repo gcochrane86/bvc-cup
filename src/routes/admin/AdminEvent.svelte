@@ -1,10 +1,11 @@
 <script lang="ts">
   import ShareLink from '../../components/ShareLink.svelte';
+  import SeasonGolfers from '../../components/SeasonGolfers.svelte';
   import { db, loadAll, photoCourses } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
   import { courseGroups, teesOf } from '../../lib/courses';
-  import { autoFourball, eventKindFor, gameLabel, gamesToSet, scrambleHandicap } from '../../lib/scoring';
+  import { autoFourball, eventKindFor, gameLabel, gamesToSet, scrambleHandicap, seasonDayCheck, type SeasonDay, type Team } from '../../lib/scoring';
   import { courseGuide } from '../../lib/guides';
   import { fourballKey, gamesFor, newRoundDefaults } from '../../lib/games';
   import ResetScores from '../../components/ResetScores.svelte';
@@ -26,6 +27,13 @@
   let paired = $state<Record<string, number>>({});
   /** Individual events: each day's group sizes (2 or 3), which decide the games it needs. */
   let groupSizes = $state<Record<string, number[]>>({});
+  /** Season events: each day's golfers. */
+  let roundGolfers = $state<Record<string, string[]>>({});
+  /** Season events, adding a day: the previous day's golfers, or a different set. */
+  let golferMode = $state<'same' | 'different'>('same');
+  let newGolfers = $state<string[]>([]);
+  /** Season events, changing a day's golfers: the list being edited, per day. */
+  let editGolfers = $state<Record<string, string[]>>({});
   /** After saving teams: a day whose pairings still need setting (scores and the leaderboard need them). */
   let nudge = $state<RoundRow | null>(null);
   /** `${roundId}:${playerId}` for players whose match that day is confirmed (their tee is locked). */
@@ -60,16 +68,19 @@
     if (!rs.length) adding = true; // a new event: straight to adding its first day
     const ids = rs.map((r) => r.id);
     if (ids.length) {
-      const [tees, gs] = await Promise.all([
+      const [tees, gs, rps] = await Promise.all([
         must(supabase.from('round_tees').select('*').in('round_id', ids)) as Promise<RoundTeeRow[]>,
         must(supabase.from('groups').select('round_id, group_players(player_id), match_results(match_type)').in('round_id', ids)) as Promise<
           { round_id: string; group_players: { player_id: string }[]; match_results: unknown[] }[]
         >,
+        must(supabase.from('round_players').select('round_id, player_id').in('round_id', ids)) as Promise<{ round_id: string; player_id: string }[]>,
       ]);
       roundTees = tees;
+      roundGolfers = Object.fromEntries(ids.map((id) => [id, rps.filter((r) => r.round_id === id).map((r) => r.player_id)]));
       // Full groups per day (for each day's pairing status): fourballs of four, or individual groups of 2–3.
-      const full = ev.kind === 'individual' ? 2 : 4;
-      paired = Object.fromEntries(ids.map((id) => [id, gs.filter((g) => g.round_id === id && g.group_players.length >= full).length]));
+      // Season days of 2 or 3 golfers are one group too.
+      const fullFor = (id: string) => (ev.kind === 'individual' || (ev.season && (roundGolfers[id]?.length ?? 4) <= 3) ? 2 : 4);
+      paired = Object.fromEntries(ids.map((id) => [id, gs.filter((g) => g.round_id === id && g.group_players.length >= fullFor(id)).length]));
       groupSizes = Object.fromEntries(ids.map((id) => [id, gs.filter((g) => g.round_id === id && g.group_players.length >= 2).map((g) => g.group_players.length)]));
       locked = new Set(gs.filter((g) => g.match_results.length).flatMap((g) => g.group_players.map((gp) => `${g.round_id}:${gp.player_id}`)));
     }
@@ -105,16 +116,36 @@
   // Step 1 (who's playing, with search) and step 2 (a one-tap team switch for each of them).
   let teamStep = $state<'who' | 'teams'>('teams');
   /** Individual events: no teams, so players are just ticked and each day has 2- and 3-player games. */
-  const individual = $derived(event?.kind === 'individual');
+  const individual = $derived(event?.kind === 'individual' && !event?.season);
+  /** Season team events: Team A v Team B, each day picks its golfers, points per format on the event. */
+  const season = $derived(!!event?.season);
   let search = $state('');
   const playingIds = $derived(db.players.filter((p) => members[p.id]?.playing).map((p) => p.id));
   /** 2 or 3 ticked: one individual group, so players are just saved (no teams). 4 or more: teams, as before. */
-  const smallGroup = $derived(eventKindFor(playingIds.length) === 'individual');
+  const smallGroup = $derived(!season && eventKindFor(playingIds.length) === 'individual');
+  /** Season events: the event's players (with a team) for the day pickers, in name order. */
+  const seasonPlayers = $derived(
+    db.players
+      .filter((p) => members[p.id]?.playing && members[p.id].team)
+      .map((p) => ({ id: p.id, name: p.name, short: p.short_name, team: members[p.id].team as Team })),
+  );
+  const seasonTeamOf = $derived(Object.fromEntries(seasonPlayers.map((p) => [p.id, p.team])) as Record<string, Team>);
+  const teamName = (t: Team) => (t === 'A' ? (event?.team_a_name ?? 'Team A') : (event?.team_b_name ?? 'Team B'));
+  /** A day's golfers: its own list, or (older days) everyone in the event. */
+  const golfersOf = (r: RoundRow) => (roundGolfers[r.id]?.length ? roundGolfers[r.id] : seasonPlayers.map((p) => p.id));
+  const lastRound = $derived(rounds.at(-1));
+  /** "Same as Day N": the last day's golfers (everyone for the first day). */
+  const sameGolfers = $derived(lastRound ? golfersOf(lastRound) : seasonPlayers.map((p) => p.id));
+  const chosenGolfers = $derived(golferMode === 'same' ? sameGolfers : newGolfers);
+  const chosenDay = $derived(seasonDayCheck(chosenGolfers, seasonTeamOf));
+  /** Season days of 2 or 3 golfers play an individual game (1 v 1 or 2 v 1); 4+ play fourballs. */
+  const seasonGameDay = (r: RoundRow) => season && golfersOf(r).length <= 3;
   const savedPlaying = $derived(playingIds.filter((id) => members[id].team).length);
   const fourballs = $derived(Math.floor(savedPlaying / 4));
   const pairingStatus = (r: RoundRow) => {
     const done = paired[r.id] ?? 0;
     if (individual) return done > 0 ? `${done} group${done === 1 ? '' : 's'} set ✓` : 'Groups not set yet';
+    if (seasonGameDay(r)) return done > 0 ? 'Group set ✓' : 'Group not set yet';
     if (fourballs > 0 && done >= fourballs) return 'Pairings set ✓';
     if (done > 0) return `${done} of ${fourballs} fourballs paired`;
     return 'Pairings not set yet';
@@ -123,9 +154,10 @@
   const roundDate = (d: string | null) =>
     d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'No date';
   /** The games a day needs: by its groups' sizes, or before groups are set by how many are playing. */
-  const gamesOf = (r: RoundRow) => gamesToSet(groupSizes[r.id] ?? [], playingIds.length);
+  const gamesOf = (r: RoundRow) =>
+    season ? { pair: golfersOf(r).length === 2, three: golfersOf(r).length === 3 } : gamesToSet(groupSizes[r.id] ?? [], playingIds.length);
   const roundGame = (r: RoundRow) =>
-    individual
+    individual || seasonGameDay(r)
       ? [gamesOf(r).pair && gameLabel(r.pair_game), gamesOf(r).three && gameLabel(r.three_game)].filter(Boolean).join(' · ')
     : r.fourball_format === 'matchplay' ? `${GAMES.matchplay} ${Number(r.allowance_pct)}%`
     : r.fourball_format === 'scramble' ? `${GAMES.scramble} ${Number(r.scramble_low_pct)}/${Number(r.scramble_high_pct)}`
@@ -265,13 +297,59 @@
           .select()
           .single(),
       )) as RoundRow;
+      if (season) return seasonGroup(added, chosenGolfers, chosenDay);
       const paired = individual ? await groupEveryDay([added]) : await pairTwoVTwo([added]);
       return paired.length ? `Round added · ${individual ? 'group' : 'pairings'} set for ${added.name}` : 'Round added';
     }, 'Round added').then(() => {
       newRound = { name: '', course: '', course_id: '', date: '' };
       adding = false;
+      golferMode = 'same';
+      newGolfers = [];
     });
   };
+
+  /**
+   * Season events: save a day's golfers, then its group — a 1 v 1 or 2 v 1 (the single first) is one group;
+   * 4 golfers split 2–2 are one fourball. Other fourball days are paired on the pairings page.
+   */
+  async function seasonGroup(r: RoundRow, ids: string[], day: SeasonDay): Promise<string> {
+    await must(supabase.from('round_players').delete().eq('round_id', r.id));
+    if (ids.length) await must(supabase.from('round_players').insert(ids.map((player_id) => ({ round_id: r.id, player_id }))));
+    let slots: { slot: string; player_id: string }[] | null = null;
+    if ('format' in day && day.format !== 'fourballs') {
+      const ordered = day.format === 'two_v_one' ? [day.single, ...ids.filter((id) => id !== day.single)] : ids;
+      slots = ordered.map((player_id, i) => ({ slot: `P${i + 1}`, player_id }));
+    } else if ('format' in day) {
+      slots = autoFourball(ids.map((playerId) => ({ playerId, team: seasonTeamOf[playerId], handicap: Number(members[playerId]?.handicap ?? 0) })));
+    }
+    if (!slots) return `${r.name}: golfers saved`;
+    await must(supabase.rpc('save_group', { p_round_id: r.id, p_group_no: 1, p_tee_time: null, p_slots: slots }));
+    await must(supabase.from('groups').delete().eq('round_id', r.id).gt('group_no', 1));
+    return `Round added · group set for ${r.name}`;
+  }
+  const saveGolfers = (r: RoundRow) => {
+    const ids = editGolfers[r.id] ?? golfersOf(r);
+    return act(async () => {
+      await seasonGroup(r, ids, seasonDayCheck(ids, seasonTeamOf));
+      delete editGolfers[r.id];
+    }, `${r.name} golfers saved`);
+  };
+
+  /** Season events: the event's points for each format (a win and a halve each). */
+  const POINT_ROWS = [
+    { key: 'fourball', label: 'Fourball' },
+    { key: 'singles', label: 'Singles' },
+    { key: 'one_v_one', label: '1 v 1' },
+    { key: 'two_v_one_single', label: '2 v 1 single' },
+    { key: 'two_v_one_pair', label: 'Each of the pair' },
+  ] as const;
+  const savePoints = () =>
+    act(async () => {
+      const pts = Object.fromEntries(
+        POINT_ROWS.map(({ key }) => [key, { win: Number(event!.points[key].win), halve: Number(event!.points[key].halve) }]),
+      );
+      await must(supabase.from('events').update({ points: pts }).eq('id', eventId));
+    }, 'Points saved');
 
   const saveRound = (r: RoundRow) =>
     act(
@@ -332,6 +410,22 @@
     <label class="setting"><span>Active event<span class="sub">Shown on the leaderboard</span></span><input class="switch" type="checkbox" bind:checked={event.is_active} /></label>
     <button onclick={saveDetails}>Save event</button>
   </section>
+
+  {#if season}
+    <!-- Every season day uses these points: 1 v 1 and 2 v 1 days count for the teams too. -->
+    <section class="card" data-testid="season-points">
+      <h2>Points for each format</h2>
+      <div class="ptable">
+        <span></span><span class="h">Win</span><span class="h">Halve</span>
+        {#each POINT_ROWS as row (row.key)}
+          <span class="fmt">{row.label}</span>
+          <input type="number" step="0.5" min="0" aria-label="{row.label} win" bind:value={event.points[row.key].win} />
+          <input type="number" step="0.25" min="0" aria-label="{row.label} halve" bind:value={event.points[row.key].halve} />
+        {/each}
+      </div>
+      <button onclick={savePoints}>Save points</button>
+    </section>
+  {/if}
 
   <ShareLink {event} />
 
@@ -408,7 +502,7 @@
     {#each rounds as r (r.id)}
       <details class="round" bind:open={openRounds[r.id]} data-testid="round">
         <summary class="tile">
-          <span><strong>{r.name} · {courseName(r.course_id)}</strong><span class="sub">{roundDate(r.date)} · {roundGame(r)}</span></span>
+          <span><strong>{r.name} · {courseName(r.course_id)}</strong><span class="sub">{roundDate(r.date)}{season ? ` · ${golfersOf(r).length} golfers` : ''} · {roundGame(r)}</span></span>
           <span class="pill" class:todo={!pairingStatus(r).endsWith('✓')}>{pairingStatus(r).replace('Pairings set ✓', 'Paired ✓').replace('Pairings not set yet', 'Not paired').replace(' fourballs paired', ' paired')}</span>
         </summary>
         <div class="row">
@@ -453,7 +547,19 @@
         {:else}
           <p class="muted small">No course guide yet · <a href="#/admin/guide/{r.course_id}">add photos</a></p>
         {/if}
-        {#if individual}
+        {#if season}
+          <details class="player-tees" data-testid="day-golfers">
+            <summary>Golfers ({golfersOf(r).length})</summary>
+            {#if editGolfers[r.id]}
+              <SeasonGolfers players={seasonPlayers} {teamName} bind:selected={editGolfers[r.id]} />
+              <button disabled={!('format' in seasonDayCheck(editGolfers[r.id], seasonTeamOf))} onclick={() => saveGolfers(r)}>Save golfers</button>
+            {:else}
+              <p class="small">{golfersOf(r).map((id) => db.players.find((p) => p.id === id)?.short_name ?? '?').join(', ')}</p>
+              <button class="secondary" disabled={golfersOf(r).some((id) => lockedIn(r.id, id))} onclick={() => (editGolfers[r.id] = [...golfersOf(r)])}>Change golfers</button>
+            {/if}
+          </details>
+        {/if}
+        {#if individual || seasonGameDay(r)}
           {@const games = gamesOf(r)}
           {@const both = games.pair && games.three}
           {#if games.pair}
@@ -534,7 +640,7 @@
         <button onclick={() => saveRound(r)}>Save round</button>
         <!-- Pairings: who plays with whom in each fourball (scores and the leaderboard need them). -->
         <div class="pairing">
-          <a class="pairbtn" href="#/admin/pairings/{r.id}">{individual ? 'Set groups →' : 'Set pairings →'}</a>
+          {#if !seasonGameDay(r)}<a class="pairbtn" href="#/admin/pairings/{r.id}">{individual ? 'Set groups →' : 'Set pairings →'}</a>{/if}
           <span class="pstatus" class:ok={pairingStatus(r).endsWith('✓')} data-testid="pairing-status">{pairingStatus(r)}</span>
         </div>
       </details>
@@ -570,8 +676,20 @@
           </select>
         </div>
       {/if}
+      {#if season}
+        <div class="field">
+          <span class="lbl">Golfers</span>
+          <label class="choice"><input type="radio" name="golfers" value="same" bind:group={golferMode} /> {lastRound ? `Same as ${lastRound.name}` : `Everyone (${seasonPlayers.length})`}</label>
+          <label class="choice"><input type="radio" name="golfers" value="different" bind:group={golferMode} onchange={() => (newGolfers = [...sameGolfers])} /> Different golfers</label>
+          {#if golferMode === 'different'}
+            <SeasonGolfers players={seasonPlayers} {teamName} bind:selected={newGolfers} />
+          {:else}
+            <SeasonGolfers players={seasonPlayers} {teamName} selected={sameGolfers} picking={false} />
+          {/if}
+        </div>
+      {/if}
       <div class="row">
-        <button type="submit">Add round</button>
+        <button type="submit" disabled={season && !('format' in chosenDay)}>Add round</button>
         <button type="button" class="secondary" onclick={() => (adding = false)}>Cancel</button>
       </div>
     </form>
@@ -670,6 +788,12 @@
   .setting { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
   .setting:last-of-type { border-bottom: 0; }
   .guidebtn { display: block; text-align: center; padding: 10px 16px; margin-bottom: 12px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1.5px solid var(--accent); }
+  .ptable { display: grid; grid-template-columns: 1fr 72px 72px; gap: 6px 8px; align-items: center; margin-bottom: 8px; }
+  .ptable .h { font-size: 0.75rem; color: var(--muted); text-align: center; }
+  .ptable .fmt { font-weight: 600; font-size: 0.9rem; }
+  .choice { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .choice input { width: 18px; height: 18px; margin: 0; }
+  .lbl { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 4px; }
   .calc { background: #e3efe7; border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; margin: 0 0 12px; font-variant-numeric: tabular-nums; }
   .player-tees summary { cursor: pointer; font-weight: 600; margin: 4px 0 8px; }
   .more summary { cursor: pointer; font-weight: 700; padding: 12px 0; color: var(--muted); }
