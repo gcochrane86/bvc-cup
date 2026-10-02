@@ -22,7 +22,7 @@
   import { singlesLineup } from '../lib/singles';
   import { courseGroups, defaultTee, teesOf } from '../lib/courses';
   import { defaultsFor, gameInfo, gamesFor, newRoundDefaults, type GameRow, type SettingKey } from '../lib/games';
-  import { holesFor, type HolesMode } from '../lib/holes';
+  import HolesPicker from './HolesPicker.svelte';
   import { seasonDayCheck, type SeasonDay, type SeasonPoints, type Team } from '../lib/scoring';
   import { formatPoints } from '../lib/scoring';
   import type { CourseRow, RoundRow } from '../lib/data/types';
@@ -71,9 +71,7 @@
   let date = $state('');
   let course = $state('');
   let courseId = $state('');
-  let holesMode = $state<HolesMode>('all');
-  let holesTo = $state(13);
-  let chosenHoles = $state<number[]>(Array.from({ length: 18 }, (_, i) => i + 1));
+  let holes = $state<number[] | null>(null);
   let golferMode = $state<'same' | 'different'>('same');
   let newGolfers = $state<string[]>([]);
   let game = $state('');
@@ -88,7 +86,6 @@
     course = c;
     courseId = defaultTee(teesOf(courses, c))?.id ?? '';
   }
-  const holes = $derived(holesMode === 'custom' ? (chosenHoles.length && chosenHoles.length < 18 ? chosenHoles : chosenHoles.length ? null : []) : holesFor(holesMode, holesTo));
 
   const golfers = $derived(season ? (golferMode === 'same' ? sameGolfers : newGolfers) : null);
   const teamOf = $derived(Object.fromEntries(seasonPlayers.map((p) => [p.id, p.team])) as Record<string, Team>);
@@ -170,29 +167,7 @@
         </div>
       {/if}
       <span class="lbl">Holes</span>
-      <div class="chips">
-        {#each [['all', 'All 18'], ['front', 'Front 9'], ['to', 'Holes 1 to…'], ['custom', 'Choose holes']] as [m, label] (m)}
-          <label class="chip" class:on={holesMode === m}><input type="radio" name="nr-holes" aria-label={label} checked={holesMode === m} onchange={() => (holesMode = m as HolesMode)} />{label}</label>
-        {/each}
-      </div>
-      {#if holesMode === 'to'}
-        <div class="stepper">
-          <span>Holes 1 to</span>
-          <button type="button" class="secondary" aria-label="Fewer holes" disabled={holesTo <= 1} onclick={() => (holesTo = Math.max(1, holesTo - 1))}>−</button>
-          <strong data-testid="holes-to">{holesTo}</strong>
-          <button type="button" class="secondary" aria-label="More holes" disabled={holesTo >= 17} onclick={() => (holesTo = Math.min(17, holesTo + 1))}>+</button>
-        </div>
-      {:else if holesMode === 'custom'}
-        <div class="holegrid">
-          {#each Array.from({ length: 18 }, (_, i) => i + 1) as h (h)}
-            <label class="hole" class:on={chosenHoles.includes(h)}>
-              <input type="checkbox" aria-label="Play hole {h}" checked={chosenHoles.includes(h)} onchange={(e) => (chosenHoles = (e.currentTarget as HTMLInputElement).checked ? [...chosenHoles, h].sort((a, b) => a - b) : chosenHoles.filter((x) => x !== h))} />{h}
-            </label>
-          {/each}
-        </div>
-      {/if}
-      {#if holes?.length}<p class="muted small">{holes.length} holes · handicaps scale to {holes.length}/18</p>{/if}
-      {#if holes && !holes.length}<p class="error small">Pick at least one hole.</p>{/if}
+      <HolesPicker id="nr" bind:holes />
     </div>
 
     {#if season}
@@ -287,13 +262,6 @@
   .chip, .seg label, .game { position: relative; }
   .chip input, .seg input, .game input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
   .chip:has(input:focus-visible), .seg label:has(input:focus-visible), .game:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .stepper { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .stepper button { width: 40px; min-height: 40px; padding: 0; font-size: 1.2rem; }
-  .stepper strong { font-size: 1.3rem; min-width: 28px; text-align: center; }
-  .holegrid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin: 6px 0; }
-  .hole { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.8rem; padding: 4px 0; border: 1px solid var(--line); border-radius: 8px; margin: 0; }
-  .hole.on { border-color: var(--accent); background: #e3efe7; }
-  .hole input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
   .seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 6px; }
   .seg label { position: relative; flex: 1; text-align: center; padding: 9px 4px; font-size: 0.85rem; color: var(--muted); cursor: pointer; margin: 0; }
   .seg label + label { border-left: 1px solid var(--line); }

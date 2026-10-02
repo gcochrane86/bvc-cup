@@ -6,6 +6,7 @@
   import { favouritesFirst } from '../../lib/favourites';
   import { setFavourite } from '../../lib/data/favourites';
   import SinglesSettings from '../../components/SinglesSettings.svelte';
+  import HolesPicker from '../../components/HolesPicker.svelte';
   import { singlesLineup } from '../../lib/singles';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
@@ -418,31 +419,6 @@
       await must(supabase.from('events').update({ points: pts }).eq('id', eventId));
     }, 'Points saved', 'points');
 
-  /** Holes played: all 18 (null), the front 9, 1–13, or a chosen set (e.g. winter: 1–9, 14 and 18). */
-  const ALL_HOLES = Array.from({ length: 18 }, (_, i) => i + 1);
-  const range = (to: number) => ALL_HOLES.filter((h) => h <= to);
-  /** Which holes choice a day is on (a chosen set is remembered while it's being edited). */
-  let choosingHoles = $state<Record<string, boolean>>({});
-  function holesMode(r: RoundRow): 'all' | 'front' | 'thirteen' | 'custom' {
-    if (choosingHoles[r.id]) return 'custom';
-    const h = r.holes ?? null;
-    if (!h || h.length >= 18) return 'all';
-    if (h.join() === range(9).join()) return 'front';
-    if (h.join() === range(13).join()) return 'thirteen';
-    return 'custom';
-  }
-  function setHolesMode(r: RoundRow, mode: 'all' | 'front' | 'thirteen' | 'custom') {
-    choosingHoles[r.id] = mode === 'custom';
-    if (mode === 'all') r.holes = null;
-    else if (mode === 'front') r.holes = range(9);
-    else if (mode === 'thirteen') r.holes = range(13);
-    else r.holes = r.holes?.length ? r.holes : [...ALL_HOLES];
-  }
-  function toggleHole(r: RoundRow, hole: number, on: boolean) {
-    const current = r.holes?.length ? r.holes : [...ALL_HOLES];
-    r.holes = on ? [...new Set([...current, hole])].sort((a, b) => a - b) : current.filter((h) => h !== hole);
-  }
-
   const saveRound = (r: RoundRow) =>
     act(
       () =>
@@ -655,20 +631,7 @@
         <!-- Holes played: all 18, or fewer (e.g. a quick 9, or winter: 1–9, 14 and 18). Handicaps scale to them. -->
         <fieldset class="holes">
           <legend>Holes played</legend>
-          {#each [['all', 'All 18'], ['front', 'Front 9'], ['thirteen', '1–13'], ['custom', 'Choose holes']] as [mode, label] (mode)}
-            <label class="choice"><input type="radio" name="holes-{r.id}" checked={holesMode(r) === mode} onchange={() => setHolesMode(r, mode as 'all' | 'front' | 'thirteen' | 'custom')} /> {label}</label>
-          {/each}
-          {#if holesMode(r) === 'custom'}
-            <div class="holegrid">
-              {#each ALL_HOLES as h (h)}
-                <label class="hole" class:on={(r.holes ?? ALL_HOLES).includes(h)}>
-                  <input type="checkbox" aria-label="Play hole {h}" checked={(r.holes ?? ALL_HOLES).includes(h)} onchange={(e) => toggleHole(r, h, (e.currentTarget as HTMLInputElement).checked)} />{h}
-                </label>
-              {/each}
-            </div>
-          {/if}
-          {#if holesMode(r) === 'custom' && !r.holes?.length}<p class="error small">Pick at least one hole.</p>{/if}
-          {#if r.holes?.length && r.holes.length < 18}<p class="muted small"><span data-testid="holes-count">{r.holes.length} holes</span> · handicaps scale to {r.holes.length}/18.</p>{/if}
+          <HolesPicker id="h-{r.id}" bind:holes={r.holes} />
         </fieldset>
         {#if guideFor(r)}
           <a class="guidebtn" href="#/admin/events/{eventId}/guide/{r.course_id}">View course guide →</a>
@@ -786,7 +749,7 @@
           </SinglesSettings>
         {/if}
         {/if}
-        <button disabled={holesMode(r) === 'custom' && !r.holes?.length} onclick={() => saveRound(r)}>Save round</button>
+        <button disabled={!!r.holes && !r.holes.length} onclick={() => saveRound(r)}>Save round</button>
         <!-- Pairings: who plays with whom in each fourball (scores and the leaderboard need them). -->
         <div class="pairing">
           {#if !seasonGameDay(r)}<a class="pairbtn" href="#/admin/pairings/{r.id}">{individual ? 'Set groups →' : 'Set pairings →'}</a>{/if}
@@ -936,15 +899,9 @@
   .guidebtn { display: block; text-align: center; padding: 10px 16px; margin-bottom: 12px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1.5px solid var(--accent); }
   .holes { border: 0; padding: 0; margin: 0 0 12px; }
   .holes legend { font-size: 0.9rem; color: var(--muted); margin-bottom: 4px; padding: 0; }
-  .holegrid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin: 6px 0; }
-  .hole { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.8rem; padding: 4px 0; border: 1px solid var(--line); border-radius: 8px; margin: 0; }
-  .hole.on { border-color: var(--accent); background: #e3efe7; }
-  .hole input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
   .ptable { display: grid; grid-template-columns: 1fr 72px 72px; gap: 6px 8px; align-items: center; margin-bottom: 8px; }
   .ptable .h { font-size: 0.75rem; color: var(--muted); text-align: center; }
   .ptable .fmt { font-weight: 600; font-size: 0.9rem; }
-  .choice { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-  .choice input { width: 18px; height: 18px; margin: 0; }
   .calc { background: #e3efe7; border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; margin: 0 0 12px; font-variant-numeric: tabular-nums; }
   .player-tees summary { cursor: pointer; font-weight: 600; margin: 4px 0 8px; }
   .more summary { cursor: pointer; font-weight: 700; padding: 12px 0; color: var(--muted); }

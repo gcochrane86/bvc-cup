@@ -252,6 +252,18 @@ test('a day can play only some holes (winter: 1–9, 14 and 18); score entry ski
   await unfoldEvent(page);
   const day1 = page.getByTestId('round').first();
   await expect(day1.getByLabel('All 18')).toBeChecked();
+  // The day's settings use the same holes picker as Add round: Holes 1 to… with − / +.
+  await expect(day1.getByLabel('1–13')).toHaveCount(0);
+  await day1.getByLabel('Holes 1 to…').check();
+  await expect(day1.getByTestId('holes-to')).toHaveText('13');
+  await day1.getByRole('button', { name: 'More holes' }).click();
+  await expect(day1.getByTestId('holes-count')).toHaveText('14 holes');
+  await day1.getByRole('button', { name: 'Save round' }).click();
+  await expect(page.getByText('Day 1 saved')).toBeVisible();
+  await expect.poll(async () => (await serviceDb().from('rounds').select('holes').eq('id', roundId).single()).data?.holes).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
+  await unfoldEvent(page);
+  await expect(day1.getByLabel('Holes 1 to…')).toBeChecked();
+  await expect(day1.getByTestId('holes-to')).toHaveText('14');
   await day1.getByLabel('Front 9').check();
   await day1.getByRole('button', { name: 'Save round' }).click();
   await expect(page.getByText('Day 1 saved')).toBeVisible();
