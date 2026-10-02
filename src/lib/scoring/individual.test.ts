@@ -258,3 +258,41 @@ describe('seasonDayCheck: fourball days', () => {
     expect(seasonDayCheck(['a1', 'a2', 'b1', 'b2', 'a3'], teamOf)).toEqual({ format: 'fourballs' });
   });
 });
+
+describe('2 v 1 Stableford (best individual)', () => {
+  it("the single's own total against the better of the pair's own totals", () => {
+    const def = buildGame('g', three(0, 0, 0), { ...base, threeGame: 'two_v_one_best' })!;
+    expect(def.stableford).toBe(true);
+    // Single pars everything: 36. Pair: p2 bogeys everything (18); p3 birdies the 1st, pars the rest (37).
+    const p3 = all(4);
+    p3[0] = 3;
+    const st = computeGameState(def, holes, indexScores(card({ p1: all(4), p2: all(5), p3 })));
+    expect(st.statusText).toBe('36–37');
+    expect(st.winner).toBe('B');
+    // Better ball would have been the same here; with p3 bogeying the 1st, the best individual total is 35.
+    const p3b = all(4);
+    p3b[0] = 5;
+    expect(computeGameState(def, holes, indexScores(card({ p1: all(4), p2: all(5), p3: p3b }))).winner).toBe('A');
+  });
+});
+
+describe('match play over fewer holes', () => {
+  it('finishes when the lead is more than the holes left to play', () => {
+    const nine = holes.slice(0, 9);
+    const def = buildGame('g', two(0, 0), { ...base, pairGame: 'flat_match' })!;
+    const st = computeGameState(def, nine, indexScores(card({ p1: Array(5).fill(4), p2: Array(5).fill(5) })));
+    expect(st.decided).toBe(true);
+    expect(st.resultText).toBe('5&4');
+  });
+  it('counts only the holes being played (1–9, 14 and 18)', () => {
+    const winter = holes.filter((h) => h.hole <= 9 || h.hole === 14 || h.hole === 18);
+    const def = buildGame('g', two(0, 0), { ...base, pairGame: 'flat_match' })!;
+    // Level after 9; p1 wins the 14th: 1 UP with one to play.
+    const p1 = [...Array(9).fill(4), ...Array(4).fill(4), 3];
+    const p2 = [...Array(9).fill(4), ...Array(4).fill(4), 4];
+    const st = computeGameState(def, winter, indexScores(card({ p1, p2 })));
+    expect(st.thru).toBe(14);
+    expect(st.statusText).toBe('1 UP');
+    expect(st.dormie).toBe(true);
+  });
+});

@@ -64,3 +64,12 @@ describe('courseHandicap', () => {
     expect(courseHandicap(12.4, null, null, 72)).toBe(12);
   });
 });
+
+describe('strokesOnHole over fewer holes', () => {
+  it('spreads shots over the holes being played', () => {
+    // 14 shots over 9 holes: one on every hole, a second on the 5 hardest.
+    expect(strokesOnHole(14, 3, 9)).toBe(2);
+    expect(strokesOnHole(14, 6, 9)).toBe(1);
+    expect(strokesOnHole(5, 6, 9)).toBe(0);
+  });
+});

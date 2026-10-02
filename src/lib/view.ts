@@ -3,6 +3,7 @@ import {
   buildMatches,
   computeGameState,
   projectedTeamPoints,
+  roundHalfUp,
   stepOf,
   computeMatchState,
   computeTracker,
@@ -90,10 +91,16 @@ export function buildEventView(s: Snapshot): EventView | null {
       const settings = settingsOf(round);
       let pointsAvailable = individual ? 0 : roundPointsAvailable(settings, groupCount);
       const holesOf = (courseId: string): HoleInfo[] =>
-        s.courseHoles
-          .filter((h) => h.course_id === courseId)
-          .map((h) => ({ hole: h.hole, par: h.par, strokeIndex: h.stroke_index }))
-          .sort((a, b) => a.hole - b.hole);
+        playedHoles(
+          s.courseHoles
+            .filter((h) => h.course_id === courseId)
+            .map((h) => ({ hole: h.hole, par: h.par, strokeIndex: h.stroke_index }))
+            .sort((a, b) => a.hole - b.hole),
+          round.holes,
+        );
+      const holesOf18 = (courseId: string) => s.courseHoles.filter((h) => h.course_id === courseId);
+      // A day playing only some holes scales handicaps to them (e.g. half over 9).
+      const holesPlayed = round.holes?.length ? Math.min(18, round.holes.length) : 18;
       const holes = holesOf(round.course_id);
       const course = s.courses.find((c) => c.id === round.course_id);
       const scores = indexScores(
@@ -125,7 +132,10 @@ export function buildEventView(s: Snapshot): EventView | null {
               const c = teeOf[gp.player_id] ?? course;
               const par = teeHoles[gp.player_id].reduce((sum, h) => sum + h.par, 0);
               const rating = c?.course_rating != null ? Number(c.course_rating) : null;
-              return [gp.player_id, courseHandicap(index, c?.slope_rating ?? null, rating, par)];
+              // Course handicap off the full 18 (its own tee's par), then scaled to the holes played.
+              const fullPar = holesOf18(c?.id ?? round.course_id).reduce((sum, h) => sum + h.par, 0) || par;
+              const ch = courseHandicap(index, c?.slope_rating ?? null, rating, fullPar);
+              return [gp.player_id, holesPlayed < 18 ? roundHalfUp((ch * holesPlayed) / 18) : ch];
             }),
           );
           const onOtherTees = Object.keys(teeOf).length > 0;
@@ -292,4 +302,16 @@ export function leaderboardRoundId(view: EventView, scoringGroupId: string | nul
   if (found) return found.round.round.id;
   const days = [...view.rounds].sort((a, b) => a.round.round_no - b.round.round_no);
   return (days.find((r) => r.completed < r.totalMatches) ?? days.at(-1))?.round.id ?? null;
+}
+
+/**
+ * The holes a day plays (all 18 when none are picked). On a day playing only some, each hole's stroke index is
+ * re-ranked among them (1 = hardest, so shots go on the hardest holes played) and `of` is how many there are;
+ * the card's stroke index is kept in `cardSi` for display.
+ */
+export function playedHoles(all: HoleInfo[], picked: number[] | null | undefined): HoleInfo[] {
+  if (!picked?.length || picked.length >= 18) return all;
+  const keep = all.filter((h) => picked.includes(h.hole));
+  const byDifficulty = [...keep].sort((a, b) => a.strokeIndex - b.strokeIndex);
+  return keep.map((h) => ({ ...h, cardSi: h.strokeIndex, strokeIndex: byDifficulty.indexOf(h) + 1, of: keep.length }));
 }

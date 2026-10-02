@@ -21,7 +21,7 @@ function sideBest(ids: string[], hole: HoleInfo, match: MatchDef, idx: ScoreInde
     const e = idx.get(scoreKey(id, hole.hole));
     if (!e || e.pickedUp || e.gross === null) continue;
     const h = playerHole(match, id, hole);
-    const toPar = e.gross - strokesOnHole(match.strokes[id] ?? 0, h.strokeIndex) - h.par;
+    const toPar = e.gross - strokesOnHole(match.strokes[id] ?? 0, h.strokeIndex, h.of) - h.par;
     if (best === null || toPar < best) best = toPar;
   }
   return best;
@@ -34,7 +34,7 @@ function sidePoints(ids: string[], hole: HoleInfo, match: MatchDef, idx: ScoreIn
     const e = idx.get(scoreKey(id, hole.hole));
     if (!e || e.pickedUp || e.gross === null) continue;
     const h = playerHole(match, id, hole);
-    const net = e.gross - strokesOnHole(match.strokes[id] ?? 0, h.strokeIndex);
+    const net = e.gross - strokesOnHole(match.strokes[id] ?? 0, h.strokeIndex, h.of);
     best = Math.max(best, 2 + h.par - net);
   }
   return best;
@@ -65,7 +65,8 @@ export function computeMatchState(match: MatchDef, holes: HoleInfo[], idx: Score
   let decided = false;
   let finalHole: number | null = null;
 
-  for (const h of sorted) {
+  // Holes left: of those being played (a day may play only some holes).
+  for (const [i, h] of sorted.entries()) {
     const o = holeOutcome(match, h, idx);
     if (o === null) break;
     if (o === 'A') lead++;
@@ -73,7 +74,7 @@ export function computeMatchState(match: MatchDef, holes: HoleInfo[], idx: Score
     holeWinners[h.hole - 1] = o;
     running[h.hole - 1] = lead;
     thru = h.hole;
-    const remaining = 18 - h.hole;
+    const remaining = sorted.length - (i + 1);
     if (Math.abs(lead) > remaining || remaining === 0) {
       decided = true;
       finalHole = h.hole;
@@ -81,7 +82,7 @@ export function computeMatchState(match: MatchDef, holes: HoleInfo[], idx: Score
     }
   }
 
-  const remaining = 18 - thru;
+  const remaining = sorted.filter((h) => h.hole > thru).length;
   const started = thru > 0;
   const winner: Outcome | null = decided ? (lead > 0 ? 'A' : lead < 0 ? 'B' : 'halved') : null;
   let resultText: string | null = null;

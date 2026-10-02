@@ -39,7 +39,9 @@ export interface RoundRow {
   fourball_format: 'matchplay' | 'stableford' | 'flat' | 'scramble';
   /** Individual events: the 2-player game, the 3-player game, and handicap settings. */
   pair_game: 'stableford' | 'flat_match' | 'stableford_match';
-  three_game: 'six_stableford' | 'six_flat' | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat';
+  three_game: 'six_stableford' | 'six_flat' | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat' | 'two_v_one_best';
+  /** The holes played that day (e.g. 1–9, 14 and 18 in winter); null = all 18. */
+  holes?: number[] | null;
   stableford_pct: number; match_pct: number; match_off_low: boolean;
   /** 2-man scramble: % of the lower and the higher partner's handicap that make the team handicap. */
   scramble_low_pct: number; scramble_high_pct: number;

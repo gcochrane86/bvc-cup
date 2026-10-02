@@ -227,3 +227,32 @@ test('Admin → Games: a game switched off leaves the pickers; a changed default
   const added = rounds!.at(-1)!;
   expect([Number(added.scramble_low_pct), Number(added.scramble_high_pct)]).toEqual([35, 35]);
 });
+
+test('a day can play only some holes (winter: 1–9, 14 and 18); score entry skips the rest', async ({ page }) => {
+  const { eventId, roundId, twoBall } = await seedIndividual();
+  await loginAdmin(page);
+  await page.goto(`/#/admin/events/${eventId}`);
+  await unfoldEvent(page);
+  const day1 = page.getByTestId('round').first();
+  await expect(day1.getByLabel('All 18')).toBeChecked();
+  await day1.getByLabel('Front 9').check();
+  await day1.getByRole('button', { name: 'Save round' }).click();
+  await expect(page.getByText('Day 1 saved')).toBeVisible();
+  const db = serviceDb();
+  await expect.poll(async () => (await db.from('rounds').select('holes').eq('id', roundId).single()).data?.holes).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+  await unfoldEvent(page);
+  await day1.getByLabel('Choose holes').check();
+  for (const h of [14, 18]) await day1.getByLabel(`Play hole ${h}`, { exact: true }).check();
+  await expect(day1.getByTestId('holes-count')).toHaveText('11 holes');
+  await day1.getByRole('button', { name: 'Save round' }).click();
+  await expect(page.getByText('Day 1 saved')).toBeVisible();
+  await expect.poll(async () => (await db.from('rounds').select('holes').eq('id', roundId).single()).data?.holes).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 18]);
+  await expect(day1.locator('summary').first()).toContainText('11 holes');
+
+  // Scoring: after the 9th comes the 14th.
+  await page.goto(`/#/score/${twoBall}`);
+  await page.getByRole('button', { name: 'Hole 9', exact: true }).click();
+  await page.getByRole('button', { name: 'Save hole 9' }).click();
+  await expect(page.getByRole('heading', { name: 'Hole 14', exact: true })).toBeVisible();
+});

@@ -4,7 +4,7 @@
 
 export type GameKey =
   | 'stableford_match' | 'stableford' | 'flat_match'
-  | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat' | 'six_stableford' | 'six_flat'
+  | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat' | 'two_v_one_best' | 'six_stableford' | 'six_flat'
   | 'fourball_matchplay' | 'fourball_stableford' | 'fourball_flat' | 'scramble';
 
 /** A setting a game uses (a round column of the same name). */
@@ -34,6 +34,7 @@ export const GAMES: GameInfo[] = [
   { key: 'six_flat', name: 'Six pointer (flat)', size: 3, teamOk: false, about: '4 / 2 / 0 a hole by gross score. No shots.', defaults: {} },
   { key: 'two_v_one', name: '2 v 1 Stableford', size: 3, teamOk: true, about: "The single's Stableford total against the pair's better ball.", defaults: { stableford_pct: 100 } },
   { key: 'two_v_one_match', name: '2 v 1 Stableford match play', size: 3, teamOk: true, about: "Hole by hole: the single's points against the pair's best.", defaults: { stableford_pct: 100 } },
+  { key: 'two_v_one_best', name: '2 v 1 Stableford (best individual)', size: 3, teamOk: true, about: "The single's own Stableford total against the better of the pair's own totals.", defaults: { stableford_pct: 100 } },
   { key: 'two_v_one_flat', name: '2 v 1 flat match play', size: 3, teamOk: true, about: "Hole by hole: the single's gross against the pair's best. No shots.", defaults: {} },
   { key: 'fourball_matchplay', name: 'Fourball match play', size: 4, teamOk: true, about: 'Better ball match play off the low.', defaults: { allowance_pct: 90 }, fourballFormat: 'matchplay' },
   { key: 'fourball_stableford', name: 'Fourball Stableford', size: 4, teamOk: true, about: 'Best Stableford points on a hole wins it, full handicaps.', defaults: {}, fourballFormat: 'stableford' },

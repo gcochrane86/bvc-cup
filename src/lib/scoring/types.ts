@@ -6,7 +6,7 @@ export type Outcome = Team | 'halved';
 /** A result's winner: a side, halved, or (six pointer) a position. */
 export type Winner = Outcome | 'P1' | 'P2' | 'P3';
 export type PairGame = 'stableford' | 'flat_match' | 'stableford_match';
-export type ThreeGame = 'six_stableford' | 'six_flat' | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat';
+export type ThreeGame = 'six_stableford' | 'six_flat' | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat' | 'two_v_one_best';
 export type IndividualGame = PairGame | ThreeGame;
 /** A player's figures from a confirmed individual game: game points and Stableford total. */
 export interface PlayerPoints { points: number; stableford: number }
@@ -17,7 +17,12 @@ export interface SeasonPoints { fourball: WinHalve; singles: WinHalve; one_v_one
 export interface HoleInfo {
   hole: number;
   par: number;
+  /** For allocating shots: on a day playing only some holes, the hole's rank among them (1 = hardest). */
   strokeIndex: number;
+  /** Holes being played that day (default 18): shots spread over these. */
+  of?: number;
+  /** The card's stroke index, when strokeIndex has been re-ranked for a day playing only some holes. */
+  cardSi?: number;
 }
 
 export interface RoundSettings {

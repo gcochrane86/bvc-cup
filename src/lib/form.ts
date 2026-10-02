@@ -53,7 +53,7 @@ export function computeForm(view: EventView, roundId: string | null): FormRow[] 
             continue;
           }
           const own = g.teeHoles[pid]?.find((x) => x.hole === h.hole) ?? h; // the player's own tee
-          const net = e.gross - strokesOnHole(courseHcp, own.strokeIndex);
+          const net = e.gross - strokesOnHole(courseHcp, own.strokeIndex, own.of);
           r.holes++;
           r.gross += e.gross;
           r.grossToPar += e.gross - own.par;
@@ -132,7 +132,7 @@ export function computePairForm(view: EventView, roundId: string | null): PairFo
               const own = g.teeHoles[id]?.find((x) => x.hole === h.hole) ?? h;
               // Scramble: the team's handicap; otherwise each player's full course handicap.
               const hcp = fourball.def.teamHandicap?.[id] ?? g.playingHcp[id] ?? 0;
-              const net = e.gross! - strokesOnHole(hcp, own.strokeIndex);
+              const net = e.gross! - strokesOnHole(hcp, own.strokeIndex, own.of);
               return { gross: e.gross! - own.par, net: net - own.par, points: Math.max(0, 2 + own.par - net) };
             });
           if (!played.length) {

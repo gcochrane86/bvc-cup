@@ -57,6 +57,7 @@
   button.cell { background: none; border: 0; min-height: 0; width: 100%; font: inherit; color: inherit; }
   .cell.partial .num { border-color: #f0a030; }
   .cell.locked { opacity: 0.55; }
+  .cell.skipped { opacity: 0.25; cursor: default; }
   .cell.current { background: var(--text); }
   .cell.current .num { color: #fff; border-color: #fff; }
   .num {

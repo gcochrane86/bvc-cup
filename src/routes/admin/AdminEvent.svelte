@@ -360,6 +360,31 @@
       await must(supabase.from('events').update({ points: pts }).eq('id', eventId));
     }, 'Points saved');
 
+  /** Holes played: all 18 (null), the front 9, 1–13, or a chosen set (e.g. winter: 1–9, 14 and 18). */
+  const ALL_HOLES = Array.from({ length: 18 }, (_, i) => i + 1);
+  const range = (to: number) => ALL_HOLES.filter((h) => h <= to);
+  /** Which holes choice a day is on (a chosen set is remembered while it's being edited). */
+  let choosingHoles = $state<Record<string, boolean>>({});
+  function holesMode(r: RoundRow): 'all' | 'front' | 'thirteen' | 'custom' {
+    if (choosingHoles[r.id]) return 'custom';
+    const h = r.holes ?? null;
+    if (!h || h.length >= 18) return 'all';
+    if (h.join() === range(9).join()) return 'front';
+    if (h.join() === range(13).join()) return 'thirteen';
+    return 'custom';
+  }
+  function setHolesMode(r: RoundRow, mode: 'all' | 'front' | 'thirteen' | 'custom') {
+    choosingHoles[r.id] = mode === 'custom';
+    if (mode === 'all') r.holes = null;
+    else if (mode === 'front') r.holes = range(9);
+    else if (mode === 'thirteen') r.holes = range(13);
+    else r.holes = r.holes?.length ? r.holes : [...ALL_HOLES];
+  }
+  function toggleHole(r: RoundRow, hole: number, on: boolean) {
+    const current = r.holes?.length ? r.holes : [...ALL_HOLES];
+    r.holes = on ? [...new Set([...current, hole])].sort((a, b) => a - b) : current.filter((h) => h !== hole);
+  }
+
   const saveRound = (r: RoundRow) =>
     act(
       () =>
@@ -377,6 +402,7 @@
               singles_allowance_pct: Number(r.singles_allowance_pct),
               singles_pairing: r.singles_pairing,
               fourball_format: r.fourball_format,
+              holes: r.holes?.length && r.holes.length < 18 ? r.holes : null,
               pair_game: r.pair_game,
               three_game: r.three_game,
               stableford_pct: Number(r.stableford_pct),
@@ -511,7 +537,7 @@
     {#each rounds as r (r.id)}
       <details class="round" bind:open={openRounds[r.id]} data-testid="round">
         <summary class="tile">
-          <span><strong>{r.name} · {courseName(r.course_id)}</strong><span class="sub">{roundDate(r.date)}{season ? ` · ${golfersOf(r).length} golfers` : ''} · {roundGame(r)}</span></span>
+          <span><strong>{r.name} · {courseName(r.course_id)}</strong><span class="sub">{roundDate(r.date)}{season ? ` · ${golfersOf(r).length} golfers` : ''}{r.holes?.length && r.holes.length < 18 ? ` · ${r.holes.length} holes` : ''} · {roundGame(r)}</span></span>
           <span class="pill" class:todo={!pairingStatus(r).endsWith('✓')}>{pairingStatus(r).replace('Pairings set ✓', 'Paired ✓').replace('Pairings not set yet', 'Not paired').replace(' fourballs paired', ' paired')}</span>
         </summary>
         <div class="row">
@@ -551,6 +577,23 @@
             {/each}
           </details>
         {/if}
+        <!-- Holes played: all 18, or fewer (e.g. a quick 9, or winter: 1–9, 14 and 18). Handicaps scale to them. -->
+        <fieldset class="holes">
+          <legend>Holes played</legend>
+          {#each [['all', 'All 18'], ['front', 'Front 9'], ['thirteen', '1–13'], ['custom', 'Choose holes']] as [mode, label] (mode)}
+            <label class="choice"><input type="radio" name="holes-{r.id}" checked={holesMode(r) === mode} onchange={() => setHolesMode(r, mode as 'all' | 'front' | 'thirteen' | 'custom')} /> {label}</label>
+          {/each}
+          {#if holesMode(r) === 'custom'}
+            <div class="holegrid">
+              {#each ALL_HOLES as h (h)}
+                <label class="hole" class:on={(r.holes ?? ALL_HOLES).includes(h)}>
+                  <input type="checkbox" aria-label="Play hole {h}" checked={(r.holes ?? ALL_HOLES).includes(h)} onchange={(e) => toggleHole(r, h, (e.currentTarget as HTMLInputElement).checked)} />{h}
+                </label>
+              {/each}
+            </div>
+          {/if}
+          {#if r.holes?.length && r.holes.length < 18}<p class="muted small"><span data-testid="holes-count">{r.holes.length} holes</span> · handicaps scale to {r.holes.length}/18.</p>{/if}
+        </fieldset>
         {#if guideFor(r)}
           <a class="guidebtn" href="#/admin/events/{eventId}/guide/{r.course_id}">View course guide →</a>
         {:else}
@@ -797,6 +840,12 @@
   .setting { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
   .setting:last-of-type { border-bottom: 0; }
   .guidebtn { display: block; text-align: center; padding: 10px 16px; margin-bottom: 12px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1.5px solid var(--accent); }
+  .holes { border: 0; padding: 0; margin: 0 0 12px; }
+  .holes legend { font-size: 0.9rem; color: var(--muted); margin-bottom: 4px; padding: 0; }
+  .holegrid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin: 6px 0; }
+  .hole { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.8rem; padding: 4px 0; border: 1px solid var(--line); border-radius: 8px; margin: 0; }
+  .hole.on { border-color: var(--accent); background: #e3efe7; }
+  .hole input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
   .ptable { display: grid; grid-template-columns: 1fr 72px 72px; gap: 6px 8px; align-items: center; margin-bottom: 8px; }
   .ptable .h { font-size: 0.75rem; color: var(--muted); text-align: center; }
   .ptable .fmt { font-weight: 600; font-size: 0.9rem; }

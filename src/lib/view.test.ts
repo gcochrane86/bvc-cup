@@ -451,3 +451,25 @@ describe('season team events: after a team switch', () => {
     expect(v.tracker.toWin).toBe(1.25); // half of 1.5, plus the 0.5 step (not the 1 a halve-only step would give)
   });
 });
+
+describe('a day playing only some holes', () => {
+  const winter = [1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 18];
+  it('uses just those holes, ranked for shots by their stroke index', () => {
+    const v = buildEventView(snapshot({ rounds: [{ ...baseRound, holes: winter }] }))!;
+    const holes = v.rounds[0].holes;
+    expect(holes.map((h) => h.hole)).toEqual(winter);
+    expect(holes.every((h) => h.of === 11)).toBe(true);
+    // SI = hole number on this course, so the ranks follow the hole order; the card SI is kept for display.
+    expect(holes.map((h) => h.strokeIndex)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(holes.find((h) => h.hole === 14)?.cardSi).toBe(14);
+  });
+  it('scales handicaps to the holes played (10 over 11 holes → 6)', () => {
+    const v = buildEventView(snapshot({ rounds: [{ ...baseRound, holes: winter }] }))!;
+    expect(v.rounds[0].groups[0].playingHcp.a1).toBe(6);
+  });
+  it('all 18 holes when none are picked', () => {
+    const v = buildEventView(snapshot())!;
+    expect(v.rounds[0].holes).toHaveLength(18);
+    expect(v.rounds[0].groups[0].playingHcp.a1).toBe(10);
+  });
+});

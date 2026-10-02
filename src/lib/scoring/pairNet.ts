@@ -32,7 +32,7 @@ export function pairNet(
       .filter(({ e }) => !e.pickedUp && e.gross !== null)
       .map(({ id, e }) => {
         const own = playerHole({ teeHoles }, id, h);
-        return e.gross! - strokesOnHole(courseHcp[id] ?? 0, own.strokeIndex) - own.par;
+        return e.gross! - strokesOnHole(courseHcp[id] ?? 0, own.strokeIndex, own.of) - own.par;
       });
     toPar += nets.length ? Math.min(...nets) : 2;
     thru++;

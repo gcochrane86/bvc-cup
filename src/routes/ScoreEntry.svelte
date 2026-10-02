@@ -118,8 +118,8 @@
       (m) => m.def.type !== 'better_ball' && [...m.def.sideA, ...m.def.sideB].includes(pid),
     );
     const own = playerHole({ teeHoles: found.group.teeHoles }, pid, info); // the player's own tee
-    const bb = bbMatch ? strokesOnHole(bbMatch.def.strokes[pid] ?? 0, own.strokeIndex) : 0;
-    const sg = singles ? strokesOnHole(singles.def.strokes[pid] ?? 0, own.strokeIndex) : null;
+    const bb = bbMatch ? strokesOnHole(bbMatch.def.strokes[pid] ?? 0, own.strokeIndex, own.of) : 0;
+    const sg = singles ? strokesOnHole(singles.def.strokes[pid] ?? 0, own.strokeIndex, own.of) : null;
     return { bb, label: shotLabel(bb, sg), stableford: !!bbMatch?.def.stableford };
   }
 
@@ -135,6 +135,7 @@
 
   function holeState(h: number): string {
     if (!found) return '';
+    if (!found.round.holes.some((x) => x.hole === h)) return 'skipped'; // not played today
     const ids = SLOTS.map((s) => found.group.slots[s]).filter((x): x is string => !!x);
     if (ids.length && ids.every((id) => locked(id, h))) return 'locked';
     const entered = ids.filter((id) => found.group.scores.has(scoreKey(id, h))).length;
@@ -197,7 +198,8 @@
         ifAbsent: !d.edited,
       });
     }
-    pickedHole = Math.min(18, saving + 1);
+    // On to the next hole being played (a day may skip some).
+    pickedHole = found.round.holes.find((h) => h.hole > saving)?.hole ?? saving;
   }
 
 </script>
@@ -225,7 +227,7 @@
   <header class="head">
     <div>
       <h1>Hole {hole}</h1>
-      <p class="muted">Par {info.par} · SI {info.strokeIndex} · {found.round.round.name} · {matchesLabel(found.group)}</p>
+      <p class="muted">Par {info.par} · SI {info.cardSi ?? info.strokeIndex} · {found.round.round.name} · {matchesLabel(found.group)}</p>
     </div>
     {#if db.pending.length}
       <span class="pending" data-testid="pending">{db.pending.length} waiting to send</span>
@@ -235,7 +237,7 @@
   <!-- Like the match summary: who won each hole and the running score (the fourball's), tap to pick a hole. -->
   {@const summary = found.group.matches.find((m) => m.def.type === 'better_ball' || m.def.type === 'individual') ?? found.group.matches[0]}
   {#if summary}
-    <HoleGrid state={summary.state} onPick={(h) => (pickedHole = h)} selected={hole} holeClass={holeState} />
+    <HoleGrid state={summary.state} onPick={(h) => { if (found.round.holes.some((x) => x.hole === h)) pickedHole = h; }} selected={hole} holeClass={holeState} />
   {/if}
 
   <div class="statuses">

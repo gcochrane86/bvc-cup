@@ -5,13 +5,13 @@ describe('games list', () => {
   it('has every game once, grouped by golfers', () => {
     expect(GAMES.map((g) => g.key).sort()).toEqual([
       'flat_match', 'fourball_flat', 'fourball_matchplay', 'fourball_stableford', 'scramble', 'six_flat', 'six_stableford',
-      'stableford', 'stableford_match', 'two_v_one', 'two_v_one_flat', 'two_v_one_match',
+      'stableford', 'stableford_match', 'two_v_one', 'two_v_one_best', 'two_v_one_flat', 'two_v_one_match',
     ]);
     expect(gamesFor(2, { teams: false, rows: [] }).map((g) => g.key)).toEqual(['stableford_match', 'stableford', 'flat_match']);
   });
 
   it('team events never offer the six pointer', () => {
-    expect(gamesFor(3, { teams: true, rows: [] }).map((g) => g.key)).toEqual(['two_v_one', 'two_v_one_match', 'two_v_one_flat']);
+    expect(gamesFor(3, { teams: true, rows: [] }).map((g) => g.key)).toEqual(['two_v_one', 'two_v_one_match', 'two_v_one_best', 'two_v_one_flat']);
     expect(gamesFor(3, { teams: false, rows: [] }).map((g) => g.key)).toContain('six_stableford');
   });
 

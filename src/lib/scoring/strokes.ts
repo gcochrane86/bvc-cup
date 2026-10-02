@@ -8,11 +8,11 @@ export function playingStrokes(diff: number, pct: number): number {
   return roundHalfUp((diff * pct) / 100);
 }
 
-/** Strokes received on a hole of the given stroke index, from a total allocation. */
-export function strokesOnHole(total: number, strokeIndex: number): number {
+/** Strokes received on a hole of the given stroke index, from a total allocation spread over `of` holes. */
+export function strokesOnHole(total: number, strokeIndex: number, of = 18): number {
   if (total <= 0) return 0;
-  const base = Math.floor(total / 18);
-  return base + (strokeIndex <= total % 18 ? 1 : 0);
+  const base = Math.floor(total / of);
+  return base + (strokeIndex <= total % of ? 1 : 0);
 }
 
 /**

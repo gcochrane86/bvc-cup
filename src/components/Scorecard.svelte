@@ -6,7 +6,8 @@
     def: MatchDef; holes: HoleInfo[]; scores: ScoreIndex; teamOf: Record<string, Team>; playingHcp?: Record<string, number>;
   } = $props();
 
-  const nines = $derived([holes.slice(0, 9), holes.slice(9, 18)]);
+  // Out and In by hole number (a day playing only some holes may have few or none on one side).
+  const nines = $derived([holes.filter((h) => h.hole <= 9), holes.filter((h) => h.hole > 9)].filter((n) => n.length));
   const players = $derived([...def.sideA, ...def.sideB]);
 
   function birdie(pid: string, h: HoleInfo): boolean {
@@ -36,16 +37,17 @@
   <div class="card wrap">
     <table>
       <thead>
-        <tr><th>{i === 0 ? 'Out' : 'In'}</th>{#each nine as h (h.hole)}<th>{h.hole}</th>{/each}<th>Tot</th></tr>
+        <tr><th>{nine[0].hole <= 9 ? 'Out' : 'In'}</th>{#each nine as h (h.hole)}<th>{h.hole}</th>{/each}<th>Tot</th></tr>
       </thead>
       <tbody>
         <tr class="muted"><td>Par</td>{#each nine as h (h.hole)}<td>{h.par}</td>{/each}<td>{nine.reduce((s, h) => s + h.par, 0)}</td></tr>
-        <tr class="muted"><td>SI</td>{#each nine as h (h.hole)}<td>{h.strokeIndex}</td>{/each}<td></td></tr>
+        <tr class="muted"><td>SI</td>{#each nine as h (h.hole)}<td>{h.cardSi ?? h.strokeIndex}</td>{/each}<td></td></tr>
         {#each players as pid (pid)}
           <tr>
             <td class="pname" style="color:var(--team-{teamOf[pid] === 'A' ? 'a' : 'b'})">{playerShort(pid)}{#if playingHcp[pid] !== undefined} <small>({playingHcp[pid]})</small>{/if}</td>
             {#each nine as h (h.hole)}
-              {@const shots = strokesOnHole(def.strokes[pid] ?? 0, playerHole(def, pid, h).strokeIndex)}
+              {@const own = playerHole(def, pid, h)}
+              {@const shots = strokesOnHole(def.strokes[pid] ?? 0, own.strokeIndex, own.of)}
               <td class:shot={shots > 0}><span class:birdie={birdie(pid, h)}>{cell(pid, h)}</span>{#if shots}<sup>{'•'.repeat(shots)}</sup>{/if}</td>
             {/each}
             <td><strong>{total(pid, nine)}</strong></td>

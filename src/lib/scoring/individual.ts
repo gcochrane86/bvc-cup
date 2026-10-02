@@ -8,10 +8,10 @@ import type { ConfirmedResult, HoleInfo, IndividualGame, MatchDef, MatchState, O
 export interface GamePlayer { slot: Slot; playerId: string; handicap: number }
 
 const POSITIONS: Slot[] = ['P1', 'P2', 'P3'];
-const STABLEFORD_GAMES: IndividualGame[] = ['stableford', 'stableford_match', 'six_stableford', 'two_v_one', 'two_v_one_match'];
+const STABLEFORD_GAMES: IndividualGame[] = ['stableford', 'stableford_match', 'six_stableford', 'two_v_one', 'two_v_one_match', 'two_v_one_best'];
 /** Games scored as match play (hole by hole): the fourball match maths, sides P1 v the rest. */
 const MATCH_GAMES: IndividualGame[] = ['flat_match', 'stableford_match', 'two_v_one_match', 'two_v_one_flat'];
-const isTwoVOne = (g: IndividualGame | undefined) => g === 'two_v_one' || g === 'two_v_one_match' || g === 'two_v_one_flat';
+const isTwoVOne = (g: IndividualGame | undefined) => !!g?.startsWith('two_v_one');
 const isSix = (g: IndividualGame | undefined) => g === 'six_stableford' || g === 'six_flat';
 
 const LABELS: Record<IndividualGame, string> = {
@@ -23,6 +23,7 @@ const LABELS: Record<IndividualGame, string> = {
   two_v_one: '2 v 1 Stableford',
   two_v_one_match: '2 v 1 Stableford match play',
   two_v_one_flat: '2 v 1 flat match play',
+  two_v_one_best: '2 v 1 Stableford (best individual)',
 };
 export const gameLabel = (game: IndividualGame) => LABELS[game];
 
@@ -87,7 +88,7 @@ function holePoints(def: MatchDef, id: string, hole: HoleInfo, idx: ScoreIndex, 
   const e = idx.get(scoreKey(id, hole.hole));
   if (!e || e.pickedUp || e.gross === null) return 0;
   const h = playerHole(def, id, hole);
-  return Math.max(0, 2 + h.par - (e.gross - strokesOnHole(strokes[id] ?? 0, h.strokeIndex)));
+  return Math.max(0, 2 + h.par - (e.gross - strokesOnHole(strokes[id] ?? 0, h.strokeIndex, h.of)));
 }
 
 /** Gross for the flat six pointer: a pick-up is worse than any real score (99, so two pick-ups tie). */
@@ -139,6 +140,13 @@ export function computeGameState(def: MatchDef, holes: HoleInfo[], idx: ScoreInd
   let winner: Winner | null = null;
   let statusText: string;
   let resultText: string | null = null;
+  // Best individual: the single's own total against the better of the pair's own totals.
+  if (def.game === 'two_v_one_best') {
+    a = totals[def.sideA[0]];
+    b = Math.max(...def.sideB.map((id) => totals[id]));
+    holeWinners.fill(null);
+    running.fill(null);
+  }
   if (isSix(def.game)) {
     statusText = started ? ids.map((id) => totals[id]).join(' · ') : 'Not started';
     if (decided) {
