@@ -207,8 +207,8 @@ test('Admin → Games: a game switched off leaves the pickers; a changed default
   await loginAdmin(page);
   await page.getByRole('link', { name: /^Games/ }).click();
   await expect(page.getByRole('heading', { name: 'Games', exact: true })).toBeVisible();
-  await page.getByLabel('Stableford on', { exact: true }).uncheck();
-  await expect(page.getByText('Stableford off', { exact: true })).toBeVisible();
+  await page.getByLabel('Stableford total on', { exact: true }).uncheck();
+  await expect(page.getByText('Stableford total off', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Edit 2-man scramble' }).click();
   await page.getByLabel('High handicap %').fill('35');
   await page.getByRole('button', { name: 'Save 2-man scramble' }).click();
@@ -218,7 +218,7 @@ test('Admin → Games: a game switched off leaves the pickers; a changed default
   await page.goto(`/#/admin/events/${eventId}`);
   await unfoldEvent(page);
   const twoPlayer = page.getByTestId('round').first().getByLabel(/2-player game|groups of 2/);
-  await expect(twoPlayer.locator('option', { hasText: /^Stableford$/ })).toHaveCount(0);
+  await expect(twoPlayer.locator('option', { hasText: /^Stableford total$/ })).toHaveCount(0);
   await expect(twoPlayer.locator('option', { hasText: 'Stableford match play' })).toHaveCount(1);
 
   // A new day on the team event starts from the scramble default 35/35.

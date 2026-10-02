@@ -65,10 +65,10 @@ test('a season team event: points per format, golfers per day, 2 v 1 from the te
   await form.getByLabel('Chris Clark golfer').check();
   await expect(form.getByTestId('day-format')).toContainText('3 golfers · 2 v 1 · Clark plays alone');
   // The game is chosen here: 2 v 1 games only, best individual first and picked.
-  await expect(form.getByLabel('2 v 1 Stableford (best individual)')).toBeChecked();
+  await expect(form.getByLabel('2 v 1 Stableford · better total')).toBeChecked();
   await expect(form.getByLabel('Six pointer (Stableford)')).toHaveCount(0);
   await expect(form.getByText('single wins 2')).toBeVisible();
-  await form.getByRole('button', { name: 'Add Day 2 · 2 v 1 Stableford (best individual)' }).click();
+  await form.getByRole('button', { name: 'Add Day 2 · 2 v 1 Stableford · better total' }).click();
   await expect(page.getByText(/Round added/)).toBeVisible();
 
   const db = serviceDb();
@@ -89,7 +89,7 @@ test('a season team event: points per format, golfers per day, 2 v 1 from the te
   await expect(tile.locator('summary').first()).toContainText('3 golfers');
   const picker = tile.getByLabel('3-player game');
   await expect(picker.locator('option', { hasText: 'Six pointer' })).toHaveCount(0);
-  await expect(picker.locator('option', { hasText: '2 v 1 flat match play' })).toHaveCount(1);
+  await expect(picker.locator('option', { hasText: '2 v 1 scratch match play' })).toHaveCount(1);
 });
 
 test('a confirmed 2 v 1 adds its points to the single\'s team; a player added later is there for new days only', async ({ browser }) => {

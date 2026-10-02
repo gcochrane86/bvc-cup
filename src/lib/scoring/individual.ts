@@ -15,15 +15,15 @@ const isTwoVOne = (g: IndividualGame | undefined) => !!g?.startsWith('two_v_one'
 const isSix = (g: IndividualGame | undefined) => g === 'six_stableford' || g === 'six_flat';
 
 const LABELS: Record<IndividualGame, string> = {
-  stableford: 'Stableford',
-  flat_match: 'Flat match play',
+  stableford: 'Stableford total',
+  flat_match: 'Scratch match play',
   stableford_match: 'Stableford match play',
   six_stableford: 'Six pointer (Stableford)',
-  six_flat: 'Six pointer (flat)',
-  two_v_one: '2 v 1 Stableford',
+  six_flat: 'Six pointer (scratch)',
+  two_v_one: '2 v 1 Stableford · better ball',
   two_v_one_match: '2 v 1 Stableford match play',
-  two_v_one_flat: '2 v 1 flat match play',
-  two_v_one_best: '2 v 1 Stableford (best individual)',
+  two_v_one_flat: '2 v 1 scratch match play',
+  two_v_one_best: '2 v 1 Stableford · better total',
 };
 export const gameLabel = (game: IndividualGame) => LABELS[game];
 

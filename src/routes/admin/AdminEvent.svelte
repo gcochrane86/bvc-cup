@@ -202,7 +202,7 @@
     if (done > 0) return `${done} of ${fourballs} fourballs paired`;
     return 'Pairings not set yet';
   };
-  const GAMES = { matchplay: 'Match play', stableford: 'Stableford', flat: 'Match play, flat', scramble: '2-man scramble' } as const;
+  const GAMES = { matchplay: 'Better ball · off the low', stableford: 'Better ball · Stableford', flat: 'Better ball · scratch', scramble: '2-man scramble' } as const;
   const roundDate = (d: string | null) =>
     d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'No date';
   /** The games a day needs: by its groups' sizes, or before groups are set by how many are playing. */

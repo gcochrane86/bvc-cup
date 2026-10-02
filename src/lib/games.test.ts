@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GAMES, defaultsFor, fourballKey, gamesFor, newRoundDefaults } from './games';
+import { gameLabel } from './scoring';
 
 describe('games list', () => {
   it('has every game once, grouped by golfers', () => {
@@ -50,3 +51,18 @@ describe('newRoundDefaults', () => {
     expect(newRoundDefaults(rows, true).three_game).toBe('two_v_one_best'); // team events: no six pointer; best individual first
   });
 });
+
+describe('game names', () => {
+  it('say how each game is scored', () => {
+    expect(GAMES.map((g) => g.name)).toEqual([
+      'Stableford match play', 'Stableford total', 'Scratch match play',
+      'Six pointer (Stableford)', 'Six pointer (scratch)',
+      '2 v 1 Stableford · better total', '2 v 1 Stableford · better ball', '2 v 1 Stableford match play', '2 v 1 scratch match play',
+      'Better ball · off the low', 'Better ball · Stableford', 'Better ball · scratch', '2-man scramble',
+    ]);
+  });
+  it('are the same wherever an individual game is labelled', () => {
+    for (const g of GAMES.filter((x) => x.size < 4)) expect(gameLabel(g.key as Parameters<typeof gameLabel>[0])).toBe(g.name);
+  });
+});
+
