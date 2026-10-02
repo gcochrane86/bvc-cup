@@ -208,17 +208,19 @@ export const eventKindFor = (players: number): 'team' | 'individual' => (players
  */
 export function teamPoints(def: MatchDef, winner: Winner, teamOf: Record<string, Team>, points: SeasonPoints): { A: number; B: number } {
   const out = { A: 0, B: 0 };
-  const add = (id: string, n: number) => {
+  for (const [id, n] of Object.entries(playerSeasonPoints(def, winner, points))) {
     const t = teamOf[id];
     if (t) out[t] += n;
-  };
-  const [aPts, bPts] = isTwoVOne(def.game) ? [points.two_v_one_single, points.two_v_one_pair] : [points.one_v_one, points.one_v_one];
-  if (winner === 'A') def.sideA.forEach((id) => add(id, aPts.win));
-  else if (winner === 'B') def.sideB.forEach((id) => add(id, bPts.win));
-  else if (winner === 'halved') {
-    def.sideA.forEach((id) => add(id, aPts.halve));
-    def.sideB.forEach((id) => add(id, bPts.halve));
   }
+  return out;
+}
+
+/** What each golfer earns from a season 1 v 1 or 2 v 1 result (the single's points, or each of the pair's). */
+export function playerSeasonPoints(def: MatchDef, winner: Winner, points: SeasonPoints): Record<string, number> {
+  const out: Record<string, number> = {};
+  const [aPts, bPts] = isTwoVOne(def.game) ? [points.two_v_one_single, points.two_v_one_pair] : [points.one_v_one, points.one_v_one];
+  for (const id of def.sideA) out[id] = winner === 'A' ? aPts.win : winner === 'halved' ? aPts.halve : 0;
+  for (const id of def.sideB) out[id] = winner === 'B' ? bPts.win : winner === 'halved' ? bPts.halve : 0;
   return out;
 }
 
@@ -232,7 +234,7 @@ export type SeasonDay =
   | { format: 'one_v_one' }
   | { format: 'two_v_one'; single: string }
   | { format: 'fourballs' }
-  | { error: 'too_few' | 'no_team' }
+  | { error: 'too_few' | 'no_team' | 'fourball_teams' }
   | { error: 'same_team'; team: Team };
 
 /**
@@ -242,7 +244,8 @@ export type SeasonDay =
 export function seasonDayCheck(ids: string[], teamOf: Record<string, Team>): SeasonDay {
   if (ids.length < 2) return { error: 'too_few' };
   if (ids.some((id) => !teamOf[id])) return { error: 'no_team' };
-  if (ids.length >= 4) return { format: 'fourballs' };
+  // Fourballs pair two from each team, so a fourball day needs at least 2 golfers from each.
+  if (ids.length >= 4) return ['A', 'B'].every((t) => ids.filter((id) => teamOf[id] === t).length >= 2) ? { format: 'fourballs' } : { error: 'fourball_teams' };
   const teams = new Set(ids.map((id) => teamOf[id]));
   if (teams.size === 1) return { error: 'same_team', team: teamOf[ids[0]] };
   if (ids.length === 2) return { format: 'one_v_one' };

@@ -250,3 +250,11 @@ describe('seasonDayCheck', () => {
     expect(seasonDayCheck(['a1', 'x9'], teamOf)).toEqual({ error: 'no_team' });
   });
 });
+
+describe('seasonDayCheck: fourball days', () => {
+  it('need at least 2 golfers from each team', () => {
+    const teamOf = { a1: 'A' as const, a2: 'A' as const, a3: 'A' as const, b1: 'B' as const, b2: 'B' as const };
+    expect(seasonDayCheck(['a1', 'a2', 'a3', 'b1'], teamOf)).toEqual({ error: 'fourball_teams' });
+    expect(seasonDayCheck(['a1', 'a2', 'b1', 'b2', 'a3'], teamOf)).toEqual({ format: 'fourballs' });
+  });
+});

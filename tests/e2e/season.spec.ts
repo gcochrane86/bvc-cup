@@ -108,13 +108,30 @@ test('a confirmed 2 v 1 adds its points to the single\'s team; a player added la
   const { data: res } = await db.from('match_results').select('points_a, points_b').eq('group_id', group!.id).single();
   expect([Number(res!.points_a), Number(res!.points_b)]).toEqual([0, 2]);
 
-  // A new player joins Blue; Day 1 keeps its golfers, a new day can pick him.
+  // Day 2: an unconfirmed 1 v 1 (Adams v Davies).
+  const { data: r2 } = await db.from('rounds').insert({ event_id: ev!.id, round_no: 2, name: 'Day 2', course_id: course!.id }).select('id').single();
+  await db.from('round_players').insert(['Alex Adams', 'Dan Davies'].map((n) => ({ round_id: r2!.id, player_id: id(n) })));
+  const { data: g2 } = await db.from('groups').insert({ round_id: r2!.id, group_no: 1 }).select('id').single();
+  await db.from('group_players').insert([['P1', 'Alex Adams'], ['P2', 'Dan Davies']].map(([slot, n]) => ({ group_id: g2!.id, slot, player_id: id(n) })));
+
+  // Re-saving the teams (2 v 2) must not turn the 1 v 1 day into a fourball.
   const admin = await browser.newPage();
   await loginAdmin(admin);
   await admin.goto(`/#/admin/events/${ev!.id}`);
   await unfoldEvent(admin);
+  await admin.getByRole('button', { name: 'Save teams' }).click();
+  await expect(admin.getByText(/Teams saved/)).toBeVisible();
+  const day2Players = (await db.from('group_players').select('slot').eq('group_id', g2!.id)).data!.map((x) => x.slot).sort();
+  expect(day2Players).toEqual(['P1', 'P2']);
+
+  // A new player joins Blue. Ticked but not saved yet, he isn't offered for a day.
+  await unfoldEvent(admin);
   await admin.getByRole('tab', { name: /Who's playing/ }).click();
   await admin.getByLabel('Ed Evans playing').check();
+  await admin.getByRole('button', { name: '+ Add round' }).click();
+  await admin.locator('form.round').getByLabel('Different golfers').check();
+  await expect(admin.locator('form.round').getByLabel('Ed Evans golfer')).toHaveCount(0);
+  await admin.locator('form.round').getByRole('button', { name: 'Cancel' }).click();
   await admin.getByRole('button', { name: 'Next: pick teams (5)' }).click();
   await admin.getByRole('button', { name: 'Ed Evans: Blue' }).click();
   await admin.getByRole('button', { name: 'Save teams' }).click();
@@ -125,4 +142,17 @@ test('a confirmed 2 v 1 adds its points to the single\'s team; a player added la
   await expect(form.getByLabel('Ed Evans golfer')).toBeVisible();
   const day1 = (await db.from('round_players').select('player_id').eq('round_id', round!.id)).data!;
   expect(day1).toHaveLength(3);
+  await admin.locator('form.round').getByRole('button', { name: 'Cancel' }).click();
+
+  // Day 2 changed to 5 golfers: too many for one group, so its old 1 v 1 group goes (pair it on the pairings page).
+  await unfoldEvent(admin);
+  const day2 = admin.getByTestId('round').nth(1);
+  await day2.getByText('Golfers (2)').click();
+  await day2.getByRole('button', { name: 'Change golfers' }).click();
+  for (const n of ['Ben Brown', 'Chris Clark', 'Ed Evans']) await day2.getByLabel(`${n} golfer`).check();
+  await expect(day2.getByTestId('day-format')).toContainText('5 golfers · fourballs');
+  await day2.getByRole('button', { name: 'Save golfers' }).click();
+  await expect(admin.getByText('Day 2 golfers saved')).toBeVisible();
+  await expect.poll(async () => (await db.from('groups').select('id').eq('round_id', r2!.id)).data?.length).toBe(0);
+  await expect.poll(async () => (await db.from('round_players').select('player_id').eq('round_id', r2!.id)).data?.length).toBe(5);
 });

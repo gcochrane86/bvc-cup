@@ -422,3 +422,32 @@ describe('season team events', () => {
     expect(v.rounds[0].pointsAvailable).toBe(2);
   });
 });
+
+describe('season team events: after a team switch', () => {
+  const POINTS = {
+    fourball: { win: 2, halve: 1 }, singles: { win: 1, halve: 0.5 }, one_v_one: { win: 1, halve: 0.5 },
+    two_v_one_single: { win: 2, halve: 1 }, two_v_one_pair: { win: 1, halve: 0.5 },
+  };
+  it('a confirmed 2 v 1 keeps the line-up it was played with', () => {
+    const s = snapshot({
+      event: { ...snapshot().event!, season: true, points: POINTS },
+      // a2 has since moved from A to B (so b1 is no longer the only Team B golfer).
+      eventPlayers: [['a1', 'A'], ['a2', 'B'], ['b1', 'B']].map(([id, team]) => ({ event_id: 'e', player_id: id, team: team as Team, handicap: 10 })),
+      groupPlayers: [
+        { group_id: 'g1', slot: 'P1', player_id: 'b1', handicap: 10 },
+        { group_id: 'g1', slot: 'P2', player_id: 'a1', handicap: 10 },
+        { group_id: 'g1', slot: 'P3', player_id: 'a2', handicap: 10 },
+      ],
+      results: [{ group_id: 'g1', match_type: 'individual', winner: 'A', points_a: 0, points_b: 2, result_text: 'By 3 pts', final_hole: 18, confirmed_at: 'x' }],
+    });
+    const m = buildEventView(s)!.rounds[0].groups[0].matches[0];
+    expect(m.def.sideA).toEqual(['b1']);
+  });
+  it("the points needed to win step by the event's win values too", () => {
+    const whole = { win: 1, halve: 1 };
+    const s = snapshot({ event: { ...snapshot().event!, season: true, points: { fourball: { win: 1.5, halve: 1 }, singles: whole, one_v_one: whole, two_v_one_single: whole, two_v_one_pair: whole } } });
+    const v = buildEventView(s)!;
+    expect(v.tracker.total).toBe(1.5);
+    expect(v.tracker.toWin).toBe(1.25); // half of 1.5, plus the 0.5 step (not the 1 a halve-only step would give)
+  });
+});

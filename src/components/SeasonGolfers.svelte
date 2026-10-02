@@ -28,6 +28,7 @@
     }
     if (check.error === 'too_few') return 'Pick at least 2 golfers.';
     if (check.error === 'no_team') return 'Everyone needs a team first (Players).';
+    if (check.error === 'fourball_teams') return 'Fourballs need at least 2 golfers from each team.';
     if (check.error !== 'same_team') return '';
     return n === 2
       ? `These 2 are both on ${teamName(check.team)}. A 1 v 1 needs one golfer from each team.`

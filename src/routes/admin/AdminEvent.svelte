@@ -34,6 +34,8 @@
   let newGolfers = $state<string[]>([]);
   /** Season events, changing a day's golfers: the list being edited, per day. */
   let editGolfers = $state<Record<string, string[]>>({});
+  /** The event's saved players (the day pickers only offer players already saved with a team). */
+  let savedPlayers = $state<EventPlayerRow[]>([]);
   /** After saving teams: a day whose pairings still need setting (scores and the leaderboard need them). */
   let nudge = $state<RoundRow | null>(null);
   /** `${roundId}:${playerId}` for players whose match that day is confirmed (their tee is locked). */
@@ -90,6 +92,7 @@
         return [p.id, { playing: !!m, team: m?.team ?? '', handicap: Number(p.default_handicap) }];
       }),
     );
+    savedPlayers = eps;
     if (!Object.values(members).some((m) => m.playing)) teamStep = 'who';
     if (!eps.length) playersOpen = true;
     // Last, so the page never shows the event with its players and pairings still loading.
@@ -126,8 +129,9 @@
   /** Season events: the event's players (with a team) for the day pickers, in name order. */
   const seasonPlayers = $derived(
     db.players
-      .filter((p) => members[p.id]?.playing && members[p.id].team)
-      .map((p) => ({ id: p.id, name: p.name, short: p.short_name, team: members[p.id].team as Team })),
+      .map((p) => ({ p, ep: savedPlayers.find((x) => x.player_id === p.id) }))
+      .filter(({ ep }) => ep?.team)
+      .map(({ p, ep }) => ({ id: p.id, name: p.name, short: p.short_name, team: ep!.team as Team })),
   );
   const seasonTeamOf = $derived(Object.fromEntries(seasonPlayers.map((p) => [p.id, p.team])) as Record<string, Team>);
   const teamName = (t: Team) => (t === 'A' ? (event?.team_a_name ?? 'Team A') : (event?.team_b_name ?? 'Team B'));
@@ -259,7 +263,8 @@
    * change of teams). Days whose match is confirmed are left alone. Returns the names of the days paired.
    */
   async function pairTwoVTwo(days: RoundRow[]): Promise<string[]> {
-    if (individual) return [];
+    // Season days pick their own golfers (and are grouped when added), so saving teams never re-pairs them.
+    if (individual || season) return [];
     const slots = autoFourball(
       Object.entries(members)
         .filter(([, m]) => m.playing && m.team)
@@ -292,7 +297,7 @@
             course_id: newRound.course_id,
             date: newRound.date || null,
             // A new day starts from Admin → Games: the first games switched on, with their defaults.
-            ...newRoundDefaults(db.games, !individual),
+            ...newRoundDefaults(db.games, season),
           })
           .select()
           .single(),
@@ -320,9 +325,13 @@
       const ordered = day.format === 'two_v_one' ? [day.single, ...ids.filter((id) => id !== day.single)] : ids;
       slots = ordered.map((player_id, i) => ({ slot: `P${i + 1}`, player_id }));
     } else if ('format' in day) {
-      slots = autoFourball(ids.map((playerId) => ({ playerId, team: seasonTeamOf[playerId], handicap: Number(members[playerId]?.handicap ?? 0) })));
+      slots = autoFourball(ids.map((playerId) => ({ playerId, team: seasonTeamOf[playerId], handicap: Number(savedPlayers.find((x) => x.player_id === playerId)?.handicap ?? 0) })));
     }
-    if (!slots) return `${r.name}: golfers saved`;
+    if (!slots) {
+      // Not one group (e.g. 5+ golfers): the day's old groups go; pair it on the pairings page.
+      await must(supabase.from('groups').delete().eq('round_id', r.id));
+      return `${r.name}: golfers saved`;
+    }
     await must(supabase.rpc('save_group', { p_round_id: r.id, p_group_no: 1, p_tee_time: null, p_slots: slots }));
     await must(supabase.from('groups').delete().eq('round_id', r.id).gt('group_no', 1));
     return `Round added · group set for ${r.name}`;

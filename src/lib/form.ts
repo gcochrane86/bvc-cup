@@ -1,7 +1,7 @@
 // "Form" rankings: per-player stats across the event (or one day), from the same derived view as the
 // leaderboard. Gross/net are over completed holes (pick-ups left out) and ranked to par, so players
 // who have played different numbers of holes compare fairly.
-import { scoreKey, strokesOnHole, type Team } from './scoring';
+import { playerSeasonPoints, scoreKey, strokesOnHole, type Team } from './scoring';
 import type { EventView } from './view';
 
 export type FormMetric = 'gross' | 'net' | 'stableford' | 'points' | 'birdies' | 'trebles';
@@ -66,6 +66,14 @@ export function computeForm(view: EventView, roundId: string | null): FormRow[] 
       }
       for (const m of g.matches) {
         if (!m.result) continue;
+        // Season 1 v 1 / 2 v 1: results hold team totals, so credit each golfer what they earned.
+        if (view.event.season && m.def.game) {
+          for (const [id, n] of Object.entries(playerSeasonPoints(m.def, m.result.winner, view.event.points))) {
+            const r = rows.get(id);
+            if (r) r.points += n;
+          }
+          continue;
+        }
         for (const id of m.def.sideA) {
           const r = rows.get(id);
           if (r) r.points += m.result.pointsA;

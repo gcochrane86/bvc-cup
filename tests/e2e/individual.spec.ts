@@ -88,6 +88,7 @@ test("an event with 3 players becomes a 3-ball: no teams, its group made automat
   await expect(day1.getByLabel('Fourball game')).toHaveCount(0);
   await expect(day1.getByLabel(/2-player game|groups of 2/)).toHaveCount(0);
   await expect(day1.locator('summary')).toContainText('1 group set');
+  await expect(day1.getByLabel('3-player game')).toHaveValue('six_stableford'); // a normal 3-ball starts on the six pointer
   await day1.getByLabel('3-player game').selectOption('two_v_one');
   await day1.getByRole('button', { name: 'Save round' }).click();
   await expect(page.getByText('Day 1 saved')).toBeVisible();

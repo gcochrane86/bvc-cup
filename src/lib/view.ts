@@ -135,7 +135,9 @@ export function buildEventView(s: Snapshot): EventView | null {
           if (season && isGame) {
             // The golfer on their own team plays alone; team events never play the six pointer.
             const ids = members.map((gp) => gp.player_id);
-            const single = ids.length === 3 ? ids.find((id) => ids.filter((x) => teamOf[x] === teamOf[id]).length === 1) : undefined;
+            // A confirmed game keeps the line-up it was played with (saved with the single as P1), even if teams change.
+            const confirmed = s.results.some((r) => r.group_id === group.id);
+            const single = !confirmed && ids.length === 3 ? ids.find((id) => ids.filter((x) => teamOf[x] === teamOf[id]).length === 1) : undefined;
             const threeGame = settings.threeGame?.startsWith('six') ? 'two_v_one' : settings.threeGame;
             built = [buildGame(group.id, players, { ...settings, threeGame }, { single })].filter((d): d is MatchDef => d !== null);
           } else if (individual) {
@@ -188,7 +190,7 @@ export function buildEventView(s: Snapshot): EventView | null {
     });
 
   const step = season
-    ? stepOf([pts.fourball.halve, pts.singles.halve, pts.one_v_one.halve, pts.two_v_one_single.halve, pts.two_v_one_pair.halve])
+    ? stepOf(Object.values(pts).flatMap((p) => [p.win, p.halve]))
     : pointsStep(rounds.map((r) => r.settings));
   return { event: s.event, rounds, tracker: computeTracker(everyMatch, total, step), teamOf, handicapOf };
 

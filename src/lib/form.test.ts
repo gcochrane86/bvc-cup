@@ -162,3 +162,24 @@ describe('form on scramble days', () => {
     expect(rows.find((r) => r.key === 'a1+a2')).toMatchObject({ holes: 1, grossToPar: 0, netToPar: 0, stableford: 2 });
   });
 });
+
+describe('season events', () => {
+  it("credits a 2 v 1's points to each golfer by what they earned, not by team totals", () => {
+    const s = snapshot({
+      event: { ...snapshot().event!, season: true },
+      rounds: [{ ...round('r1', 1), three_game: 'two_v_one' }],
+      groups: [{ id: 'g1', round_id: 'r1', group_no: 1, tee_time: null, singles_crossed: false }],
+      groupPlayers: [
+        { group_id: 'g1', slot: 'P1', player_id: 'b1', handicap: null },
+        { group_id: 'g1', slot: 'P2', player_id: 'a1', handicap: null },
+        { group_id: 'g1', slot: 'P3', player_id: 'a2', handicap: null },
+      ],
+      scores: [],
+      // The single (b1, Team B) won: Team B 2, Team A 0.
+      results: [{ group_id: 'g1', match_type: 'individual', winner: 'A', points_a: 0, points_b: 2, result_text: 'By 3 pts', final_hole: 18, confirmed_at: 'x' }],
+    });
+    const rows = computeForm(buildEventView(s)!, null);
+    const pts = Object.fromEntries(rows.map((r) => [r.playerId, r.points]));
+    expect(pts).toMatchObject({ b1: 2, a1: 0, a2: 0 });
+  });
+});
