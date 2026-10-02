@@ -1198,12 +1198,12 @@ test('Admin → Players is a compact list: search, filter to the event, tap a pl
   await expect(zara).toContainText('3.1');
 
   // Tap to edit, save a new handicap; the row shows it.
-  await zara.getByRole('button', { name: /Zara Outsider/ }).click();
+  await zara.locator('button.line').click();
   await zara.getByLabel('Handicap index').fill('4.5');
   await zara.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Saved Zara Outsider')).toBeVisible();
-  await expect(zara.getByRole('button', { name: /Zara Outsider/ })).toContainText('4.5');
-  await zara.getByRole('button', { name: /Zara Outsider/ }).click();
+  await expect(zara.locator('button.line')).toContainText('4.5');
+  await zara.locator('button.line').click();
   await expect(zara.getByLabel('Handicap index')).toHaveCount(0);
 
   // Add player opens the form only when pressed.
