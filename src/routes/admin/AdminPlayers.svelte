@@ -4,6 +4,7 @@
   import type { PlayerRow } from '../../lib/data/types';
   import Avatar from '../../components/Avatar.svelte';
   import PhotoUpload from '../../components/PhotoUpload.svelte';
+  import { loadFavourites, setFavourite } from '../../lib/data/favourites';
 
   let name = $state('');
   let shortName = $state('');
@@ -48,10 +49,27 @@
   let adding = $state(false);
   let search = $state('');
   let onlyEvent = $state(false);
+  let onlyFavs = $state(false);
+  /** This admin's favourite players: they top every event's Who's playing list. */
+  let favs = $state<string[]>([]);
+  $effect(() => {
+    loadFavourites().then((f) => (favs = f), () => {});
+  });
+  async function toggleFav(id: string) {
+    const was = favs;
+    const on = !was.includes(id);
+    favs = on ? [...was, id] : was.filter((x) => x !== id);
+    try {
+      await setFavourite(id, on);
+    } catch (e) {
+      favs = was;
+      msg = `Error: ${(e as Error).message}`;
+    }
+  }
   const inEvent = (id: string) => db.eventPlayers.some((ep) => ep.player_id === id);
   const eventCount = $derived(db.players.filter((p) => inEvent(p.id)).length);
   const shown = $derived(
-    db.players.filter((p) => (!onlyEvent || inEvent(p.id)) && `${p.name} ${p.short_name}`.toLowerCase().includes(search.trim().toLowerCase())),
+    db.players.filter((p) => (!onlyEvent || inEvent(p.id)) && (!onlyFavs || favs.includes(p.id)) && `${p.name} ${p.short_name}`.toLowerCase().includes(search.trim().toLowerCase())),
   );
 
   const remove = (p: PlayerRow) => {
@@ -82,25 +100,29 @@
 {/if}
 
 <input class="search" type="search" placeholder="Search {db.players.length} players" bind:value={search} />
-{#if db.event}
-  <div class="filters" role="group" aria-label="Show">
-    <button class:on={!onlyEvent} onclick={() => (onlyEvent = false)}>All · {db.players.length}</button>
-    <button class:on={onlyEvent} onclick={() => (onlyEvent = true)}>{db.event.name} · {eventCount}</button>
-  </div>
-{/if}
+<div class="filters" role="group" aria-label="Show">
+  <button class:on={!onlyEvent && !onlyFavs} onclick={() => ((onlyEvent = false), (onlyFavs = false))}>All · {db.players.length}</button>
+  <button class:on={onlyFavs} onclick={() => ((onlyFavs = true), (onlyEvent = false))}>★ Favourites · {favs.length}</button>
+  {#if db.event}<button class:on={onlyEvent} onclick={() => ((onlyEvent = true), (onlyFavs = false))}>{db.event.name} · {eventCount}</button>{/if}
+</div>
+<p class="muted small">Star the players you play with most: they come first when picking who's playing in an event.</p>
 
 <div class="list">
   {#each shown as p (p.id)}
+    {@const fav = favs.includes(p.id)}
     <div class="player" class:open={open === p.id} data-testid="admin-player">
-      <button class="line" aria-expanded={open === p.id} onclick={() => (open = open === p.id ? null : p.id)}>
-        <Avatar name={p.name} url={playerPhotoUrl(p.id)} colour="var(--accent)" size={40} />
-        <span class="who">
-          <strong>{p.name}</strong>
-          <span class="muted small">{p.short_name}{inEvent(p.id) ? ' · in this event' : ''}</span>
-        </span>
-        <span class="hi" title="Handicap index">{Number(p.default_handicap).toFixed(1)}</span>
-        <span class="chev" aria-hidden="true">›</span>
-      </button>
+      <div class="top">
+        <button class="line" aria-expanded={open === p.id} onclick={() => (open = open === p.id ? null : p.id)}>
+          <Avatar name={p.name} url={playerPhotoUrl(p.id)} colour="var(--accent)" size={40} />
+          <span class="who">
+            <strong>{p.name}</strong>
+            <span class="muted small">{p.short_name}{inEvent(p.id) ? ' · in this event' : ''}</span>
+          </span>
+          <span class="hi" title="Handicap index">{Number(p.default_handicap).toFixed(1)}</span>
+          <span class="chev" aria-hidden="true">›</span>
+        </button>
+        <button class="star" class:on={fav} aria-label="{fav ? 'Unfavourite' : 'Favourite'} {p.name}" aria-pressed={fav} onclick={() => toggleFav(p.id)}>{fav ? '★' : '☆'}</button>
+      </div>
       {#if open === p.id}
         <div class="edit">
           <div class="photo"><PhotoUpload playerId={p.id} label={p.photo_path ? 'Change photo' : 'Add photo'} /></div>
@@ -117,7 +139,7 @@
       {/if}
     </div>
   {:else}
-    <p class="muted center">No players match.</p>
+    <p class="muted center">{onlyFavs && !favs.length ? 'No favourites yet: tap ☆ next to a player.' : 'No players match.'}</p>
   {/each}
 </div>
 
@@ -135,6 +157,9 @@
   .filters button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   .list { background: var(--surface); border-radius: var(--radius); overflow: hidden; margin-bottom: 14px; }
   .player + .player { border-top: 1px solid var(--line); }
+  .top { display: flex; align-items: center; }
+  .star { background: none; color: var(--muted); border: 0; min-height: 0; padding: 10px 14px 10px 4px; font-size: 1.3rem; line-height: 1; }
+  .star.on { color: #c58a12; }
   .line { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; background: none; color: var(--text); border: 0; border-radius: 0; text-align: left; font-weight: 400; }
   .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .who strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

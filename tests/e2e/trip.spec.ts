@@ -1299,8 +1299,17 @@ async function previewSeedGuide(admin: import('@playwright/test').Page, eventId:
 test("favourite players sit at the top of Who's playing (each admin's own); saving folds the section away", async ({ page }) => {
   await loginAdmin(page);
   const eventId = await activeEventId();
+
+  // Star a regular in Admin → Players: the Favourites filter shows just them, and they top the event's list.
+  await page.getByRole('link', { name: /^Players/ }).click();
+  await page.getByRole('button', { name: 'Favourite Finn Fox' }).click();
+  await expect(page.getByRole('button', { name: 'Unfavourite Finn Fox' })).toBeVisible();
+  await page.getByRole('button', { name: /^★ Favourites · 1/ }).click();
+  await expect(page.getByTestId('admin-player')).toHaveCount(1);
   await openEvent(page, eventId);
   await page.getByRole('tab', { name: /Who's playing/ }).click();
+  await expect(page.getByTestId('pick-row').first()).toContainText('Finn Fox');
+  await page.getByRole('button', { name: 'Unfavourite Finn Fox' }).click();
 
   // The button is above the list, and the list scrolls in its own box.
   const next = page.getByRole('button', { name: /^Next: pick teams/ });

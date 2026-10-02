@@ -4,6 +4,7 @@
   import AddRound, { type AddRoundPayload } from '../../components/AddRound.svelte';
   import { db, loadAll, photoCourses } from '../../lib/data/store.svelte';
   import { favouritesFirst } from '../../lib/favourites';
+  import { setFavourite } from '../../lib/data/favourites';
   import SinglesSettings from '../../components/SinglesSettings.svelte';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
@@ -185,8 +186,7 @@
     const on = !was.includes(id);
     favs = on ? [...was, id] : was.filter((x) => x !== id);
     try {
-      if (on) await must(supabase.from('player_favourites').insert({ player_id: id }));
-      else await must(supabase.from('player_favourites').delete().eq('player_id', id));
+      await setFavourite(id, on);
     } catch (e) {
       favs = was;
       msg = `Error: ${(e as Error).message}`;
