@@ -27,7 +27,7 @@
   const CHOICES: { value: Pairing; label: string; hint: string }[] = [
     { value: 'handicap', label: 'By handicap', hint: 'Low v low, high v high. Set automatically.' },
     { value: 'random', label: 'Random draw', hint: 'Drawn for each fourball when the pairings are saved.' },
-    { value: 'selected', label: "I'll choose", hint: "Pick each fourball's singles in the day's settings once it's paired." },
+    { value: 'selected', label: "I'll choose", hint: "Add the day and pair its fourballs, then pick each fourball's singles in the day's settings." },
   ];
   const worth = $derived(fixedPoints ?? Number(points));
 </script>
@@ -42,7 +42,7 @@
       {#if fixedPoints === null}
         <span class="num"><label for="{id}-sp">Points</label><input id="{id}-sp" type="number" step="0.5" min="0" bind:value={points} /></span>
       {/if}
-      <span class="num"><label for="{id}-sa">Allowance %</label><input id="{id}-sa" type="number" min="0" max="100" bind:value={allowance} /></span>
+      <span class="num"><label for="{id}-sa">Singles allowance %</label><input id="{id}-sa" type="number" min="0" max="100" bind:value={allowance} /></span>
     </div>
     <span class="lbl">Who plays who</span>
     <div class="chips">

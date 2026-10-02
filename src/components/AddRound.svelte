@@ -9,6 +9,8 @@
     golfers: string[] | null;
     day: Day | null;
     round: Partial<Round>;
+    /** "I'll choose" singles on a one-fourball day: true = A1 v B2 & A2 v B1. */
+    singlesCrossed: boolean;
   }
 </script>
 
@@ -17,6 +19,7 @@
   // game for that many golfers and its settings. The day is fully set before it's added.
   import SeasonGolfers from './SeasonGolfers.svelte';
   import SinglesSettings from './SinglesSettings.svelte';
+  import { singlesLineup } from '../lib/singles';
   import { courseGroups, defaultTee, teesOf } from '../lib/courses';
   import { defaultsFor, gameInfo, gamesFor, newRoundDefaults, type GameRow, type SettingKey } from '../lib/games';
   import { holesFor, type HolesMode } from '../lib/holes';
@@ -38,6 +41,8 @@
     teamName,
     points,
     canCancel,
+    fourballFor,
+    nameOf,
     onAdd,
     onCancel,
   }: {
@@ -55,6 +60,9 @@
     teamName: (t: Team) => string;
     points: SeasonPoints | null;
     canCancel: boolean;
+    /** The day's one fourball if its golfers (null: the event's players) are exactly 2 a side; else null. */
+    fourballFor: (golfers: string[] | null) => { a: string[]; b: string[] } | null;
+    nameOf: (id: string) => string;
     onAdd: (p: AddRoundPayload) => void;
     onCancel: () => void;
   } = $props();
@@ -71,7 +79,9 @@
   let game = $state('');
   let settings = $state<Partial<Record<SettingKey, number | boolean>>>({});
   // Singles in each fourball (4+ golfers, not a scramble).
-  let singles = $state({ enabled: false, points: 0.5, allowance: 90, pairing: 'handicap' as 'handicap' | 'random' | 'selected' });
+  let singles = $state({ enabled: false, points: 0.5, allowance: 90, pairing: 'handicap' as 'handicap' | 'random' | 'selected', crossed: false });
+  const lineupText = (fb: { a: string[]; b: string[] }, crossed: boolean) =>
+    singlesLineup(fb, crossed).map(([a, b]) => `${nameOf(a)} v ${nameOf(b)}`).join(' · ');
 
   const tees = $derived(teesOf(courses, course));
   function pickCourse(c: string) {
@@ -89,6 +99,8 @@
     return n >= 4 ? 4 : n === 3 ? 3 : n === 2 ? 2 : null;
   });
   // Team events (season, or 4+ fourballs) never offer the six pointer.
+  /** One fourball (2 a side, teams set): its singles line-up can be picked here. */
+  const sole = $derived(size === 4 ? fourballFor(season ? golfers : null) : null);
   const options = $derived(size ? gamesFor(size, { teams: season || size === 4, rows }) : []);
   $effect(() => {
     if (options.length && !options.some((g) => g.key === game)) chooseGame(options[0].key);
@@ -125,7 +137,8 @@
       round.singles_enabled = withSingles;
       if (withSingles) Object.assign(round, { singles_points: Number(singles.points), singles_allowance_pct: Number(singles.allowance), singles_pairing: singles.pairing });
     }
-    onAdd({ name: title, date: date || null, course_id: courseId, golfers, day, round });
+    const singlesCrossed = !!(round.singles_enabled && singles.pairing === 'selected' && sole && singles.crossed);
+    onAdd({ name: title, date: date || null, course_id: courseId, golfers, day, round, singlesCrossed });
   }
 </script>
 
@@ -218,7 +231,7 @@
           {#if settings.match_off_low}<div class="set"><label for="nr-mp">Low man %</label><input id="nr-mp" type="number" min="0" max="100" bind:value={settings.match_pct as number} /></div>{/if}
         {/if}
         {#if uses('stableford_pct')}<div class="set"><label for="nr-sp">Stableford %</label><input id="nr-sp" type="number" min="0" max="100" bind:value={settings.stableford_pct as number} /></div>{/if}
-        {#if uses('allowance_pct')}<div class="set"><label for="nr-ap">Allowance %</label><input id="nr-ap" type="number" min="0" max="100" bind:value={settings.allowance_pct as number} /></div>{/if}
+        {#if uses('allowance_pct')}<div class="set"><label for="nr-ap">Fourball allowance %</label><input id="nr-ap" type="number" min="0" max="100" bind:value={settings.allowance_pct as number} /></div>{/if}
         {#if game === 'scramble'}
           <div class="set"><label for="nr-sl">Low handicap %</label><input id="nr-sl" type="number" min="0" max="100" bind:value={settings.scramble_low_pct as number} /></div>
           <div class="set"><label for="nr-sh">High handicap %</label><input id="nr-sh" type="number" min="0" max="100" bind:value={settings.scramble_high_pct as number} /></div>
@@ -231,6 +244,7 @@
             bind:allowance={singles.allowance}
             bind:pairing={singles.pairing}
             fixedPoints={season && points ? points.singles.win : null}
+            choose={sole ? lineups : undefined}
           />
         {/if}
         {#if worth}<p class="muted small">{worth}</p>{/if}
@@ -243,6 +257,20 @@
     {#if canCancel}<button type="button" class="secondary" onclick={onCancel}>Cancel</button>{/if}
   </div>
 </form>
+
+{#snippet lineups()}
+  {#if sole}
+    <div class="fb">
+      <span class="fbt"><b>Fourball 1</b> · {nameOf(sole.a[0])} &amp; {nameOf(sole.a[1])} v {nameOf(sole.b[0])} &amp; {nameOf(sole.b[1])}</span>
+      {#each [false, true] as crossed (crossed)}
+        <label class="lineup" class:on={singles.crossed === crossed}>
+          <input type="radio" name="nr-lineup" aria-label="Fourball 1: {lineupText(sole, crossed)}" checked={singles.crossed === crossed} onchange={() => (singles.crossed = crossed)} />
+          {lineupText(sole, crossed)}
+        </label>
+      {/each}
+    </div>
+  {/if}
+{/snippet}
 
 <style>
   .add h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; }
@@ -283,4 +311,10 @@
   .actions { display: flex; gap: 8px; margin-top: 10px; }
   .actions button[type='submit'] { flex: 1; }
   .note { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: var(--bg); color: var(--ink, inherit); }
+  .fb { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 8px; display: grid; gap: 6px; }
+  .fbt { font-size: 0.8rem; color: var(--muted); }
+  .fbt b { color: var(--text); }
+  .lineup { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; cursor: pointer; font-size: 0.9rem; }
+  .lineup.on { border-color: var(--accent); background: #eef5f0; font-weight: 600; }
+  .lineup input { margin: 0; accent-color: var(--accent); }
 </style>

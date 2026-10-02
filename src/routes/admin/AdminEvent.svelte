@@ -48,6 +48,14 @@
   type Fourball = { groupNo: number; a: string[]; b: string[]; crossed: boolean; locked: boolean };
   let dayFourballs = $state<Record<string, Fourball[]>>({});
   const shortName = (id: string) => db.players.find((p) => p.id === id)?.short_name ?? '?';
+  /** A new day's one fourball, when its golfers (or, null, the event's players) are exactly 2 a side: it's paired when added. */
+  function soleFourball(ids: string[] | null): { a: string[]; b: string[] } | null {
+    const list = ids ? savedPlayers.filter((m) => ids.includes(m.player_id)) : savedPlayers;
+    const slots = autoFourball(list.filter((m) => m.team).map((m) => ({ playerId: m.player_id, team: m.team as Team, handicap: Number(m.handicap) })));
+    if (!slots) return null;
+    const at = (sl: string) => slots.find((x) => x.slot === sl)!.player_id;
+    return { a: [at('A1'), at('A2')], b: [at('B1'), at('B2')] };
+  }
   /** Rounds show as one-line tiles; these are the ones opened for editing (kept open across saves). */
   let openRounds = $state<Record<string, boolean>>({});
   let openGolfers = $state<Record<string, boolean>>({});
@@ -348,9 +356,15 @@
           .select()
           .single(),
       )) as RoundRow;
-      if (season && p.golfers && p.day) return seasonGroup(added, p.golfers, p.day);
-      const paired = individual ? await groupEveryDay([added]) : await pairTwoVTwo([added]);
-      return paired.length ? `Round added · ${individual ? 'group' : 'pairings'} set for ${added.name}` : 'Round added';
+      let said: string;
+      if (season && p.golfers && p.day) said = await seasonGroup(added, p.golfers, p.day);
+      else {
+        const paired = individual ? await groupEveryDay([added]) : await pairTwoVTwo([added]);
+        said = paired.length ? `Round added · ${individual ? 'group' : 'pairings'} set for ${added.name}` : 'Round added';
+      }
+      // Singles line-up picked in the form (one fourball): straight is the default.
+      if (p.singlesCrossed) await must(supabase.from('groups').update({ singles_crossed: true }).eq('round_id', added.id).eq('group_no', 1));
+      return said;
     }, 'Round added').then(() => {
       adding = false;
     });
@@ -717,7 +731,7 @@
         <div class="row">
           <!-- Stableford plays off full course handicaps and flat has no shots, so the allowance doesn't apply. -->
           {#if r.fourball_format === 'matchplay'}
-            <div class="field"><label for="ra-{r.id}">Allowance %</label><input id="ra-{r.id}" type="number" min="0" max="100" bind:value={r.allowance_pct} /></div>
+            <div class="field"><label for="ra-{r.id}">Fourball allowance %</label><input id="ra-{r.id}" type="number" min="0" max="100" bind:value={r.allowance_pct} /></div>
           {/if}
           <div class="field"><label for="rp-{r.id}">Fourball pts</label><input id="rp-{r.id}" type="number" step="0.5" bind:value={r.better_ball_points} /></div>
         </div>
@@ -798,6 +812,8 @@
         {teamName}
         points={season ? event.points : null}
         canCancel={rounds.length > 0}
+        fourballFor={soleFourball}
+        nameOf={shortName}
         onAdd={addRound}
         onCancel={() => (adding = false)}
       />

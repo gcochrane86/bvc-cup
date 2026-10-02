@@ -591,9 +591,9 @@ test('a day can be played as fourball Stableford: full handicaps, best points wi
   const { data: ev } = await serviceDb().from('events').select('id').eq('is_active', true).single();
   await openEvent(admin, ev!.id);
   const game = admin.getByLabel('Fourball game').first();
-  await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(3);
+  await expect(admin.getByLabel('Fourball allowance %', { exact: true })).toHaveCount(3);
   await game.selectOption('stableford');
-  await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1 (Days 2 and 3 still match play)
+  await expect(admin.getByLabel('Fourball allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1 (Days 2 and 3 still match play)
   await admin.getByRole('button', { name: 'Save round' }).first().click();
   await expect(admin.getByText('Day 1 saved')).toBeVisible();
 
@@ -769,7 +769,7 @@ test('a day can be played as a flat fourball: no shots, lower best gross wins th
   await loginAdmin(admin);
   await openEvent(admin, ev!.id);
   await admin.getByLabel('Fourball game').first().selectOption('flat');
-  await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1
+  await expect(admin.getByLabel('Fourball allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1
   await admin.getByRole('button', { name: 'Save round' }).first().click();
   await expect(admin.getByText('Day 1 saved')).toBeVisible();
 
@@ -886,7 +886,7 @@ test('a day can be a 2-man scramble: one score per team, saved for both players'
   await loginAdmin(admin);
   await openEvent(admin, ev!.id);
   await admin.getByLabel('Fourball game').first().selectOption('scramble');
-  await expect(admin.getByLabel('Allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1
+  await expect(admin.getByLabel('Fourball allowance %', { exact: true })).toHaveCount(2); // hidden on Day 1
   await admin.getByRole('button', { name: 'Save round' }).first().click();
   await expect(admin.getByText('Day 1 saved')).toBeVisible();
 

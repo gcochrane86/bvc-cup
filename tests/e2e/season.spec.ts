@@ -39,8 +39,17 @@ test('a season team event: points per format, golfers per day, 2 v 1 from the te
   await form.getByLabel('Course').selectOption('Seed Links');
   await expect(form.getByLabel(/Everyone/)).toBeChecked();
   await expect(form.getByTestId('day-format')).toContainText('4 golfers · fourballs');
+  // One fourball with teams set: its singles line-up can be picked right here.
+  await form.getByRole('switch', { name: 'Play singles' }).check();
+  await form.getByLabel("I'll choose").check();
+  const lineups = form.getByRole('radio', { name: /^Fourball 1: / });
+  await expect(lineups).toHaveCount(2);
+  await expect(lineups.first()).toBeChecked();
+  await lineups.nth(1).check();
   await form.getByRole('button', { name: /^Add Day/ }).click();
   await expect(page.getByText(/Round added/)).toBeVisible();
+  const { data: d1 } = await serviceDb().from('rounds').select('id, events!inner(season)').eq('name', 'Day 1').eq('events.season', true).single();
+  await expect.poll(async () => (await serviceDb().from('groups').select('singles_crossed').eq('round_id', d1!.id).single()).data?.singles_crossed).toBe(true);
 
   // Day 2: different golfers — two from Team A only is blocked; with Clark it's a 2 v 1, Clark alone.
   await page.getByRole('button', { name: '+ Add round' }).click();
