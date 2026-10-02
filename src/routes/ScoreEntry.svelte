@@ -3,7 +3,7 @@
   import { untrack } from 'svelte';
   import { db, enterScore, loadAll, photoUrl, playerName, playerShort } from '../lib/data/store.svelte';
   import { buildEventView, findGroup, firstIncompleteHole, matchesLabel, matchName, onlyGroupId, pairingLabel, resumeGroupId, scoringList } from '../lib/view';
-  import { gameLabel, isScoreLocked, playerHole, scoreKey, shotLabel, strokesOnHole, type Slot } from '../lib/scoring';
+  import { gameLabel, isScoreLocked, playerHole, scoreKey, shotLabel, strokesOnHole, wolfHole, wolfTeeOrder, type Slot } from '../lib/scoring';
   import Avatar from '../components/Avatar.svelte';
   import HoleGrid from '../components/HoleGrid.svelte';
 
@@ -164,7 +164,40 @@
 
   // 2-man scramble: one row per team (the A1 and B1 rows), saved for both partners.
   const scramble = $derived(found?.group.matches[0]?.def.scramble ? found.group.matches[0].def : null);
-  const rowSlots = $derived<Slot[]>(scramble ? ['A1', 'B1'] : SLOTS);
+  // Wolf: the hole's tee order (second off is the wolf); rows are listed in it.
+  const wolf = $derived(found?.group.matches.find((m) => m.def.game?.startsWith('wolf')) ?? null);
+  const teeOrder = $derived(wolf && found ? wolfTeeOrder(wolf.def, found.round.holes, hole) : null);
+  const slotOf = (pid: string) => SLOTS.find((s) => found?.group.slots[s] === pid)!;
+  const rowSlots = $derived<Slot[]>(scramble ? ['A1', 'B1'] : teeOrder ? teeOrder.map(slotOf) : SLOTS);
+
+  /** Wolf: after a hole's scores are saved, ask who played on their own (null: not asking). */
+  let wolfAsk = $state<{ hole: number; lone: string | null } | null>(null);
+  const askInfo = $derived(wolfAsk && found ? found.round.holes.find((h) => h.hole === wolfAsk!.hole) ?? null : null);
+  const askResult = $derived(wolf && wolfAsk?.lone && askInfo && found ? wolfHole(wolf.def, askInfo, found.group.scores, wolfAsk.lone) : null);
+  const nextHole = (h: number) => found?.round.holes.find((x) => x.hole > h)?.hole ?? null;
+  /** What each player did on the hole being asked about: Stableford points, or gross for scratch. */
+  function holeFigure(pid: string): string {
+    const e = found && wolfAsk ? found.group.scores.get(scoreKey(pid, wolfAsk.hole)) : undefined;
+    if (!e || !wolf || !askInfo || !found) return '';
+    if (wolf.def.game === 'wolf_flat') return e.pickedUp ? 'picked up' : `${e.gross}`;
+    if (e.pickedUp || e.gross === null) return '0 pts';
+    const own = playerHole({ teeHoles: found.group.teeHoles }, pid, askInfo);
+    const pts = Math.max(0, 2 + own.par - (e.gross - strokesOnHole(wolf.def.strokes[pid] ?? 0, own.strokeIndex, own.of)));
+    return `${pts} pt${pts === 1 ? '' : 's'}`;
+  }
+  /** Save who was on their own (on all three players' scores for the hole), then on to the next hole. */
+  async function saveLone() {
+    if (!found || !wolfAsk?.lone || !teeOrder) return;
+    const { hole: h, lone } = wolfAsk;
+    const at = new Date().toISOString();
+    for (const pid of wolf!.def.players ?? []) {
+      const e = found.group.scores.get(scoreKey(pid, h));
+      if (!e || locked(pid, h)) continue;
+      await enterScore({ roundId: found.round.round.id, playerId: pid, hole: h, gross: e.gross, pickedUp: e.pickedUp, clientUpdatedAt: at, lone: pid === lone });
+    }
+    wolfAsk = null;
+    pickedHole = nextHole(h) ?? h;
+  }
   /** A scramble team's players, in name order. */
   function teamIds(slot: Slot): string[] {
     if (!found) return [];
@@ -203,6 +236,13 @@
         // An untouched row is only a par default: it must never overwrite someone's real score.
         ifAbsent: !d.edited,
       });
+    }
+    // Wolf: ask who played on their own first (the answer already saved is picked to start with).
+    const ids = wolf?.def.players ?? [];
+    if (wolf && ids.every((id) => !locked(id, saving))) {
+      pickedHole = saving; // stay on this hole while asking
+      wolfAsk = { hole: saving, lone: ids.find((id) => found!.group.scores.get(scoreKey(id, saving))?.lone) ?? null };
+      return;
     }
     // On to the next hole being played (a day may skip some).
     pickedHole = found.round.holes.find((h) => h.hole > saving)?.hole ?? saving;
@@ -258,6 +298,16 @@
     {/each}
   </div>
 
+  {#if teeOrder}
+    <div class="tee" data-testid="tee-order">
+      <span class="lbl">Tee order</span>
+      <span class="order">
+        {#each teeOrder as id, i (id)}<span class:wolfp={i === 1}><span class="n">{i + 1}</span>{playerShort(id)}{i === 1 ? ' 🐺' : ''}</span>{/each}
+      </span>
+      <small class="muted">{playerShort(teeOrder[1])} is the wolf: partner {playerShort(teeOrder[0])}, or go solo.</small>
+    </div>
+  {/if}
+
   {#each rowSlots as slot (slot)}
     {@const pid = found.group.slots[slot]}
     {#if pid && draft[pid]}
@@ -299,10 +349,55 @@
   {/each}
 
   <button class="save" onclick={save} disabled={allLocked}>Save hole {hole}</button>
+
+  {#if wolfAsk && teeOrder && wolf}
+    {@const order = wolfTeeOrder(wolf.def, found.round.holes, wolfAsk.hole)}
+    {@const next = nextHole(wolfAsk.hole)}
+    <div class="shade">
+      <div class="sheet" role="dialog" aria-label="Who played on their own?">
+        <h2>Hole {wolfAsk.hole}: who played on their own?</h2>
+        <div class="pick">
+          {#each order as id, i (id)}
+            <button class="pbtn" class:on={wolfAsk.lone === id} aria-pressed={wolfAsk.lone === id} onclick={() => (wolfAsk!.lone = id)}>
+              <span>{playerShort(id)}{i === 1 ? ' 🐺' : ''}</span>
+              <small class="muted">{i === 1 ? 'wolf went solo · ' : ''}{holeFigure(id)}</small>
+            </button>
+          {/each}
+        </div>
+        {#if askResult}
+          <p class="result" data-testid="wolf-result">
+            {#if askResult.winners.length === 1}{playerShort(askResult.winners[0])} wins the hole on their own: +2
+            {:else if askResult.winners.length === 2}{askResult.winners.map(playerShort).join(' & ')} win the hole: +1 each
+            {:else}Tied hole: no points{/if}
+          </p>
+        {/if}
+        {#if next}
+          {@const nextOrder = wolfTeeOrder(wolf.def, found.round.holes, next)}
+          <p class="nextorder"><span class="lbl">Hole {next} tee order</span> {nextOrder.map((id, i) => `${i + 1} ${playerShort(id)}${i === 1 ? ' 🐺' : ''}`).join(' · ')}</p>
+        {/if}
+        <button class="save" disabled={!wolfAsk.lone} onclick={saveLone}>{next ? `Next: hole ${next} →` : 'Save'}</button>
+        <button class="secondary" onclick={() => (wolfAsk = null)}>Back to hole {wolfAsk.hole}</button>
+      </div>
+    </div>
+  {/if}
   {#if !onlyGroupId(toScore)}<p class="muted small"><a href="#/score" onclick={allMatches}>← All matches</a></p>{/if}
 {/if}
 
 <style>
+  .tee { background: #fff3dc; border: 1px solid #c58a12; border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; display: grid; gap: 2px; }
+  .lbl { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #8a5a00; }
+  .order { display: flex; gap: 10px; flex-wrap: wrap; font-weight: 700; }
+  .order .n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid #c58a12; font-size: 0.72rem; margin-right: 4px; background: var(--surface); }
+  .order .wolfp { color: #8a5a00; }
+  .shade { position: fixed; inset: 0; z-index: 50; background: rgb(10 20 15 / 0.45); display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { background: var(--surface); width: 100%; max-width: 560px; border-radius: 18px 18px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 10px; }
+  .sheet h2 { margin: 0; font-size: 1.1rem; }
+  .pick { display: grid; gap: 8px; }
+  .pbtn { display: flex; justify-content: space-between; align-items: center; margin: 0; background: var(--surface); color: var(--text); border: 1px solid var(--line); text-align: left; }
+  .pbtn.on { border-color: #c58a12; background: #fff3dc; font-weight: 700; }
+  .result { margin: 0; padding: 8px 12px; border-radius: 10px; background: #e3efe7; color: var(--ok, #155d27); font-weight: 700; }
+  .nextorder { margin: 0; font-weight: 600; }
+  .sheet .save, .sheet .secondary { margin: 0; }
   .group-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
   .day { font-size: 1rem; margin: 16px 0 8px; }
   .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }

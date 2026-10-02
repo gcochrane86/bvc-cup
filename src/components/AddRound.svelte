@@ -230,6 +230,9 @@
           <label class="row setting"><input type="checkbox" bind:checked={settings.match_off_low as boolean} /> Off the low man</label>
           {#if settings.match_off_low}<div class="set"><label for="nr-mp">Low man %</label><input id="nr-mp" type="number" min="0" max="100" bind:value={settings.match_pct as number} /></div>{/if}
         {/if}
+        {#if game === 'wolf_stableford'}
+          <label class="row setting"><input type="checkbox" bind:checked={settings.wolf_off_low as boolean} /> Off the low (off: full handicaps)</label>
+        {/if}
         {#if uses('stableford_pct')}<div class="set"><label for="nr-sp">Stableford %</label><input id="nr-sp" type="number" min="0" max="100" bind:value={settings.stableford_pct as number} /></div>{/if}
         {#if uses('allowance_pct')}<div class="set"><label for="nr-ap">Fourball allowance %</label><input id="nr-ap" type="number" min="0" max="100" bind:value={settings.allowance_pct as number} /></div>{/if}
         {#if game === 'scramble'}

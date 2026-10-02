@@ -6,7 +6,7 @@ export type Outcome = Team | 'halved';
 /** A result's winner: a side, halved, or (six pointer) a position. */
 export type Winner = Outcome | 'P1' | 'P2' | 'P3';
 export type PairGame = 'stableford' | 'flat_match' | 'stableford_match';
-export type ThreeGame = 'six_stableford' | 'six_flat' | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat' | 'two_v_one_best';
+export type ThreeGame = 'six_stableford' | 'six_flat' | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat' | 'two_v_one_best' | 'wolf_stableford' | 'wolf_flat';
 export type IndividualGame = PairGame | ThreeGame;
 /** A player's figures from a confirmed individual game: game points and Stableford total. */
 export interface PlayerPoints { points: number; stableford: number }
@@ -45,6 +45,8 @@ export interface RoundSettings {
   matchPct?: number;
   /** Stableford match play: off the low man (default) or full handicaps. */
   matchOffLow?: boolean;
+  /** Stableford wolf: shots off the lowest of the three (at the Stableford %), not full handicaps. */
+  wolfOffLow?: boolean;
 }
 
 export interface SlotPlayer {
@@ -59,6 +61,8 @@ export interface ScoreEntry {
   hole: number;
   gross: number | null;
   pickedUp: boolean;
+  /** Wolf: this player played the hole on their own. */
+  lone?: boolean;
 }
 
 export interface MatchDef {
@@ -111,6 +115,8 @@ export interface MatchState {
   totals?: Record<string, number>;
   /** Individual games: each player's Stableford total off full handicap × the Stableford %, over the holes scored. */
   stableford?: Record<string, number>;
+  /** Wolf: how many counted holes each player was the wolf. */
+  wolves?: Record<string, number>;
 }
 
 export interface ConfirmedResult {

@@ -466,6 +466,7 @@
               stableford_pct: Number(r.stableford_pct),
               match_pct: Number(r.match_pct),
               match_off_low: r.match_off_low,
+              wolf_off_low: r.wolf_off_low,
               scramble_low_pct: Number(r.scramble_low_pct),
               scramble_high_pct: Number(r.scramble_high_pct),
             })
@@ -712,13 +713,19 @@
                 {#each gamesFor(3, { teams: !individual, rows: db.games, keep: r.three_game }) as g (g.key)}<option value={g.key}>{g.name}</option>{/each}
               </select>
             </div>
+            {#if r.three_game === 'wolf_stableford'}
+              <label class="row"><input type="checkbox" bind:checked={r.wolf_off_low} /> Wolf off the low (off: full handicaps)</label>
+            {/if}
+            {#if r.three_game.startsWith('wolf')}
+              <p class="muted small">Wolf: lowest handicap tees off first, then the order rotates. The scoring screen shows it each hole and asks who played on their own.</p>
+            {/if}
             {#if r.three_game.startsWith('two_v_one')}
               <p class="muted small">2 v 1: the single against the pair's better ball. Choose who plays alone on the groups page.</p>
             {/if}
           {/if}
           {#if both}<p class="muted small">Groups of 2 play the first game, groups of 3 the second. Once the day's groups are set, only the games they need are shown.</p>{/if}
           <!-- Stableford % only matters to the games played off it. -->
-          {#if (games.pair && r.pair_game === 'stableford') || (games.three && !['six_flat', 'two_v_one_flat'].includes(r.three_game))}
+          {#if (games.pair && r.pair_game === 'stableford') || (games.three && !['six_flat', 'two_v_one_flat', 'wolf_flat'].includes(r.three_game))}
             <div class="field"><label for="rspc-{r.id}">Stableford %</label><input id="rspc-{r.id}" type="number" min="0" max="100" bind:value={r.stableford_pct} /></div>
           {/if}
         {:else}

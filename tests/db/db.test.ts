@@ -13,6 +13,7 @@ beforeEach(async () => {
 const T1 = '2026-10-01T10:00:00Z';
 const T0 = '2026-10-01T09:00:00Z';
 const T2 = '2026-10-01T11:00:00Z';
+const T3 = '2026-10-01T12:00:00Z';
 
 async function upsert(who: Who, player: string, hole: number, gross: number | null, pickedUp = false, at = T1, ifAbsent = false) {
   return as(db, who, async () => {
@@ -303,7 +304,7 @@ describe('confirmation and locking', () => {
     const r = await as(db, 'trip', () => db.query<{ key: string; enabled: boolean }>(`select key, enabled from public.games order by key`));
     expect(r.rows.map((g) => g.key)).toEqual([
       'flat_match', 'fourball_flat', 'fourball_matchplay', 'fourball_stableford', 'scramble', 'six_flat', 'six_stableford',
-      'stableford', 'stableford_match', 'two_v_one', 'two_v_one_best', 'two_v_one_flat', 'two_v_one_match',
+      'stableford', 'stableford_match', 'two_v_one', 'two_v_one_best', 'two_v_one_flat', 'two_v_one_match', 'wolf_flat', 'wolf_stableford',
     ]);
     expect(r.rows.every((g) => g.enabled)).toBe(true);
     const sc = await db.query<{ defaults: Record<string, number> }>(`select defaults from public.games where key = 'scramble'`);
@@ -352,6 +353,36 @@ describe('confirmation and locking', () => {
     expect(theirs.rows).toHaveLength(0);
     await as(db, 'admin', () => db.query(`delete from public.player_favourites where player_id = $1`, [s.players.a1]));
     expect((await db.query(`select 1 from public.player_favourites`)).rows).toHaveLength(1);
+  });
+
+  it('wolf: keeps who played on their own with the score, and a later correction keeps it', async () => {
+    const lone = (player: string, hole: number, gross: number, at: string, isLone: boolean | null) =>
+      as(db, 'trip', () =>
+        db.query<{ r: string }>(
+          `select public.upsert_score($1::uuid, $2::uuid, $3::int, $4::int, false, $5::timestamptz, false, $6::boolean) as r`,
+          [s.roundId, player, hole, gross, at, isLone],
+        ),
+      );
+    const row = async () =>
+      (await db.query<{ gross: number; lone: boolean }>(`select gross, lone from public.scores where round_id = $1 and player_id = $2 and hole = 1`, [s.roundId, s.players.a1])).rows[0];
+    await lone(s.players.a1, 1, 4, T1, true);
+    expect(await row()).toEqual({ gross: 4, lone: true });
+    await upsert('trip', s.players.a1, 1, 5, false, T2); // a correction that doesn't say: still on their own
+    expect(await row()).toEqual({ gross: 5, lone: true });
+    await lone(s.players.a1, 1, 5, T3, false);
+    expect(await row()).toEqual({ gross: 5, lone: false });
+    // A new score defaults to not on their own.
+    await upsert('trip', s.players.a2, 1, 4);
+    expect((await db.query<{ lone: boolean }>(`select lone from public.scores where player_id = $1 and hole = 1`, [s.players.a2])).rows[0].lone).toBe(false);
+  });
+
+  it('wolf games are allowed, Stableford wolf plays off full handicaps unless set off the low', async () => {
+    await db.query(`update public.rounds set three_game = 'wolf_stableford' where id = $1`, [s.roundId]);
+    await db.query(`update public.rounds set three_game = 'wolf_flat' where id = $1`, [s.roundId]);
+    const r = await db.query<{ wolf_off_low: boolean }>(`select wolf_off_low from public.rounds where id = $1`, [s.roundId]);
+    expect(r.rows[0].wolf_off_low).toBe(false);
+    const g = await db.query(`select key from public.games where key in ('wolf_stableford', 'wolf_flat')`);
+    expect(g.rows).toHaveLength(2);
   });
 
   it('plays all 18 holes unless a day picks its holes (any of 1–18)', async () => {

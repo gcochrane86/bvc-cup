@@ -50,6 +50,12 @@ describe('score merging', () => {
     expect(rows).toEqual([{ round_id: 'r', player_id: 'x', hole: 3, gross: null, picked_up: true, client_updated_at: '2026-10-01T10:05:00Z' }]);
   });
 
+  it('wolf: a pending edit keeps who was on their own unless it says', () => {
+    const saved = [{ round_id: 'r', player_id: 'x', hole: 3, gross: 4, picked_up: false, client_updated_at: '2026-10-01T10:00:00Z', lone: true }];
+    expect(applyPending(saved, [pend(3, 5, '2026-10-01T10:05:00Z')])[0]).toMatchObject({ gross: 5, lone: true });
+    expect(applyPending(saved, [{ ...pend(3, 4, '2026-10-01T10:05:00Z'), lone: false }])[0]).toMatchObject({ gross: 4, lone: false });
+  });
+
   it('detects pending scores for a match’s players', () => {
     const pending = [pend(1, 4, 'x')];
     expect(hasPendingFor(pending, 'r', ['x', 'y'])).toBe(true);

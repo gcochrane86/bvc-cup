@@ -5,14 +5,16 @@ import { computeMatchState, playerHole, scoreKey, type ScoreIndex } from './matc
 import { playingStrokes, strokesOnHole } from './strokes';
 import type { ConfirmedResult, HoleInfo, IndividualGame, MatchDef, MatchState, Outcome, PlayerPoints, RoundSettings, SeasonPoints, Slot, Team, Winner } from './types';
 
-export interface GamePlayer { slot: Slot; playerId: string; handicap: number }
+/** name: for the wolf tee order (equal handicaps go in name order). */
+export interface GamePlayer { slot: Slot; playerId: string; handicap: number; name?: string }
 
 const POSITIONS: Slot[] = ['P1', 'P2', 'P3'];
-const STABLEFORD_GAMES: IndividualGame[] = ['stableford', 'stableford_match', 'six_stableford', 'two_v_one', 'two_v_one_match', 'two_v_one_best'];
+const STABLEFORD_GAMES: IndividualGame[] = ['stableford', 'stableford_match', 'six_stableford', 'two_v_one', 'two_v_one_match', 'two_v_one_best', 'wolf_stableford'];
 /** Games scored as match play (hole by hole): the fourball match maths, sides P1 v the rest. */
 const MATCH_GAMES: IndividualGame[] = ['flat_match', 'stableford_match', 'two_v_one_match', 'two_v_one_flat'];
 const isTwoVOne = (g: IndividualGame | undefined) => !!g?.startsWith('two_v_one');
 const isSix = (g: IndividualGame | undefined) => g === 'six_stableford' || g === 'six_flat';
+const isWolf = (g: IndividualGame | undefined) => g === 'wolf_stableford' || g === 'wolf_flat';
 
 const LABELS: Record<IndividualGame, string> = {
   stableford: 'Stableford total',
@@ -24,6 +26,8 @@ const LABELS: Record<IndividualGame, string> = {
   two_v_one_match: '2 v 1 Stableford match play',
   two_v_one_flat: '2 v 1 scratch match play',
   two_v_one_best: '2 v 1 Stableford · better total',
+  wolf_stableford: 'Wolf (Stableford)',
+  wolf_flat: 'Wolf (scratch)',
 };
 export const gameLabel = (game: IndividualGame) => LABELS[game];
 
@@ -41,18 +45,24 @@ export function buildGame(groupId: string, players: GamePlayer[], s: RoundSettin
   if (opts.single && ps.some((p) => p.playerId === opts.single)) ps = [ps.find((p) => p.playerId === opts.single)!, ...ps.filter((p) => p.playerId !== opts.single)];
   const game = gameFor(ps.length, s);
   if (!game) return null;
+  // Wolf: the tee order on the first hole is lowest handicap first (equal handicaps in name order).
+  if (isWolf(game)) ps = [...ps].sort((x, y) => x.handicap - y.handicap || (x.name ?? '').localeCompare(y.name ?? '') || POSITIONS.indexOf(x.slot) - POSITIONS.indexOf(y.slot));
   const ids = ps.map((p) => p.playerId);
   const each = (f: (p: GamePlayer) => number) => Object.fromEntries(ps.map((p) => [p.playerId, f(p)]));
   const stablefordStrokes = each((p) => playingStrokes(p.handicap, s.stablefordPct ?? 100));
   let strokes: Record<string, number>;
-  if (game === 'flat_match' || game === 'six_flat' || game === 'two_v_one_flat') strokes = each(() => 0);
+  if (game === 'flat_match' || game === 'six_flat' || game === 'two_v_one_flat' || game === 'wolf_flat') strokes = each(() => 0);
+  else if (game === 'wolf_stableford' && s.wolfOffLow) {
+    const low = Math.min(...ps.map((p) => p.handicap));
+    strokes = each((p) => playingStrokes(p.handicap - low, s.stablefordPct ?? 100));
+  }
   else if (game === 'stableford_match' && (s.matchOffLow ?? true)) {
     const low = Math.min(...ps.map((p) => p.handicap));
     strokes = each((p) => playingStrokes(p.handicap - low, s.matchPct ?? 85));
   } else if (game === 'stableford_match') strokes = each((p) => p.handicap);
   else strokes = stablefordStrokes;
-  // Six pointer: everyone for themselves (one "side"). 1 v 1 and 2 v 1: P1 against the rest.
-  const [sideA, sideB] = isSix(game) ? [ids, []] : [ids.slice(0, 1), ids.slice(1)];
+  // Six pointer and wolf: everyone for themselves (one "side"). 1 v 1 and 2 v 1: P1 against the rest.
+  const [sideA, sideB] = isSix(game) || isWolf(game) ? [ids, []] : [ids.slice(0, 1), ids.slice(1)];
   return {
     id: `${groupId}:individual`,
     groupId,
@@ -104,6 +114,33 @@ function stablefordTotals(def: MatchDef, holes: HoleInfo[], idx: ScoreIndex): Re
   return Object.fromEntries(ids.map((id) => [id, holes.reduce((sum, h) => sum + holePoints(def, id, h, idx, strokes), 0)]));
 }
 
+/** Wolf: the tee order for a hole. The first hole's order (def.players) rotates by one for each hole played before it. */
+export function wolfTeeOrder(def: MatchDef, holes: HoleInfo[], hole: number): string[] {
+  const ids = def.players ?? def.sideA;
+  const k = Math.max(0, [...holes].sort((x, y) => x.hole - y.hole).findIndex((h) => h.hole === hole)) % ids.length;
+  return [...ids.slice(k), ...ids.slice(0, k)];
+}
+
+/**
+ * Wolf: a hole's result once everyone has a score and someone is marked as on their own (or tryLone, to
+ * show "what if" before it's saved). Their score against the other two's better one: lowest gross (scratch)
+ * or most Stableford points. A lone winner gets 2, a winning pair 1 each, a tie nothing.
+ */
+export function wolfHole(def: MatchDef, hole: HoleInfo, idx: ScoreIndex, tryLone?: string): { lone: string; winners: string[]; points: Record<string, number> } | null {
+  const ids = def.players ?? def.sideA;
+  if (!ids.every((id) => idx.has(scoreKey(id, hole.hole)))) return null;
+  const lone = tryLone ?? ids.find((id) => idx.get(scoreKey(id, hole.hole))?.lone);
+  if (!lone) return null;
+  const flat = def.game === 'wolf_flat';
+  const value = (id: string) => (flat ? -grossOrWorst(id, hole, idx) : holePoints(def, id, hole, idx, def.strokes)); // higher is better
+  const others = ids.filter((id) => id !== lone);
+  const mine = value(lone);
+  const best = Math.max(...others.map(value));
+  const winners = mine > best ? [lone] : mine < best ? others : [];
+  const points = Object.fromEntries(ids.map((id) => [id, winners.includes(id) ? (winners.length === 1 ? 2 : 1) : 0]));
+  return { lone, winners, points };
+}
+
 export function computeGameState(def: MatchDef, holes: HoleInfo[], idx: ScoreIndex): MatchState {
   const stableford = stablefordTotals(def, holes, idx);
   if (MATCH_GAMES.includes(def.game!)) return { ...computeMatchState(def, holes, idx), stableford };
@@ -116,10 +153,17 @@ export function computeGameState(def: MatchDef, holes: HoleInfo[], idx: ScoreInd
   let thru = 0;
   let a = 0;
   let b = 0;
-  for (const h of sorted) {
+  const wolves: Record<string, number> = Object.fromEntries(ids.map((id) => [id, 0]));
+  for (const [k, h] of sorted.entries()) {
     // A hole counts once every player has a score for it.
     if (!ids.every((id) => idx.has(scoreKey(id, h.hole)))) break;
-    if (isSix(def.game)) {
+    if (isWolf(def.game)) {
+      // A hole counts once someone is marked as on their own (the pop-up after the scores).
+      const w = wolfHole(def, h, idx);
+      if (!w) break;
+      for (const id of ids) totals[id] += w.points[id];
+      wolves[ids[(k + 1) % ids.length]]++; // second off the tee
+    } else if (isSix(def.game)) {
       const values = ids.map((id) => (def.game === 'six_flat' ? grossOrWorst(id, h, idx) : holePoints(def, id, h, idx, def.strokes)));
       sixPoints(values, def.game === 'six_stableford').forEach((p, i) => (totals[ids[i]] += p));
     } else {
@@ -147,7 +191,7 @@ export function computeGameState(def: MatchDef, holes: HoleInfo[], idx: ScoreInd
     holeWinners.fill(null);
     running.fill(null);
   }
-  if (isSix(def.game)) {
+  if (isSix(def.game) || isWolf(def.game)) {
     statusText = started ? ids.map((id) => totals[id]).join(' · ') : 'Not started';
     if (decided) {
       const best = Math.max(...ids.map((id) => totals[id]));
@@ -166,6 +210,7 @@ export function computeGameState(def: MatchDef, holes: HoleInfo[], idx: ScoreInd
   return {
     started, thru, lead: a - b, holeWinners, running, decided, dormie: false, winner,
     finalHole: decided ? thru : null, resultText, statusText, projectedA: 0, projectedB: 0, totals, stableford,
+    ...(isWolf(def.game) ? { wolves } : {}),
   };
 }
 

@@ -287,3 +287,45 @@ test('a day can play only some holes (winter: 1–9, 14 and 18); score entry ski
   await expect(day1.getByText('Pick at least one hole')).toBeVisible();
   await expect(day1.getByRole('button', { name: 'Save round' })).toBeDisabled();
 });
+
+test('wolf: the tee order shows each hole; after the scores, the pop-up asks who played on their own', async ({ page }) => {
+  const { threeBall, roundId } = await seedIndividual({ threeGame: 'wolf_flat' });
+  // Clark 6, Davies 14, Evans 3: Evans tees off first, Clark is the wolf on hole 1.
+  await login(page, undefined, undefined, { expectLeaderboard: false });
+  await page.goto(`/#/score/${threeBall}`);
+  await expect(page.getByTestId('tee-order')).toContainText('Clark is the wolf: partner Evans, or go solo.');
+  await expect(page.getByTestId(/^row-/).first()).toHaveAttribute('data-testid', 'row-P3'); // Evans's row first
+
+  // Clark (P1) makes 3, the others 4.
+  await page.getByTestId('row-P1').getByRole('button', { name: /^Decrease/ }).click();
+  await page.getByRole('button', { name: 'Save hole 1' }).click();
+  const ask = page.getByRole('dialog', { name: 'Who played on their own?' });
+  await expect(ask).toBeVisible();
+  await ask.getByRole('button', { name: /^Clark/ }).click();
+  await expect(ask.getByTestId('wolf-result')).toHaveText('Clark wins the hole on their own: +2');
+  await expect(ask).toContainText('Hole 2 tee order 1 Clark · 2 Davies 🐺 · 3 Evans');
+  await ask.getByRole('button', { name: 'Next: hole 2 →' }).click();
+  await expect(ask).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Hole 2', exact: true })).toBeVisible();
+  await expect(page.getByTestId('tee-order')).toContainText('Davies is the wolf: partner Clark, or go solo.');
+
+  // Saved on the scores (through the offline queue): Clark was on his own on hole 1.
+  const db = serviceDb();
+  await expect
+    .poll(async () => ((await db.from('scores').select('lone, players(name)').eq('round_id', roundId).eq('hole', 1)).data ?? []).filter((r) => r.lone).map((r) => (r.players as unknown as { name: string }).name))
+    .toEqual(['Chris Clark']);
+
+  // Hole 2: Davies partners Clark, Evans alone; everyone makes 4 → a tie, no points.
+  await page.getByRole('button', { name: 'Save hole 2' }).click();
+  await ask.getByRole('button', { name: /^Evans/ }).click();
+  await expect(ask.getByTestId('wolf-result')).toHaveText('Tied hole: no points');
+  await ask.getByRole('button', { name: 'Next: hole 3 →' }).click();
+
+  // The match card: each player's points and how often they've been wolf.
+  await page.goto(`/#/match/${threeBall}/individual`);
+  const card = page.getByTestId('match-card').filter({ hasText: 'Wolf (scratch)' });
+  await expect(card).toContainText('Clark');
+  await expect(card.locator('.who').filter({ hasText: 'Clark' })).toContainText('2');
+  await expect(card.locator('.who').filter({ hasText: 'Clark' })).toContainText('Wolf ×1');
+  await expect(card.locator('.who').filter({ hasText: 'Davies' })).toContainText('Wolf ×1');
+});

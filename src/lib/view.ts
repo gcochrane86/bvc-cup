@@ -68,6 +68,7 @@ export function settingsOf(r: RoundRow): RoundSettings {
     stablefordPct: Number(r.stableford_pct ?? 100),
     matchPct: Number(r.match_pct ?? 85),
     matchOffLow: r.match_off_low ?? true,
+    wolfOffLow: r.wolf_off_low ?? false,
   };
 }
 
@@ -106,7 +107,7 @@ export function buildEventView(s: Snapshot): EventView | null {
       const scores = indexScores(
         s.scores
           .filter((x) => x.round_id === round.id)
-          .map((x) => ({ playerId: x.player_id, hole: x.hole, gross: x.gross, pickedUp: x.picked_up })),
+          .map((x) => ({ playerId: x.player_id, hole: x.hole, gross: x.gross, pickedUp: x.picked_up, lone: !!x.lone })),
       );
       const groups = s.groups
         .filter((g) => g.round_id === round.id)
@@ -139,7 +140,9 @@ export function buildEventView(s: Snapshot): EventView | null {
             }),
           );
           const onOtherTees = Object.keys(teeOf).length > 0;
-          const players = members.map((gp) => ({ slot: gp.slot, playerId: gp.player_id, handicap: playingHcp[gp.player_id] }));
+          const players = members.map((gp) => ({
+            slot: gp.slot, playerId: gp.player_id, handicap: playingHcp[gp.player_id], name: s.players.find((p) => p.id === gp.player_id)?.name,
+          }));
           const isGame = members.some((gp) => gp.slot.startsWith('P'));
           let built: MatchDef[];
           if (season && isGame) {
@@ -148,7 +151,7 @@ export function buildEventView(s: Snapshot): EventView | null {
             // A confirmed game keeps the line-up it was played with (saved with the single as P1), even if teams change.
             const confirmed = s.results.some((r) => r.group_id === group.id);
             const single = !confirmed && ids.length === 3 ? ids.find((id) => ids.filter((x) => teamOf[x] === teamOf[id]).length === 1) : undefined;
-            const threeGame = settings.threeGame?.startsWith('six') ? 'two_v_one' : settings.threeGame;
+            const threeGame = settings.threeGame?.startsWith('six') || settings.threeGame?.startsWith('wolf') ? 'two_v_one' : settings.threeGame;
             built = [buildGame(group.id, players, { ...settings, threeGame }, { single })].filter((d): d is MatchDef => d !== null);
           } else if (individual) {
             built = [buildGame(group.id, players, settings)].filter((d): d is MatchDef => d !== null);
@@ -208,7 +211,7 @@ export function buildEventView(s: Snapshot): EventView | null {
   function seasonPointsAt(def: MatchDef): number {
     if (!def.game) return def.points;
     if (def.game.startsWith('two_v_one')) return Math.max(pts.two_v_one_single.win, pts.two_v_one_pair.win);
-    return def.game.startsWith('six') ? 0 : pts.one_v_one.win;
+    return def.game.startsWith('six') || def.game.startsWith('wolf') ? 0 : pts.one_v_one.win;
   }
 }
 

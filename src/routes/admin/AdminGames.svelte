@@ -13,6 +13,7 @@
   const LABELS: Record<SettingKey, string> = {
     match_off_low: 'Off the low man (off: full handicaps)',
     match_pct: 'Low man %',
+    wolf_off_low: 'Off the low (off: full handicaps)',
     stableford_pct: 'Stableford %',
     allowance_pct: 'Allowance %',
     scramble_low_pct: 'Low handicap %',
@@ -28,6 +29,7 @@
   function summary(g: GameInfo): string {
     const d = defaultsFor(g.key, db.games);
     if (g.key === 'stableford_match') return d.match_off_low ? `Off the low man ${d.match_pct}%` : 'Full handicaps';
+    if (g.key === 'wolf_stableford') return `${d.wolf_off_low ? 'Off the low' : 'Full handicaps'} ${d.stableford_pct}%`;
     if (g.key === 'scramble') return `${d.scramble_low_pct}% low · ${d.scramble_high_pct}% high`;
     if (d.allowance_pct !== undefined) return `Allowance ${d.allowance_pct}%`;
     if (d.stableford_pct !== undefined) return `Stableford ${d.stableford_pct}%`;

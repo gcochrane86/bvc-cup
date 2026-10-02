@@ -41,14 +41,15 @@
     </span>
     <span class="slot right">{#if badge && lead < 0}<span class="badge" style="background:{colour}">{badge}</span>{/if}</span>
   </header>
-  {#if mv.def.game === 'six_stableford' || mv.def.game === 'six_flat'}
-    <!-- Six pointer: three players, each with their points so far. -->
+  {#if mv.def.game === 'six_stableford' || mv.def.game === 'six_flat' || mv.def.game?.startsWith('wolf')}
+    <!-- Six pointer and wolf: three players, each with their points so far (wolf: and how often they've been wolf). -->
     <div class="six">
       {#each mv.def.players ?? [] as id (id)}
         <div class="who">
           <Avatar name={playerName(id)} url={photoUrl(id)} colour="var(--team-a)" size={40} />
           <span class="name">{playerShort(id)}</span>
           <strong class="pts">{mv.result?.playerPoints?.[id]?.points ?? mv.state.totals?.[id] ?? 0}</strong>
+          {#if mv.state.wolves}<span class="wolves">Wolf ×{mv.state.wolves[id] ?? 0}</span>{/if}
         </div>
       {/each}
     </div>
@@ -100,4 +101,5 @@
   .six .name { max-width: 100%; }
   .six .pts { font-size: 1.2rem; }
   .six-status { margin-top: 6px; }
+  .wolves { font-size: 0.72rem; color: var(--muted); }
 </style>

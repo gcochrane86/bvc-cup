@@ -4,11 +4,11 @@
 
 export type GameKey =
   | 'stableford_match' | 'stableford' | 'flat_match'
-  | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat' | 'two_v_one_best' | 'six_stableford' | 'six_flat'
+  | 'two_v_one' | 'two_v_one_match' | 'two_v_one_flat' | 'two_v_one_best' | 'six_stableford' | 'six_flat' | 'wolf_stableford' | 'wolf_flat'
   | 'fourball_matchplay' | 'fourball_stableford' | 'fourball_flat' | 'scramble';
 
 /** A setting a game uses (a round column of the same name). */
-export type SettingKey = 'match_off_low' | 'match_pct' | 'stableford_pct' | 'allowance_pct' | 'scramble_low_pct' | 'scramble_high_pct';
+export type SettingKey = 'match_off_low' | 'match_pct' | 'stableford_pct' | 'wolf_off_low' | 'allowance_pct' | 'scramble_low_pct' | 'scramble_high_pct';
 export type FourballFormat = 'matchplay' | 'stableford' | 'flat' | 'scramble';
 
 export interface GameInfo {
@@ -32,6 +32,8 @@ export const GAMES: GameInfo[] = [
   { key: 'flat_match', name: 'Scratch match play', size: 2, teamOk: true, about: 'Lower gross score wins each hole. No shots.', defaults: {} },
   { key: 'six_stableford', name: 'Six pointer (Stableford)', size: 3, teamOk: false, about: '4 / 2 / 0 a hole by Stableford points.', defaults: { stableford_pct: 100 } },
   { key: 'six_flat', name: 'Six pointer (scratch)', size: 3, teamOk: false, about: '4 / 2 / 0 a hole by gross score. No shots.', defaults: {} },
+  { key: 'wolf_stableford', name: 'Wolf (Stableford)', size: 3, teamOk: false, about: 'Rotating tee order; the wolf goes solo or partners. Lone win 2, pair win 1 each.', defaults: { stableford_pct: 100, wolf_off_low: false } },
+  { key: 'wolf_flat', name: 'Wolf (scratch)', size: 3, teamOk: false, about: 'Same game on gross scores. No shots.', defaults: {} },
   { key: 'two_v_one_best', name: '2 v 1 Stableford · better total', size: 3, teamOk: true, about: "The single's own Stableford total against the better of the pair's own totals.", defaults: { stableford_pct: 100 } },
   { key: 'two_v_one', name: '2 v 1 Stableford · better ball', size: 3, teamOk: true, about: "The single's Stableford total against the pair's best score on each hole, added up.", defaults: { stableford_pct: 100 } },
   { key: 'two_v_one_match', name: '2 v 1 Stableford match play', size: 3, teamOk: true, about: "Hole by hole: the single's points against the pair's best.", defaults: { stableford_pct: 100 } },
@@ -80,5 +82,6 @@ export function newRoundDefaults(rows: GameRow[], teams: boolean) {
     stableford_pct: (d(pair).stableford_pct ?? d(three).stableford_pct ?? 100) as number,
     match_pct: d('stableford_match').match_pct as number,
     match_off_low: d('stableford_match').match_off_low as boolean,
+    wolf_off_low: d('wolf_stableford').wolf_off_low as boolean,
   };
 }

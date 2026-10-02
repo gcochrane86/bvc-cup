@@ -7,6 +7,8 @@ export interface PendingScore {
   clientUpdatedAt: string;
   /** A par default the scorer didn't touch: fill the cell only if nobody has entered a score yet. */
   ifAbsent?: boolean;
+  /** Wolf: on their own this hole (true/false); left out, the server keeps what it has. */
+  lone?: boolean;
 }
 
 /** 'exists': an ifAbsent default was skipped because a score is already there. */

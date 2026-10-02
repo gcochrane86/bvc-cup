@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGame, computeGameState, eventKindFor, gameFor, gameResult, gamesToSet, projectedTeamPoints, seasonDayCheck, sixPoints, teamPoints, winnerIds } from './individual';
+import { buildGame, computeGameState, eventKindFor, gameFor, gameResult, gamesToSet, projectedTeamPoints, seasonDayCheck, sixPoints, teamPoints, winnerIds, wolfHole, wolfTeeOrder } from './individual';
 import { indexScores } from './matchState';
 import type { HoleInfo, RoundSettings, ScoreEntry } from './types';
 
@@ -296,3 +296,81 @@ describe('match play over fewer holes', () => {
     expect(st.dormie).toBe(true);
   });
 });
+
+describe('wolf', () => {
+  // Group saved as Adams, Brown, Clark; handicaps 10, 10, 6.
+  const ppl = [
+    { slot: 'P1' as const, playerId: 'a', handicap: 10, name: 'Alex Adams' },
+    { slot: 'P2' as const, playerId: 'b', handicap: 10, name: 'Ben Brown' },
+    { slot: 'P3' as const, playerId: 'c', handicap: 6, name: 'Chris Clark' },
+  ];
+  const flat = { ...base, threeGame: 'wolf_flat' as const };
+  const stab = { ...base, threeGame: 'wolf_stableford' as const };
+  /** One hole: gross per player and who played on their own. */
+  const hole = (n: number, gross: Record<string, number>, lone?: string): ScoreEntry[] =>
+    Object.entries(gross).map(([playerId, g]) => ({ playerId, hole: n, gross: g, pickedUp: false, lone: playerId === lone }));
+
+  it('tees off lowest handicap first (equal handicaps in name order), then rotates each hole', () => {
+    const def = buildGame('g', ppl, flat)!;
+    expect(def.players).toEqual(['c', 'a', 'b']);
+    expect(def.sideA).toEqual(['c', 'a', 'b']);
+    expect(wolfTeeOrder(def, holes, 1)).toEqual(['c', 'a', 'b']); // Adams is the wolf (second off)
+    expect(wolfTeeOrder(def, holes, 2)).toEqual(['a', 'b', 'c']);
+    expect(wolfTeeOrder(def, holes, 3)).toEqual(['b', 'c', 'a']);
+    expect(wolfTeeOrder(def, holes, 4)).toEqual(['c', 'a', 'b']);
+    // A day playing only some holes rotates through the holes it plays: 1–9, 14, 18 → the 14th is the 10th hole.
+    const some = holes.filter((h) => h.hole <= 9 || h.hole === 14 || h.hole === 18);
+    expect(wolfTeeOrder(def, some, 14)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('shots: scratch none; Stableford full handicaps, or off the low', () => {
+    expect(buildGame('g', ppl, flat)!.strokes).toEqual({ a: 0, b: 0, c: 0 });
+    expect(buildGame('g', ppl, stab)!.strokes).toEqual({ a: 10, b: 10, c: 6 });
+    expect(buildGame('g', ppl, stab)!.stableford).toBe(true);
+    expect(buildGame('g', ppl, { ...stab, wolfOffLow: true, stablefordPct: 90 })!.strokes).toEqual({ a: 4, b: 4, c: 0 }); // 4 × 0.9 = 3.6 → 4
+  });
+
+  it('a lone winner gets 2, a winning pair 1 each, a tie nothing; a hole counts once someone is marked as on their own', () => {
+    const def = buildGame('g', ppl, flat)!;
+    const idx = indexScores([
+      ...hole(1, { c: 4, a: 3, b: 5 }, 'a'), // Adams (wolf) solo, 3 v 4: Adams +2
+      ...hole(2, { a: 5, b: 4, c: 4 }, 'c'), // Brown partners Adams, Clark alone, 4 v 4: tie
+      ...hole(3, { b: 4, c: 5, a: 4 }, 'c'), // Clark (wolf) solo, 5 v 4: Adams & Brown +1 each
+      ...hole(4, { c: 4, a: 4, b: 4 }), // scored, but nobody marked yet: not counted
+    ]);
+    const st = computeGameState(def, holes, idx);
+    expect(st.totals).toEqual({ c: 0, a: 3, b: 1 });
+    expect(st.thru).toBe(3);
+    expect(st.statusText).toBe('0 · 3 · 1');
+    expect(st.wolves).toEqual({ c: 1, a: 1, b: 1 }); // holes counted as wolf: Adams (1), Brown (2), Clark (3)
+    expect(wolfHole(def, holes[0], idx)).toEqual({ lone: 'a', winners: ['a'], points: { c: 0, a: 2, b: 0 } });
+    expect(wolfHole(def, holes[1], idx)).toEqual({ lone: 'c', winners: [], points: { c: 0, a: 0, b: 0 } });
+    expect(wolfHole(def, holes[2], idx)).toEqual({ lone: 'c', winners: ['a', 'b'], points: { c: 0, a: 1, b: 1 } });
+    expect(wolfHole(def, holes[3], idx)).toBeNull();
+    // Asking "what if": the pop-up can try a player before it's saved.
+    expect(wolfHole(def, holes[3], idx, 'b')).toEqual({ lone: 'b', winners: [], points: { c: 0, a: 0, b: 0 } });
+  });
+
+  it('Stableford wolf: most points wins the hole (a pick-up scores 0)', () => {
+    const def = buildGame('g', ppl, stab)!;
+    // Hole 1 (SI 1): everyone gets a shot. Clark 3 → net 2 = 4 pts; Adams 4 → 3 pts; Brown picks up → 0.
+    const idx = indexScores([
+      { playerId: 'c', hole: 1, gross: 3, pickedUp: false, lone: true },
+      { playerId: 'a', hole: 1, gross: 4, pickedUp: false },
+      { playerId: 'b', hole: 1, gross: null, pickedUp: true },
+    ]);
+    expect(wolfHole(def, holes[0], idx)).toEqual({ lone: 'c', winners: ['c'], points: { c: 2, a: 0, b: 0 } });
+  });
+
+  it('decided after the last hole: the most points wins', () => {
+    const def = buildGame('g', ppl, flat)!;
+    const three = holes.slice(0, 3);
+    const idx = indexScores([...hole(1, { c: 4, a: 3, b: 5 }, 'a'), ...hole(2, { a: 5, b: 4, c: 4 }, 'c'), ...hole(3, { b: 4, c: 5, a: 4 }, 'c')]);
+    const st = computeGameState(def, three, idx);
+    expect(st.decided).toBe(true);
+    expect(st.winner).toBe('P2'); // Adams, second in the tee order
+    expect(winnerIds(def, st.winner!)).toEqual(['a']);
+    expect(gameResult(def, st)!.playerPoints!.a.points).toBe(3);
+  });
+});
+

@@ -53,6 +53,7 @@ async function send(p: PendingScore): Promise<SendResult> {
       p_picked_up: p.pickedUp,
       p_client_updated_at: p.clientUpdatedAt,
       p_if_absent: p.ifAbsent ?? false,
+      ...(p.lone !== undefined ? { p_lone: p.lone } : {}),
     }),
   ) as Promise<SendResult>;
 }
