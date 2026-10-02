@@ -90,7 +90,7 @@
     <button class="wide secondary" disabled={busy} onclick={unlock}>Unlock result</button>
   {/if}
   <h3>Match summary</h3>
-  <HoleGrid state={mv.state} editHref={mv.result ? null : (h) => `#/score/${groupId}/${h}`} />
+  <HoleGrid state={mv.state} editHref={mv.result ? null : (h) => `#/score/${groupId}/${h}`} played={found.round.holes.map((h) => h.hole)} />
   <h3>Scorecard</h3>
   <Scorecard def={mv.def} holes={found.round.holes} scores={found.group.scores} teamOf={view.teamOf} playingHcp={found.group.playingHcp} />
   <p class="muted small">• = shot received on that hole in this match. P = picked up.</p>

@@ -255,4 +255,18 @@ test('a day can play only some holes (winter: 1–9, 14 and 18); score entry ski
   await page.getByRole('button', { name: 'Hole 9', exact: true }).click();
   await page.getByRole('button', { name: 'Save hole 9' }).click();
   await expect(page.getByRole('heading', { name: 'Hole 14', exact: true })).toBeVisible();
+
+  // A link to a hole that isn't played lands on the next one that is; the match page doesn't link skipped holes.
+  await page.goto(`/#/score/${twoBall}/12`);
+  await expect(page.getByRole('heading', { name: 'Hole 14', exact: true })).toBeVisible();
+  await page.goto(`/#/match/${twoBall}/individual`);
+  await expect(page.getByRole('link', { name: 'Edit hole 9 scores' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Edit hole 12 scores' })).toHaveCount(0);
+
+  // Choosing holes needs at least one.
+  await page.goto(`/#/admin/events/${eventId}`);
+  await unfoldEvent(page);
+  for (const h of [1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 18]) await day1.getByLabel(`Play hole ${h}`, { exact: true }).uncheck();
+  await expect(day1.getByText('Pick at least one hole')).toBeVisible();
+  await expect(day1.getByRole('button', { name: 'Save round' })).toBeDisabled();
 });

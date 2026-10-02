@@ -10,13 +10,19 @@
     onPick = null,
     selected = null,
     holeClass = () => '',
+    played = null,
   }: {
     state: MatchState;
     editHref?: ((hole: number) => string) | null;
     onPick?: ((hole: number) => void) | null;
     selected?: number | null;
     holeClass?: (hole: number) => string;
+    /** The holes played that day (null = all 18): the others are greyed and can't be opened. */
+    played?: number[] | null;
   } = $props();
+  const isPlayed = (h: number) => !played || played.includes(h);
+  /** The next hole to play: the first played hole after the last one scored. */
+  const nextHole = $derived((played ?? Array.from({ length: 18 }, (_, i) => i + 1)).find((h) => h > state.thru) ?? null);
   const nines = [[1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 11, 12, 13, 14, 15, 16, 17, 18]];
   const winnerColour = (o: Outcome) => (o === 'A' ? 'var(--team-a)' : o === 'B' ? 'var(--team-b)' : '#8a948f');
   const chip = (lead: number | null) => (lead === null ? '–' : lead === 0 ? 'AS' : `${Math.abs(lead)}UP`);
@@ -28,15 +34,17 @@
       {#each nine as h (h)}
         {@const o = state.holeWinners[h - 1]}
         {@const lead = state.running[h - 1]}
+        {@const open = isPlayed(h)}
         <svelte:element
-          this={onPick ? 'button' : editHref ? 'a' : 'div'}
+          this={open && onPick ? 'button' : open && editHref ? 'a' : 'div'}
           class="cell {onPick ? holeClass(h) : ''}"
-          class:current={onPick ? h === selected : !state.decided && h === state.thru + 1}
-          class:link={!!editHref || !!onPick}
-          href={editHref && !onPick ? editHref(h) : undefined}
-          aria-label={onPick ? `Hole ${h}` : editHref ? `Edit hole ${h} scores` : undefined}
-          onclick={onPick ? () => onPick(h) : undefined}
-          role={onPick ? 'button' : undefined}
+          class:skipped={!open}
+          class:current={onPick ? h === selected : !state.decided && h === nextHole}
+          class:link={open && (!!editHref || !!onPick)}
+          href={open && editHref && !onPick ? editHref(h) : undefined}
+          aria-label={open && onPick ? `Hole ${h}` : open && editHref ? `Edit hole ${h} scores` : undefined}
+          onclick={open && onPick ? () => onPick(h) : undefined}
+          role={open && onPick ? 'button' : undefined}
         >
           <span class="num" style={o ? `background:${winnerColour(o)};color:#fff;border-color:transparent` : ''}>{h}</span>
           <span class="chip" style={lead ? `background:${lead > 0 ? 'var(--team-a)' : 'var(--team-b)'};color:#fff` : ''}>{chip(lead)}</span>

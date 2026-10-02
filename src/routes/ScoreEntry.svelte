@@ -54,7 +54,13 @@
 
   // Opened from a hole on the match summary: start there. (App keys this page by group and hole.)
   let pickedHole = $state<number | null>(untrack(() => startHole));
-  const hole = $derived(found ? (pickedHole ?? firstIncompleteHole(found.group, found.round.holes)) : 1);
+  // A hole not played today (e.g. from an old link) moves on to the next one that is.
+  const hole = $derived.by(() => {
+    if (!found) return 1;
+    if (pickedHole === null) return firstIncompleteHole(found.group, found.round.holes);
+    if (found.round.holes.some((h) => h.hole === pickedHole)) return pickedHole;
+    return found.round.holes.find((h) => h.hole > pickedHole!)?.hole ?? firstIncompleteHole(found.group, found.round.holes);
+  });
   const info = $derived(found?.round.holes.find((h) => h.hole === hole) ?? null);
 
   // edited: changed on this phone (always sent). hasScore: a saved score exists for this cell.
@@ -237,7 +243,7 @@
   <!-- Like the match summary: who won each hole and the running score (the fourball's), tap to pick a hole. -->
   {@const summary = found.group.matches.find((m) => m.def.type === 'better_ball' || m.def.type === 'individual') ?? found.group.matches[0]}
   {#if summary}
-    <HoleGrid state={summary.state} onPick={(h) => { if (found.round.holes.some((x) => x.hole === h)) pickedHole = h; }} selected={hole} holeClass={holeState} />
+    <HoleGrid state={summary.state} onPick={(h) => (pickedHole = h)} selected={hole} holeClass={holeState} played={found.round.holes.map((h) => h.hole)} />
   {/if}
 
   <div class="statuses">

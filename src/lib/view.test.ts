@@ -473,3 +473,11 @@ describe('a day playing only some holes', () => {
     expect(v.rounds[0].groups[0].playingHcp.a1).toBe(10);
   });
 });
+
+describe('holes played: repeated holes', () => {
+  it('count each hole once when scaling handicaps', () => {
+    const v = buildEventView(snapshot({ rounds: [{ ...baseRound, holes: [1, 1, 2, 3, 4, 5, 6, 7, 8, 9] }] }))!;
+    expect(v.rounds[0].holes).toHaveLength(9);
+    expect(v.rounds[0].groups[0].playingHcp.a1).toBe(5); // 10 × 9/18
+  });
+});

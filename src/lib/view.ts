@@ -100,7 +100,7 @@ export function buildEventView(s: Snapshot): EventView | null {
         );
       const holesOf18 = (courseId: string) => s.courseHoles.filter((h) => h.course_id === courseId);
       // A day playing only some holes scales handicaps to them (e.g. half over 9).
-      const holesPlayed = round.holes?.length ? Math.min(18, round.holes.length) : 18;
+      const holesPlayed = round.holes?.length ? Math.min(18, new Set(round.holes).size) : 18;
       const holes = holesOf(round.course_id);
       const course = s.courses.find((c) => c.id === round.course_id);
       const scores = indexScores(

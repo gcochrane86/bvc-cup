@@ -592,6 +592,7 @@
               {/each}
             </div>
           {/if}
+          {#if holesMode(r) === 'custom' && !r.holes?.length}<p class="error small">Pick at least one hole.</p>{/if}
           {#if r.holes?.length && r.holes.length < 18}<p class="muted small"><span data-testid="holes-count">{r.holes.length} holes</span> · handicaps scale to {r.holes.length}/18.</p>{/if}
         </fieldset>
         {#if guideFor(r)}
@@ -689,7 +690,7 @@
           </div>
         {/if}
         {/if}
-        <button onclick={() => saveRound(r)}>Save round</button>
+        <button disabled={holesMode(r) === 'custom' && !r.holes?.length} onclick={() => saveRound(r)}>Save round</button>
         <!-- Pairings: who plays with whom in each fourball (scores and the leaderboard need them). -->
         <div class="pairing">
           {#if !seasonGameDay(r)}<a class="pairbtn" href="#/admin/pairings/{r.id}">{individual ? 'Set groups →' : 'Set pairings →'}</a>{/if}
