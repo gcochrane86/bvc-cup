@@ -31,6 +31,7 @@
     season,
     players,
     seasonPlayers,
+    unsaved = 0,
     sameGolfers,
     sameLabel,
     teamName,
@@ -46,6 +47,8 @@
     /** Normal events: how many players the event has (2 or 3 → one individual group; 4+ → fourballs). */
     players: number;
     seasonPlayers: { id: string; name: string; short: string; team: Team }[];
+    /** Season events: players ticked on Who's playing whose teams aren't saved yet (not offered for a day). */
+    unsaved?: number;
     sameGolfers: string[];
     sameLabel: string;
     teamName: (t: Team) => string;
@@ -176,14 +179,17 @@
     {#if season}
       <div class="step">
         <span class="lbl">Golfers</span>
-        <div class="seg">
-          <label class:on={golferMode === 'same'}><input type="radio" name="nr-golfers" checked={golferMode === 'same'} onchange={() => (golferMode = 'same')} />{sameLabel}</label>
-          <label class:on={golferMode === 'different'}><input type="radio" name="nr-golfers" checked={golferMode === 'different'} onchange={() => ((golferMode = 'different'), (newGolfers = [...sameGolfers]))} />Different golfers</label>
-        </div>
-        {#if golferMode === 'different'}
-          <SeasonGolfers players={seasonPlayers} {teamName} bind:selected={newGolfers} />
-        {:else}
-          <SeasonGolfers players={seasonPlayers} {teamName} selected={sameGolfers} picking={false} />
+        {#if unsaved}<p class="note small">{unsaved} {unsaved === 1 ? 'player' : 'players'} picked but not saved yet — tap Save teams above to include them.</p>{/if}
+        {#if seasonPlayers.length}
+          <div class="seg">
+            <label class:on={golferMode === 'same'}><input type="radio" name="nr-golfers" checked={golferMode === 'same'} onchange={() => (golferMode = 'same')} />{sameLabel}</label>
+            <label class:on={golferMode === 'different'}><input type="radio" name="nr-golfers" checked={golferMode === 'different'} onchange={() => ((golferMode = 'different'), (newGolfers = [...sameGolfers]))} />Different golfers</label>
+          </div>
+          {#if golferMode === 'different'}
+            <SeasonGolfers players={seasonPlayers} {teamName} bind:selected={newGolfers} />
+          {:else}
+            <SeasonGolfers players={seasonPlayers} {teamName} selected={sameGolfers} picking={false} />
+          {/if}
         {/if}
       </div>
     {/if}
@@ -191,7 +197,7 @@
     <div class="step">
       <span class="lbl">Game</span>
       {#if !size}
-        <p class="muted small">{season ? 'Pick golfers first.' : 'Pick the players (Players above) to choose the game — or add the day now and set it later.'}</p>
+        <p class="muted small">{season ? (seasonPlayers.length ? 'Pick golfers first.' : 'Save the teams first.') : 'Pick the players (Players above) to choose the game — or add the day now and set it later.'}</p>
       {:else}
         <div class="games" role="radiogroup" aria-label="Game">
           {#each options as g (g.key)}
@@ -263,4 +269,5 @@
   .setting { margin: 4px 0 6px; }
   .actions { display: flex; gap: 8px; margin-top: 10px; }
   .actions button[type='submit'] { flex: 1; }
+  .note { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: var(--bg); color: var(--ink, inherit); }
 </style>

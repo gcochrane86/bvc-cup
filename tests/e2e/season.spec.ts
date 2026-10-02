@@ -137,6 +137,7 @@ test('a confirmed 2 v 1 adds its points to the single\'s team; a player added la
   await admin.locator('form.round').getByLabel('Course').selectOption('Seed Links');
   await admin.locator('form.round').getByLabel('Different golfers').check();
   await expect(admin.locator('form.round').getByLabel('Ed Evans golfer')).toHaveCount(0);
+  await expect(admin.locator('form.round').getByText('1 player picked but not saved yet — tap Save teams above to include them.')).toBeVisible();
   await admin.locator('form.round').getByRole('button', { name: 'Cancel' }).click();
   await admin.getByRole('button', { name: 'Next: pick teams (5)' }).click();
   await admin.getByRole('button', { name: 'Ed Evans: Blue' }).click();

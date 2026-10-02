@@ -692,6 +692,7 @@
         {season}
         players={savedPlayers.length}
         {seasonPlayers}
+        unsaved={season ? playingIds.filter((id) => !seasonPlayers.some((p) => p.id === id)).length : 0}
         {sameGolfers}
         sameLabel={lastRound ? `Same as ${lastRound.name}` : `Everyone (${seasonPlayers.length})`}
         {teamName}
