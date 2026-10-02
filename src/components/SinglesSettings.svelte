@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   // Singles in each fourball: one switch, and when on, points, allowance and who plays who right here.
   // Used by a day's settings and the Add round form.
   type Pairing = 'handicap' | 'random' | 'selected';
@@ -9,6 +10,7 @@
     allowance = $bindable(90),
     pairing = $bindable<Pairing>('handicap'),
     fixedPoints = null,
+    choose,
   }: {
     /** Unique per form, for the inputs' ids. */
     id: string;
@@ -18,12 +20,14 @@
     pairing?: Pairing;
     /** Season events: singles are worth the event's points, so they're shown, not edited. */
     fixedPoints?: number | null;
+    /** Shown under "I'll choose": each fourball's line-ups (a day's settings). Without it, a hint says where to choose. */
+    choose?: Snippet;
   } = $props();
 
   const CHOICES: { value: Pairing; label: string; hint: string }[] = [
     { value: 'handicap', label: 'By handicap', hint: 'Low v low, high v high. Set automatically.' },
     { value: 'random', label: 'Random draw', hint: 'Drawn for each fourball when the pairings are saved.' },
-    { value: 'selected', label: "I'll choose", hint: 'You pick them on the pairings page after saving.' },
+    { value: 'selected', label: "I'll choose", hint: "Pick each fourball's singles in the day's settings once it's paired." },
   ];
   const worth = $derived(fixedPoints ?? Number(points));
 </script>
@@ -46,7 +50,11 @@
         <label class="chip" class:on={pairing === c.value}><input type="radio" name="{id}-pairing" value={c.value} bind:group={pairing} />{c.label}</label>
       {/each}
     </div>
-    <p class="hint">{CHOICES.find((c) => c.value === pairing)?.hint}</p>
+    {#if pairing === 'selected' && choose}
+      {@render choose()}
+    {:else}
+      <p class="hint">{CHOICES.find((c) => c.value === pairing)?.hint}</p>
+    {/if}
   {/if}
 </div>
 

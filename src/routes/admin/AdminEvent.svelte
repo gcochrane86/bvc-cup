@@ -6,6 +6,7 @@
   import { favouritesFirst } from '../../lib/favourites';
   import { setFavourite } from '../../lib/data/favourites';
   import SinglesSettings from '../../components/SinglesSettings.svelte';
+  import { singlesLineup } from '../../lib/singles';
   import { must, supabase } from '../../lib/supabase';
   import type { EventPlayerRow, EventRow, RoundRow, RoundTeeRow } from '../../lib/data/types';
   import { courseGroups, teesOf } from '../../lib/courses';
@@ -43,6 +44,10 @@
   let nudge = $state<RoundRow | null>(null);
   /** `${roundId}:${playerId}` for players whose match that day is confirmed (their tee is locked). */
   let locked = $state<Set<string>>(new Set());
+  /** Each day's full fourballs (A1 A2 v B1 B2): their singles line-up, and locked once a singles is confirmed. */
+  type Fourball = { groupNo: number; a: string[]; b: string[]; crossed: boolean; locked: boolean };
+  let dayFourballs = $state<Record<string, Fourball[]>>({});
+  const shortName = (id: string) => db.players.find((p) => p.id === id)?.short_name ?? '?';
   /** Rounds show as one-line tiles; these are the ones opened for editing (kept open across saves). */
   let openRounds = $state<Record<string, boolean>>({});
   let openGolfers = $state<Record<string, boolean>>({});
@@ -79,8 +84,16 @@
     if (ids.length) {
       const [tees, gs, rps] = await Promise.all([
         must(supabase.from('round_tees').select('*').in('round_id', ids)) as Promise<RoundTeeRow[]>,
-        must(supabase.from('groups').select('round_id, group_players(player_id), match_results(match_type)').in('round_id', ids)) as Promise<
-          { round_id: string; group_players: { player_id: string }[]; match_results: unknown[] }[]
+        must(
+          supabase.from('groups').select('round_id, group_no, singles_crossed, group_players(player_id, slot), match_results(match_type)').in('round_id', ids),
+        ) as Promise<
+          {
+            round_id: string;
+            group_no: number;
+            singles_crossed: boolean;
+            group_players: { player_id: string; slot: string }[];
+            match_results: { match_type: string }[];
+          }[]
         >,
         must(supabase.from('round_players').select('round_id, player_id').in('round_id', ids)) as Promise<{ round_id: string; player_id: string }[]>,
       ]);
@@ -91,6 +104,24 @@
       const fullFor = (id: string) => (ev.kind === 'individual' || (ev.season && (roundGolfers[id]?.length ?? 4) <= 3) ? 2 : 4);
       paired = Object.fromEntries(ids.map((id) => [id, gs.filter((g) => g.round_id === id && g.group_players.length >= fullFor(id)).length]));
       groupSizes = Object.fromEntries(ids.map((id) => [id, gs.filter((g) => g.round_id === id && g.group_players.length >= 2).map((g) => g.group_players.length)]));
+      dayFourballs = Object.fromEntries(
+        ids.map((id) => [
+          id,
+          gs
+            .filter((g) => g.round_id === id && ['A1', 'A2', 'B1', 'B2'].every((sl) => g.group_players.some((p) => p.slot === sl)))
+            .sort((x, y) => x.group_no - y.group_no)
+            .map((g) => {
+              const at = (sl: string) => g.group_players.find((p) => p.slot === sl)!.player_id;
+              return {
+                groupNo: g.group_no,
+                a: [at('A1'), at('A2')],
+                b: [at('B1'), at('B2')],
+                crossed: g.singles_crossed,
+                locked: g.match_results.some((m) => m.match_type !== 'better_ball'),
+              };
+            }),
+        ]),
+      );
       locked = new Set(gs.filter((g) => g.match_results.length).flatMap((g) => g.group_players.map((gp) => `${g.round_id}:${gp.player_id}`)));
     }
     members = Object.fromEntries(
@@ -431,6 +462,10 @@
           await must(supabase.from('round_tees').delete().eq('round_id', r.id).not('course_id', 'in', `(${tees.join(',')})`));
           // By handicap means the straight line-up for every group (random/chosen are set on the pairings page).
           if (r.singles_pairing === 'handicap') await must(supabase.from('groups').update({ singles_crossed: false }).eq('round_id', r.id));
+          // Chosen here: each fourball's line-up (confirmed singles keep theirs).
+          if (r.singles_enabled && r.singles_pairing === 'selected')
+            for (const fb of dayFourballs[r.id] ?? [])
+              if (!fb.locked) await must(supabase.from('groups').update({ singles_crossed: fb.crossed }).eq('round_id', r.id).eq('group_no', fb.groupNo));
         }),
       `${r.name} saved`,
       `round:${r.id}`,
@@ -707,7 +742,28 @@
             bind:allowance={r.singles_allowance_pct}
             bind:pairing={r.singles_pairing}
             fixedPoints={season ? event.points.singles.win : null}
-          />
+          >
+            {#snippet choose()}
+              {#each dayFourballs[r.id] ?? [] as fb (fb.groupNo)}
+                {@const text = (crossed: boolean) => singlesLineup(fb, crossed).map(([a, b]) => `${shortName(a)} v ${shortName(b)}`).join(' · ')}
+                <div class="fb">
+                  <span class="fbt"><b>Fourball {fb.groupNo}</b> · {shortName(fb.a[0])} &amp; {shortName(fb.a[1])} v {shortName(fb.b[0])} &amp; {shortName(fb.b[1])}</span>
+                  {#if fb.locked}
+                    <span class="muted small">🔒 {text(fb.crossed)} (a singles is confirmed, so this can't change)</span>
+                  {:else}
+                    {#each [false, true] as crossed (crossed)}
+                      <label class="lineup" class:on={fb.crossed === crossed}>
+                        <input type="radio" name="lu-{r.id}-{fb.groupNo}" aria-label="Fourball {fb.groupNo}: {text(crossed)}" checked={fb.crossed === crossed} onchange={() => (fb.crossed = crossed)} />
+                        {text(crossed)}
+                      </label>
+                    {/each}
+                  {/if}
+                </div>
+              {:else}
+                <p class="muted small">Pair the fourballs first, then choose the singles here. <a href="#/admin/pairings/{r.id}">Set pairings →</a></p>
+              {/each}
+            {/snippet}
+          </SinglesSettings>
         {/if}
         {/if}
         <button disabled={holesMode(r) === 'custom' && !r.holes?.length} onclick={() => saveRound(r)}>Save round</button>
@@ -721,7 +777,7 @@
         <!-- Saved and folded: the next step (pairings) stays one tap away. -->
         <p class="saved" class:error={msg.startsWith('Error')} data-testid="saved-next">
           <span>{msg}</span>
-          {#if !msg.startsWith('Error') && !seasonGameDay(r) && (!pairingStatus(r).endsWith('✓') || (r.singles_enabled && r.singles_pairing === 'selected'))}
+          {#if !msg.startsWith('Error') && !seasonGameDay(r) && !pairingStatus(r).endsWith('✓')}
             <a class="nextbtn" href="#/admin/pairings/{r.id}">{individual ? 'Set groups →' : 'Set pairings →'}</a>
           {/if}
         </p>
@@ -797,6 +853,12 @@
   .empty { padding: 10px 12px; margin: 0; }
   .wide.top { margin: 0 0 8px; }
   .saved { margin: 6px 2px 12px; font-weight: 600; color: var(--ok, #155d27); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fb { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 8px; display: grid; gap: 6px; }
+  .fbt { font-size: 0.8rem; color: var(--muted); }
+  .fbt b { color: var(--text); }
+  .lineup { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; cursor: pointer; font-size: 0.9rem; }
+  .lineup.on { border-color: var(--accent); background: #eef5f0; font-weight: 600; }
+  .lineup input { margin: 0; accent-color: var(--accent); }
   .nextbtn { border: 1px solid var(--accent); border-radius: 8px; padding: 5px 10px; color: var(--accent); text-decoration: none; font-weight: 700; }
   .saved.error { color: var(--danger, #b00020); }
   .pick:last-child { border-bottom: 0; }

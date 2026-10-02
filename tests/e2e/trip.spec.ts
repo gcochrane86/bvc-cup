@@ -358,20 +358,18 @@ test('the admin can choose the singles line-up and it shows on the leaderboard',
   await admin.getByTestId('swipe-row').first().getByRole('link').click();
   await unfoldEvent(admin);
   const day3 = admin.locator('.round').nth(2);
-  // Singles are on for day 3: who plays who is a chip, with what happens next.
+  // Singles are on for day 3: "I'll choose" lists each fourball's two line-ups right here.
   await expect(day3.getByRole('switch', { name: 'Play singles' })).toBeChecked();
   await day3.getByLabel("I'll choose").check();
-  await expect(day3.getByText('You pick them on the pairings page after saving.')).toBeVisible();
+  // Seed group 1: Adams/Brown v Green/Hill. Swap: Adams v Hill, Brown v Green.
+  await expect(day3.getByLabel('Fourball 1: Adams v Green · Brown v Hill')).toBeChecked();
+  await day3.getByLabel('Fourball 1: Adams v Hill · Brown v Green').check();
   await day3.getByRole('button', { name: 'Save round' }).click();
-  // The day folds; Set pairings sits by "Day 3 saved", no reopening.
+  // Saved and folded; the day is paired, so there's nothing to do on the pairings page.
   const saved = admin.getByTestId('saved-next');
   await expect(saved).toContainText('Day 3 saved');
+  await expect(saved.getByRole('link')).toHaveCount(0);
   await expect(day3.getByRole('button', { name: 'Save round' })).toBeHidden();
-  await saved.getByRole('link', { name: 'Set pairings →' }).click();
-  // Seed group 1: Adams/Brown v Green/Hill. Swap: Adams v Hill, Brown v Green.
-  await admin.getByTestId('singles-1').getByLabel(/Singles 1: Adams v Hill/).check();
-  await admin.getByRole('button', { name: 'Save pairings' }).click();
-  await expect(admin.getByText('Pairings saved')).toBeVisible();
 
   const trip = await newPhone(browser);
   await login(trip);
