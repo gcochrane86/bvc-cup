@@ -2,11 +2,12 @@
 import { must, supabase } from './supabase';
 import type { GuidePhotoRow } from './data/types';
 import { sourceRect, turnedSize, type Box } from './crop';
+import { GUIDE_QUALITY, guideScale } from './imageSize';
 
-/** Shrink to at most 1600px on the long side and re-encode as JPEG (fixes phone EXIF rotation; ~150–400 KB). */
-export async function resizeForGuide(file: Blob, max = 1600): Promise<Blob> {
+/** Shrink (see guideScale: tall pages keep their width) and re-encode as JPEG (fixes phone EXIF rotation). */
+export async function resizeForGuide(file: Blob): Promise<Blob> {
   const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const scale = guideScale(bmp.width, bmp.height);
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(bmp.width * scale);
   canvas.height = Math.round(bmp.height * scale);
@@ -15,17 +16,17 @@ export async function resizeForGuide(file: Blob, max = 1600): Promise<Blob> {
   ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
   bmp.close();
   return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode photo'))), 'image/jpeg', 0.82),
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode photo'))), 'image/jpeg', GUIDE_QUALITY),
   );
 }
 
-/** Turn a photo by quarter turns, keep just the frame, shrink to at most 1600px and re-encode as JPEG. */
-export async function cropForGuide(file: Blob, box: Box, turns: number, max = 1600): Promise<Blob> {
+/** Turn a photo by quarter turns, keep just the frame, shrink (guideScale) and re-encode as JPEG. */
+export async function cropForGuide(file: Blob, box: Box, turns: number): Promise<Blob> {
   const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
   const turned = turnCanvas(bmp, turns);
   bmp.close();
   const { sx, sy, sw, sh } = sourceRect(box, turned.width, turned.height);
-  const scale = Math.min(1, max / Math.max(sw, sh));
+  const scale = guideScale(sw, sh);
   const out = document.createElement('canvas');
   out.width = Math.max(1, Math.round(sw * scale));
   out.height = Math.max(1, Math.round(sh * scale));
@@ -33,7 +34,7 @@ export async function cropForGuide(file: Blob, box: Box, turns: number, max = 16
   if (!ctx) throw new Error('Canvas not supported');
   ctx.drawImage(turned, sx, sy, sw, sh, 0, 0, out.width, out.height);
   return new Promise((resolve, reject) =>
-    out.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode photo'))), 'image/jpeg', 0.82),
+    out.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode photo'))), 'image/jpeg', GUIDE_QUALITY),
   );
 }
 

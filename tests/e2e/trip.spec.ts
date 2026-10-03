@@ -1443,3 +1443,29 @@ test('a scanned guide as one PDF: pages are matched to holes (a cover skipped) a
   await expect(page.getByRole('img', { name: 'Hole 2 photo 1' })).toBeVisible();
   await expect.poll(async () => (await db.from('guide_photos').select('hole').eq('course_name', 'Seed Links')).data?.map((r) => r.hole).sort()).toEqual([1, 2]);
 });
+
+test("a scanned guide page keeps the scan's detail: a tall strokesaver page stays readable (full width, not shrunk to 1600 tall)", async ({ page }) => {
+  await loginAdmin(page);
+  const db = serviceDb();
+  const { data: course } = await db.from('courses').select('id').eq('name', 'Seed Links').limit(1).single();
+  await page.goto(`/#/admin/guide/${course!.id}`);
+  await page.getByLabel('Upload a scanned guide (PDF)').setInputFiles('tests/fixtures/guide-tall-scan.pdf'); // one 1000 × 3600 scan
+  const match = page.getByRole('dialog', { name: 'Match pages to holes' });
+  await match.getByRole('button', { name: 'Upload 1 page' }).click();
+  await expect(match).toBeHidden({ timeout: 30_000 });
+  const { data: row } = await db.from('guide_photos').select('path').eq('course_name', 'Seed Links').eq('hole', 1).single();
+  const { data: blob } = await db.storage.from('course-guides').download(row!.path);
+  const size = jpegSize(Buffer.from(await blob!.arrayBuffer()));
+  expect(size).toEqual({ width: 1000, height: 3600 });
+});
+
+/** A JPEG's pixel size, from its frame header. */
+function jpegSize(b: Buffer): { width: number; height: number } {
+  for (let i = 2; i < b.length; ) {
+    const marker = b[i + 1];
+    const len = b.readUInt16BE(i + 2);
+    if (marker >= 0xc0 && marker <= 0xc3) return { height: b.readUInt16BE(i + 5), width: b.readUInt16BE(i + 7) };
+    i += 2 + len;
+  }
+  throw new Error('not a JPEG');
+}

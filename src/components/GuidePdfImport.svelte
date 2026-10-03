@@ -36,7 +36,7 @@
         const p = await openPdf(f);
         pdf = p;
         for (let i = 1; i <= p.pages; i++) {
-          const blob = await p.render(i, 160);
+          const blob = await p.thumb(i);
           thumbs = { ...thumbs, [i]: URL.createObjectURL(blob) };
         }
       } catch (e) {
@@ -56,7 +56,7 @@
     const p = pdf;
     uploading = { done: 0, total: count };
     try {
-      await onUpload(holes, replace, (page) => p.render(page, 1600), (done) => (uploading = { done, total: count }));
+      await onUpload(holes, replace, (page) => p.render(page), (done) => (uploading = { done, total: count }));
     } catch (e) {
       error = `Error: ${(e as Error).message}`;
       uploading = null;
