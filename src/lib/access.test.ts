@@ -11,7 +11,7 @@ describe('access list helpers', () => {
     expect(validEmail('not an email')).toBe(false);
   });
   it('groups people waiting first, newest first within each group', () => {
-    const m = (email: string, status: Member['status'], created_at: string): Member => ({ user_id: email, email, status, created_at, decided_at: null });
+    const m = (email: string, status: Member['status'], created_at: string): Member => ({ user_id: email, email, status, role: 'member', created_at, decided_at: null });
     const g = groupMembers([
       m('a@x.com', 'approved', '2026-09-01T00:00:00Z'),
       m('b@x.com', 'pending', '2026-09-02T00:00:00Z'),

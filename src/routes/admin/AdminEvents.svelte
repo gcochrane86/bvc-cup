@@ -3,6 +3,7 @@
   import { db, loadAll } from '../../lib/data/store.svelte';
   import type { EventRow } from '../../lib/data/types';
   import SwipeToDelete from '../../components/SwipeToDelete.svelte';
+  import { isAdmin } from '../../lib/auth.svelte';
 
   let events = $state<EventRow[]>([]);
   let rounds = $state<{ event_id: string; course_id: string }[]>([]);
@@ -93,15 +94,21 @@
 {#if error}<p class="error">{error}</p>{/if}
 {#if msg}<p>{msg}</p>{/if}
 {#each sorted as ev (ev.id)}
-  <SwipeToDelete label={ev.name} onDelete={() => remove(ev)}>
+  {#snippet tile()}
     <a class="tile" class:active={ev.is_active} href="#/admin/events/{ev.id}">
       <span class="name"><strong>{ev.name}</strong>{#if ev.is_active}<span class="pill">Active</span>{/if}</span>
       <span class="sub">{summary(ev)}</span>
       <span class="arrow" aria-hidden="true">›</span>
     </a>
-  </SwipeToDelete>
+  {/snippet}
+  <!-- Only the admin deletes events. -->
+  {#if isAdmin()}
+    <SwipeToDelete label={ev.name} onDelete={() => remove(ev)}>{@render tile()}</SwipeToDelete>
+  {:else}
+    {@render tile()}
+  {/if}
 {/each}
-{#if events.length}<p class="muted small hint">Swipe an event left to delete it.</p>{/if}
+{#if events.length && isAdmin()}<p class="muted small hint">Swipe an event left to delete it.</p>{/if}
 
 <style>
   .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }

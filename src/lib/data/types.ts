@@ -10,6 +10,8 @@ export interface RoundTeeRow { round_id: string; player_id: string; course_id: s
 export interface CourseHoleRow { course_id: string; hole: number; par: number; stroke_index: number }
 export interface EventRow {
   id: string; name: string;
+  /** Who created it (organisers may reset scores only on their own events); null for older events. */
+  created_by?: string | null;
   team_a_name: string; team_a_colour: string;
   team_b_name: string; team_b_colour: string;
   is_active: boolean;

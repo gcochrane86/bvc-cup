@@ -7,7 +7,8 @@ export const auth = $state<{
   ready: boolean;
   session: Session | null;
   access: 'unknown' | Member['status'] | 'none';
-}>({ ready: false, session: null, access: 'unknown' });
+  role: Member['role'];
+}>({ ready: false, session: null, access: 'unknown', role: 'member' });
 
 export async function initAuth() {
   const { data } = await supabase.auth.getSession();
@@ -25,14 +26,23 @@ export function isAdmin(): boolean {
   return auth.session?.user?.app_metadata?.role === 'admin';
 }
 
+/** The admin, or an approved organiser: runs events, players and courses (not Access or Games). */
+export function isOrganiser(): boolean {
+  return isAdmin() || (auth.access === 'approved' && auth.role === 'organiser');
+}
+
+/** Admin pages only the admin opens (the database enforces this too). */
+export const ADMIN_ONLY = ['admin-access', 'admin-games'];
+
 /** Look up whether the signed-in person has been let in (the database enforces this too). */
 export async function refreshAccess() {
   const uid = auth.session?.user?.id;
   if (!uid) return void (auth.access = 'unknown');
   if (isAdmin()) return void (auth.access = 'approved');
-  const { data, error } = await supabase.from('members').select('status').eq('user_id', uid).maybeSingle();
+  const { data, error } = await supabase.from('members').select('status, role').eq('user_id', uid).maybeSingle();
   if (error) return; // offline: keep what we knew
   auth.access = (data?.status as Member['status'] | undefined) ?? 'none';
+  auth.role = (data?.role as Member['role'] | undefined) ?? 'member';
 }
 
 const REMEMBER = 'golf.email';
@@ -77,5 +87,6 @@ export async function login(password: string, mode: 'trip' | 'admin', email = ''
 export async function logout() {
   await supabase.auth.signOut();
   auth.access = 'unknown';
+  auth.role = 'member';
   location.hash = '#/';
 }

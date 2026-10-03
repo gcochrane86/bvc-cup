@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
-import { ADMIN_ID, as, makeDb, PENDING_ID, seed, STRANGER_ID, TRIP_ID, type Seed, type Who } from './harness';
+import { ADMIN_ID, as, makeDb, ORGANISER_ID, PENDING_ID, seed, STRANGER_ID, TRIP_ID, type Seed, type Who } from './harness';
 
 let db: PGlite;
 let s: Seed;
@@ -122,7 +122,7 @@ describe('access list', () => {
 
   it('lets the admin see everyone, approve and remove', async () => {
     const all = await as(db, 'admin', () => db.query(`select email from public.members order by email`));
-    expect(all.rows).toEqual([{ email: 'me@example.com' }, { email: 'new@example.com' }]);
+    expect(all.rows).toEqual([{ email: 'me@example.com' }, { email: 'new@example.com' }, { email: 'org@example.com' }]);
     await as(db, 'admin', () => db.query(`update public.members set status = 'approved' where user_id = $1`, [PENDING_ID]));
     expect(await readPlayers('pending')).toBe(4);
     await as(db, 'admin', () => db.query(`update public.members set status = 'removed' where user_id = $1`, [PENDING_ID]));
@@ -497,7 +497,7 @@ describe('reset_event_scores', () => {
 
   it('refuses the trip user', async () => {
     await upsert('trip', s.players.a1, 1, 4);
-    await expect(as(db, 'trip', () => db.query(`select public.reset_event_scores($1::uuid)`, [s.eventId]))).rejects.toThrow(/admin only/);
+    await expect(as(db, 'trip', () => db.query(`select public.reset_event_scores($1::uuid)`, [s.eventId]))).rejects.toThrow(/creator or an admin/);
     expect(await readScore(s.players.a1, 1)).toEqual({ gross: 4, picked_up: false });
   });
 });
@@ -525,7 +525,7 @@ describe('reset_round_scores', () => {
 
   it('refuses the trip user', async () => {
     await upsert('trip', s.players.a1, 1, 4);
-    await expect(as(db, 'trip', () => db.query(`select public.reset_round_scores($1::uuid)`, [s.roundId]))).rejects.toThrow(/admin only/);
+    await expect(as(db, 'trip', () => db.query(`select public.reset_round_scores($1::uuid)`, [s.roundId]))).rejects.toThrow(/creator or an admin/);
     expect(await readScore(s.players.a1, 1)).toEqual({ gross: 4, picked_up: false });
   });
 });
@@ -560,7 +560,7 @@ describe('admin RPCs', () => {
   it('refuses save_course for the trip user', async () => {
     await expect(
       as(db, 'trip', () => db.query(`select public.save_course(null, 'X', $1::jsonb, null, null)`, [holes])),
-    ).rejects.toThrow(/admin only/);
+    ).rejects.toThrow(/organisers only/);
   });
 
   it('replaces a group’s players with save_group', async () => {
@@ -656,3 +656,85 @@ describe('guide photos', () => {
     await expect(add('admin', 19)).rejects.toThrow(/check constraint/);
   });
 });
+
+describe('organisers', () => {
+  let db: PGlite;
+  let s: Seed;
+  beforeEach(async () => {
+    db = await makeDb();
+    s = await seed(db);
+  });
+  const q = (who: Who, sql: string, params: unknown[] = []) => as(db, who, () => db.query<Record<string, unknown>>(sql, params));
+  const rls = /row-level security|permission denied|42501|only/;
+
+  it('run events: create one (as its creator), set it up, pair it and reopen results', async () => {
+    const ev = (await q('organiser', `insert into public.events(name) values ('Away Day') returning id, created_by`)).rows[0];
+    expect(ev.created_by).toBe(ORGANISER_ID);
+    await q('organiser', `update public.events set name = 'Away Day 2' where id = $1`, [s.eventId]);
+    const r = (await q('organiser', `insert into public.rounds(event_id, course_id, round_no, name) values ($1, $2, 1, 'Day 1') returning id`, [ev.id, s.courseId])).rows[0];
+    await q('organiser', `insert into public.event_players(event_id, player_id, team, handicap) values ($1, $2, 'A', 4)`, [ev.id, s.players.a1]);
+    await q('organiser', `insert into public.round_players(round_id, player_id) values ($1, $2)`, [r.id, s.players.a1]);
+    await q('organiser', `insert into public.round_tees(round_id, player_id, course_id) values ($1, $2, $3)`, [r.id, s.players.a1, s.courseId]);
+    await q('organiser', `select public.save_group($1::uuid, 1, null, $2::jsonb)`, [
+      s.roundId, JSON.stringify([['A1', 'a1'], ['A2', 'a2'], ['B1', 'b1'], ['B2', 'b2']].map(([slot, k]) => ({ slot, player_id: s.players[k as 'a1'] }))),
+    ]);
+    await db.query(`insert into public.match_results(group_id, match_type, winner, points_a, points_b, result_text, final_hole) values ($1, 'better_ball', 'A', 1, 0, '2&1', 17)`, [s.groupId]);
+    await q('organiser', `delete from public.match_results where group_id = $1`, [s.groupId]);
+    expect((await db.query(`select 1 from public.match_results`)).rows).toHaveLength(0);
+  });
+
+  it('add players and courses (and guide photos), but only the admin deletes players, courses and events', async () => {
+    const p = (await q('organiser', `insert into public.players(name, short_name) values ('New Guy', 'Guy') returning id`)).rows[0];
+    await q('organiser', `update public.players set default_handicap = 12 where id = $1`, [p.id]);
+    const c = (await q('organiser', `select public.save_course(null, 'Away Links', $1::jsonb, 113, 72) as id`, [
+      JSON.stringify(Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, stroke_index: i + 1 }))),
+    ])).rows[0];
+    await q('organiser', `insert into public.guide_photos(course_name, hole, path) values ('Away Links', 1, 'x/1.jpg')`);
+    await q('organiser', `delete from public.guide_photos where course_name = 'Away Links'`);
+    expect((await db.query(`select 1 from public.guide_photos`)).rows).toHaveLength(0);
+    // Deletes are the admin's: nothing goes.
+    await q('organiser', `delete from public.players where id = $1`, [p.id]);
+    await q('organiser', `delete from public.courses where id = $1`, [c.id]);
+    await q('organiser', `delete from public.events where id = $1`, [s.eventId]);
+    expect((await db.query(`select 1 from public.players where id = $1`, [p.id])).rows).toHaveLength(1);
+    expect((await db.query(`select 1 from public.courses where id = $1`, [c.id])).rows).toHaveLength(1);
+    expect((await db.query(`select 1 from public.events where id = $1`, [s.eventId])).rows).toHaveLength(1);
+    await q('admin', `delete from public.players where id = $1`, [p.id]);
+    expect((await db.query(`select 1 from public.players where id = $1`, [p.id])).rows).toHaveLength(0);
+  });
+
+  it("reset scores only on events they created (the admin: any event)", async () => {
+    const ev = (await q('organiser', `insert into public.events(name) values ('Mine') returning id`)).rows[0];
+    const r = (await q('organiser', `insert into public.rounds(event_id, course_id, round_no, name) values ($1, $2, 1, 'Day 1') returning id`, [ev.id, s.courseId])).rows[0];
+    await db.query(`insert into public.scores(round_id, player_id, hole, gross, client_updated_at) values ($1, $2, 1, 4, now()), ($3, $2, 1, 4, now())`, [r.id, s.players.a1, s.roundId]);
+    await q('organiser', `select public.reset_event_scores($1::uuid)`, [ev.id]);
+    expect((await db.query(`select 1 from public.scores where round_id = $1`, [r.id])).rows).toHaveLength(0);
+    // The seed event has no creator: not theirs.
+    await expect(q('organiser', `select public.reset_event_scores($1::uuid)`, [s.eventId])).rejects.toThrow(rls);
+    await expect(q('organiser', `select public.reset_round_scores($1::uuid)`, [s.roundId])).rejects.toThrow(rls);
+    expect((await db.query(`select 1 from public.scores where round_id = $1`, [s.roundId])).rows).toHaveLength(1);
+    await q('admin', `select public.reset_event_scores($1::uuid)`, [s.eventId]);
+    expect((await db.query(`select 1 from public.scores where round_id = $1`, [s.roundId])).rows).toHaveLength(0);
+  });
+
+  it("can't change Access or Games; members still can't set events up; the admin chooses who's an organiser", async () => {
+    await q('organiser', `update public.members set role = 'organiser' where user_id = $1`, [TRIP_ID]);
+    expect((await db.query<{ role: string }>(`select role from public.members where user_id = $1`, [TRIP_ID])).rows[0].role).toBe('member');
+    await expect(q('organiser', `insert into public.games(key) values ('new_game')`)).rejects.toThrow(rls);
+    await expect(q('trip', `insert into public.events(name) values ('Nope')`)).rejects.toThrow(rls);
+    await expect(q('trip', `insert into public.players(name, short_name) values ('Nope', 'Nope')`)).rejects.toThrow(rls);
+    await q('admin', `update public.members set role = 'organiser' where user_id = $1`, [TRIP_ID]);
+    expect((await db.query<{ role: string }>(`select role from public.members where user_id = $1`, [TRIP_ID])).rows[0].role).toBe('organiser');
+    await expect(db.query(`update public.members set role = 'boss' where user_id = $1`, [TRIP_ID])).rejects.toThrow(/check constraint/);
+    // Everyone can see their own level (the app shows the right Admin area).
+    expect((await q('organiser', `select role from public.members where user_id = $1`, [ORGANISER_ID])).rows[0].role).toBe('organiser');
+  });
+
+  it('keep their own favourite players; a removed organiser loses everything', async () => {
+    await q('organiser', `insert into public.player_favourites(player_id) values ($1)`, [s.players.a1]);
+    expect((await q('organiser', `select player_id from public.player_favourites`)).rows).toHaveLength(1);
+    await db.query(`update public.members set status = 'removed' where user_id = $1`, [ORGANISER_ID]);
+    await expect(q('organiser', `insert into public.events(name) values ('Nope')`)).rejects.toThrow(rls);
+  });
+});
+

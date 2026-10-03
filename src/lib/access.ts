@@ -3,6 +3,8 @@ export interface Member {
   user_id: string;
   email: string;
   status: 'pending' | 'approved' | 'removed';
+  /** Organisers run events and add players and courses; the admin sets this in Admin → Access. */
+  role: 'member' | 'organiser';
   created_at: string;
   decided_at: string | null;
 }

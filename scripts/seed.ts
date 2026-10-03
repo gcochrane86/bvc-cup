@@ -25,10 +25,12 @@ await run(db.from('courses').delete().neq('id', NONE));
 const GAME_DEFAULTS: Record<string, object> = {
   stableford_match: { match_off_low: true, match_pct: 85 }, stableford: { stableford_pct: 100 }, flat_match: {},
   two_v_one: { stableford_pct: 100 }, two_v_one_match: { stableford_pct: 100 }, two_v_one_flat: {}, two_v_one_best: { stableford_pct: 100 },
-  six_stableford: { stableford_pct: 100 }, six_flat: {},
+  six_stableford: { stableford_pct: 100 }, six_flat: {}, wolf_stableford: { stableford_pct: 100, wolf_off_low: false }, wolf_flat: {},
   fourball_matchplay: { allowance_pct: 90 }, fourball_stableford: {}, fourball_flat: {}, scramble: { scramble_low_pct: 35, scramble_high_pct: 15 },
 };
 await run(db.from('games').upsert(Object.entries(GAME_DEFAULTS).map(([key, defaults]) => ({ key, enabled: true, defaults }))));
+// Everyone on the access list back to a member (organisers are chosen in Admin → Access).
+await run(db.from('members').update({ role: 'member' }).neq('user_id', NONE));
 
 const names = [
   'Alex Adams', 'Ben Brown', 'Chris Clark', 'Dan Davies', 'Ed Evans', 'Finn Fox',

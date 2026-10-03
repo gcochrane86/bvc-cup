@@ -2,7 +2,7 @@ import type { GameRow } from '../games';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createStore, del, get, set, values } from 'idb-keyval';
 import { must, supabase } from '../supabase';
-import { isAdmin } from '../auth.svelte';
+import { isOrganiser } from '../auth.svelte';
 import { applyPending, isBehind, removeScoreRow, upsertScoreRow } from './merge';
 import { freshOnly } from './fresh';
 import { endWatching, watch } from '../watch.svelte';
@@ -207,7 +207,7 @@ export function playerPhotoUrl(playerId: string): string | null {
 }
 export const playerName = (id: string) => db.players.find((p) => p.id === id)?.name ?? '?';
 /** Players see the Leaderboard (and match pages) unless the admin hid it for this event; the admin always does. */
-export const leaderboardShown = () => db.event?.show_leaderboard !== false || isAdmin();
+export const leaderboardShown = () => db.event?.show_leaderboard !== false || isOrganiser();
 
 /** Courses (by name) that have uploaded guide photos. */
 export const photoCourses = () => [...new Set(db.guidePhotos.map((p) => p.course_name))];

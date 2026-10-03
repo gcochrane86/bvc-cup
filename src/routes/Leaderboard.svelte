@@ -3,7 +3,7 @@
   import { buildEventView, leaderboardRoundId } from '../lib/view';
   import { courseLabel } from '../lib/courses';
   import { readScoringGroup } from '../lib/scoringMemory';
-  import { isAdmin } from '../lib/auth.svelte';
+  import { isOrganiser } from '../lib/auth.svelte';
   import TeamTracker from '../components/TeamTracker.svelte';
   import ScoreBar from '../components/ScoreBar.svelte';
   import MatchCard from '../components/MatchCard.svelte';
@@ -32,7 +32,7 @@
 {#if !view}
   <p class="center">
     No active event yet.
-    {#if isAdmin()}<a href="#/admin/events">Set one up</a>{:else}Ask the organiser to set one up.{/if}
+    {#if isOrganiser()}<a href="#/admin/events">Set one up</a>{:else}Ask the organiser to set one up.{/if}
   </p>
 {:else}
   <h1>{view.event.name}</h1>

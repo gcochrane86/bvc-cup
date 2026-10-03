@@ -2,7 +2,7 @@
   import { router } from '../lib/router.svelte';
   import { db, photoCourses } from '../lib/data/store.svelte';
   import { eventGuides } from '../lib/guides';
-  import { isAdmin } from '../lib/auth.svelte';
+  import { isOrganiser } from '../lib/auth.svelte';
   import { leaderboardShown } from '../lib/data/store.svelte';
 
   const items = $derived([
@@ -18,7 +18,7 @@
     // Form (rankings) only when the admin has switched it on for this event.
     ...(db.event?.show_form ? [{ href: '#/form', label: 'Form', active: router.route.name === 'form' }] : []),
     // Admin (player photos are added in Admin → Players).
-    ...(isAdmin() ? [{ href: '#/admin', label: 'Admin', active: router.route.name.startsWith('admin') }] : []),
+    ...(isOrganiser() ? [{ href: '#/admin', label: 'Admin', active: router.route.name.startsWith('admin') }] : []),
   ]);
 </script>
 

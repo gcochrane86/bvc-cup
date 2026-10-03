@@ -5,6 +5,7 @@
   import Avatar from '../../components/Avatar.svelte';
   import PhotoUpload from '../../components/PhotoUpload.svelte';
   import { loadFavourites, setFavourite } from '../../lib/data/favourites';
+  import { isAdmin } from '../../lib/auth.svelte';
 
   let name = $state('');
   let shortName = $state('');
@@ -133,7 +134,7 @@
           </div>
           <div class="row">
             <button onclick={() => save(p)}>Save</button>
-            <button class="secondary" onclick={() => remove(p)}>Delete</button>
+            {#if isAdmin()}<button class="secondary" onclick={() => remove(p)}>Delete</button>{/if}
           </div>
         </div>
       {/if}

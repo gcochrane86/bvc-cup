@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { auth, initAuth, isAdmin } from './lib/auth.svelte';
+  import { ADMIN_ONLY, auth, initAuth, isAdmin, isOrganiser } from './lib/auth.svelte';
   import { router } from './lib/router.svelte';
   import { startWatching, watch } from './lib/watch.svelte';
   import { db, leaderboardShown, startData, stopData } from './lib/data/store.svelte';
@@ -67,7 +67,7 @@
 
 {#if !auth.ready}
   <p class="center muted">Loading…</p>
-{:else if route.name === 'admin-login' || (signedIn && needsAdmin && !isAdmin())}
+{:else if route.name === 'admin-login' || (signedIn && needsAdmin && !isOrganiser())}
   <Login mode="admin" />
 {:else if route.name === 'watch'}
   <p class="center muted">Loading…</p>
@@ -128,6 +128,9 @@
         {#key `${route.groupId}:${route.hole}`}
           <ScoreEntry groupId={route.groupId} startHole={route.hole} />
         {/key}
+      {:else if ADMIN_ONLY.includes(route.name) && !isAdmin()}
+        <p><a href="#/admin">← Admin</a></p>
+        <p class="muted">Only the admin can change this.</p>
       {:else if route.name === 'admin'}
         <AdminHome />
       {:else if route.name === 'admin-players'}

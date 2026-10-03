@@ -4,7 +4,7 @@
   import { db, flushOutbox, loadAll } from '../lib/data/store.svelte';
   import { hasPendingFor } from '../lib/data/merge';
   import { must, supabase } from '../lib/supabase';
-  import { isAdmin } from '../lib/auth.svelte';
+  import { isOrganiser } from '../lib/auth.svelte';
   import { buildEventView, findGroup, matchLabel } from '../lib/view';
   import { gameLabel, resultFromState, type MatchType } from '../lib/scoring';
   import MatchCard from '../components/MatchCard.svelte';
@@ -86,7 +86,7 @@
   {#if mv.state.decided && !mv.result}
     <button class="wide" disabled={busy} onclick={confirmResult}>Confirm result</button>
   {/if}
-  {#if mv.result && isAdmin()}
+  {#if mv.result && isOrganiser()}
     <button class="wide secondary" disabled={busy} onclick={unlock}>Unlock result</button>
   {/if}
   <h3>Match summary</h3>

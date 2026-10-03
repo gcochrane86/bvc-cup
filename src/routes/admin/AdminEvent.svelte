@@ -15,6 +15,7 @@
   import { courseGuide } from '../../lib/guides';
   import { fourballKey, gamesFor } from '../../lib/games';
   import ResetScores from '../../components/ResetScores.svelte';
+  import { auth, isAdmin } from '../../lib/auth.svelte';
   import ConfirmedResults from '../../components/ConfirmedResults.svelte';
 
   let { eventId }: { eventId: string } = $props();
@@ -819,7 +820,12 @@
     </section>
     {#key event.id}<ConfirmedResults {event} />{/key}
     {#if rounds.length}
-      <ResetScores {event} {rounds} onDone={load} />
+      <!-- Reset: the admin, or the organiser who created this event (the database checks too). -->
+      {#if isAdmin() || (event.created_by && event.created_by === auth.session?.user?.id)}
+        <ResetScores {event} {rounds} onDone={load} />
+      {:else}
+        <p class="muted small" data-testid="reset-not-yours">Only the person who created this event, or an admin, can reset its scores.</p>
+      {/if}
     {/if}
   </details>
   {#if msg && msgAt === 'more'}<p class="saved" class:error={msg.startsWith('Error')}>{msg}</p>{/if}

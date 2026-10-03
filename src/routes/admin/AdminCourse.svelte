@@ -3,6 +3,7 @@
   import { db, loadAll } from '../../lib/data/store.svelte';
   import { must, supabase } from '../../lib/supabase';
   import { validateHoles, validateRating, type HoleInfo } from '../../lib/scoring';
+  import { isAdmin } from '../../lib/auth.svelte';
 
   // copyFrom: a new tee for an existing course — its name, par and SI come from that tee.
   let { courseId, copyFrom = null }: { courseId: string; copyFrom?: string | null } = $props();
@@ -58,6 +59,22 @@
       busy = false;
     }
   }
+
+  /** Admin only. A course a day is played on can't go (the database refuses). */
+  async function remove() {
+    if (!confirm(`Delete ${name}${tee ? ` (${tee})` : ''}? This can't be undone.`)) return;
+    busy = true;
+    try {
+      await must(supabase.from('courses').delete().eq('id', courseId));
+      await loadAll();
+      location.hash = '#/admin/courses';
+    } catch (e) {
+      const m = (e as Error).message;
+      errors = [/foreign key|violates/.test(m) ? 'A day is played on this course: change that day\'s course first.' : m];
+    } finally {
+      busy = false;
+    }
+  }
 </script>
 
 <p><a href="#/admin/courses">← Courses</a></p>
@@ -82,6 +99,7 @@
 
 {#each errors as err (err)}<p class="error">{err}</p>{/each}
 <button class="wide" disabled={busy} onclick={save}>Save course</button>
+{#if isAdmin() && !isNew}<button class="wide secondary" disabled={busy} onclick={remove}>Delete course</button>{/if}
 
 <style>
   .grid { display: grid; grid-template-columns: 56px 1fr 1fr; gap: 6px; align-items: center; }

@@ -1344,3 +1344,72 @@ test("favourite players sit at the top of Who's playing (each admin's own); savi
   await expect(page.getByText('Day 1 saved')).toBeVisible();
   await expect(day1.getByRole('button', { name: 'Save round' })).toBeHidden();
 });
+
+test('organisers: the admin picks them in Access; they run events and add courses, but only the admin deletes, and reset is for their own events', async ({ browser }) => {
+  // The admin makes the trip tester an organiser.
+  const admin = await newPhone(browser);
+  await loginAdmin(admin);
+  await admin.getByRole('link', { name: /Access/ }).click();
+  const row = admin.getByTestId('access-row').filter({ hasText: 'tester@example.com' });
+  await expect(row).toContainText('Scores and follows events.');
+  await row.getByRole('button', { name: 'Organiser' }).click();
+  await expect(admin.getByText('tester@example.com is now an organiser')).toBeVisible();
+  await expect(row).toContainText('Runs events and adds players and courses.');
+
+  const org = await newPhone(browser);
+  org.on('dialog', (d) => void d.accept());
+  await login(org);
+  await org.getByRole('link', { name: 'Admin' }).click();
+  await expect(org.getByTestId('organiser-note')).toBeVisible();
+  await expect(org.getByRole('link', { name: /^Events/ })).toBeVisible();
+  await expect(org.getByRole('link', { name: /^Courses/ })).toBeVisible();
+  await expect(org.getByRole('link', { name: /^Games/ })).toHaveCount(0);
+  await expect(org.getByRole('link', { name: /^Access/ })).toHaveCount(0);
+  await org.goto('/#/admin/games');
+  await expect(org.getByText('Only the admin can change this.')).toBeVisible();
+
+  // Add a course (pars and SIs default to a valid card); no Delete for them.
+  await org.goto('/#/admin/courses/new');
+  await org.getByLabel('Course name').fill('Away Links');
+  await org.getByRole('button', { name: 'Save course' }).click();
+  await expect(org).toHaveURL(/#\/admin\/courses$/);
+  const db = serviceDb();
+  const { data: away } = await db.from('courses').select('id').eq('name', 'Away Links').single();
+  await org.goto(`/#/admin/courses/${away!.id}`);
+  await expect(org.getByRole('button', { name: 'Save course' })).toBeVisible();
+  await expect(org.getByRole('button', { name: 'Delete course' })).toHaveCount(0);
+
+  // Players: edit yes, delete no.
+  await org.goto('/#/admin/players');
+  await org.getByTestId('admin-player').filter({ hasText: 'Alex Adams' }).locator('button.line').click();
+  await expect(org.getByLabel('Handicap index')).toBeVisible();
+  await expect(org.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+
+  // An event they create: theirs to reset. The seeded event (no creator): not theirs.
+  await org.goto('/#/admin/events');
+  await expect(org.getByText('Swipe an event left to delete it.')).toHaveCount(0);
+  await org.getByRole('button', { name: '+ New event' }).click();
+  await org.getByLabel('New event name').fill('Organiser Day');
+  await org.getByRole('button', { name: 'Create event' }).click();
+  await expect(org).toHaveURL(/#\/admin\/events\/[0-9a-f-]{36}$/);
+  const form = org.locator('form.round');
+  await form.getByLabel('Course').selectOption('Away Links');
+  await form.getByRole('button', { name: /^Add Day/ }).click();
+  await expect(org.getByText(/Round added/)).toBeVisible();
+  await org.getByText('More options').click();
+  await expect(org.getByTestId('reset-scores')).toBeVisible();
+  await org.goto(`/#/admin/events/${await activeEventId()}`);
+  await org.getByText('More options').click();
+  await expect(org.getByTestId('reset-not-yours')).toBeVisible();
+  await expect(org.getByTestId('reset-scores')).toHaveCount(0);
+
+  // The admin can delete the course (nothing plays on it once the organiser's day moves off it).
+  const { data: ev } = await db.from('events').select('id, created_by').eq('name', 'Organiser Day').single();
+  expect(ev!.created_by).toBeTruthy();
+  await db.from('rounds').delete().eq('event_id', ev!.id);
+  admin.on('dialog', (d) => void d.accept());
+  await admin.goto(`/#/admin/courses/${away!.id}`);
+  await admin.getByRole('button', { name: 'Delete course' }).click();
+  await expect(admin).toHaveURL(/#\/admin\/courses$/);
+  await expect.poll(async () => (await db.from('courses').select('id').eq('name', 'Away Links')).data?.length).toBe(0);
+});
