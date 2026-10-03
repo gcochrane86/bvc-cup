@@ -1423,3 +1423,23 @@ test('organisers: the admin picks them in Access; they run events and add course
   await expect(admin).toHaveURL(/#\/admin\/courses$/);
   await expect.poll(async () => (await db.from('courses').select('id').eq('name', 'Away Links')).data?.length).toBe(0);
 });
+
+test('a scanned guide as one PDF: pages are matched to holes (a cover skipped) and uploaded together', async ({ page }) => {
+  await loginAdmin(page);
+  const db = serviceDb();
+  const { data: course } = await db.from('courses').select('id').eq('name', 'Seed Links').limit(1).single();
+  await page.goto(`/#/admin/guide/${course!.id}`);
+  await page.getByLabel('Upload a scanned guide (PDF)').setInputFiles('tests/fixtures/guide-3-pages.pdf');
+  const match = page.getByRole('dialog', { name: 'Match pages to holes' });
+  await expect(match).toContainText('3 pages found');
+  await expect(match.getByLabel('Page 1 goes on')).toHaveValue('1');
+  // Page 1 is a cover: hole 1 is on page 2.
+  await match.getByRole('button', { name: 'Hole 1 on a later page' }).click();
+  await expect(match.getByLabel('Page 1 goes on')).toHaveValue('0');
+  await expect(match.getByLabel('Page 2 goes on')).toHaveValue('1');
+  await match.getByRole('button', { name: 'Upload 2 pages' }).click();
+  await expect(match).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByRole('img', { name: 'Hole 1 photo 1' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('img', { name: 'Hole 2 photo 1' })).toBeVisible();
+  await expect.poll(async () => (await db.from('guide_photos').select('hole').eq('course_name', 'Seed Links')).data?.map((r) => r.hole).sort()).toEqual([1, 2]);
+});

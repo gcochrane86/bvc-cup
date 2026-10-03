@@ -3,6 +3,7 @@
   import { db, loadAll } from '../../lib/data/store.svelte';
   import { cropForGuide, guidePhotoUrls, removeGuidePhoto, uploadGuidePhoto } from '../../lib/guidePhotos';
   import CropPhoto from '../../components/CropPhoto.svelte';
+  import GuidePdfImport from '../../components/GuidePdfImport.svelte';
   import type { Box } from '../../lib/crop';
   import type { GuidePhotoRow } from '../../lib/data/types';
   import { guideForCourse } from '../../lib/guides';
@@ -26,6 +27,29 @@
 
   let busy = $state<number | null>(null);
   let msg = $state<string | null>(null);
+
+  /** A whole guide scanned as one PDF: its pages matched to holes, then uploaded. */
+  let pdfFile = $state<File | null>(null);
+  function pickPdf(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    pdfFile = input.files?.[0] ?? null;
+    input.value = '';
+    msg = null;
+  }
+  async function uploadPdf(holesOf: number[], replace: boolean, render: (page: number) => Promise<Blob>, progress: (done: number) => void) {
+    if (!course) return;
+    const used = [...new Set(holesOf.filter((h) => h > 0))];
+    if (replace) for (const p of db.guidePhotos.filter((x) => x.course_name === course.name && used.includes(x.hole))) await removeGuidePhoto(p);
+    let done = 0;
+    for (const [i, hole] of holesOf.entries()) {
+      if (!hole) continue;
+      await uploadGuidePhoto(course.name, hole, await render(i + 1), true);
+      progress(++done);
+    }
+    await loadAll();
+    pdfFile = null;
+    msg = `${done} page${done === 1 ? '' : 's'} added`;
+  }
 
   /** Photos picked for a hole, cropped one at a time before each uploads. */
   let cropping = $state<{ hole: number; files: File[]; i: number } | null>(null);
@@ -82,7 +106,12 @@
       This course has a built-in guide. A hole's photos replace it for that hole; holes without photos keep the built-in guide.
     </p>
   {/if}
-  {#if msg}<p class="error">{msg}</p>{/if}
+  <label class="pdfbtn">
+    Upload a scanned guide (PDF)
+    <input type="file" accept="application/pdf,.pdf" aria-label="Upload a scanned guide (PDF)" disabled={busy !== null} onchange={pickPdf} />
+  </label>
+  <p class="muted small">One page per hole, e.g. Notes → Scan Documents → Share → Save to Files.</p>
+  {#if msg}<p class:error={msg.startsWith('Error')}>{msg}</p>{/if}
   <div class="card list">
     {#each holes as h (h.hole)}
       {@const photos = photosFor(h.hole)}
@@ -111,6 +140,17 @@
   </div>
 {/if}
 
+{#if pdfFile && course}
+  {#key pdfFile}
+    <GuidePdfImport
+      file={pdfFile}
+      holesWithPhotos={[...new Set(db.guidePhotos.filter((p) => p.course_name === course.name).map((p) => p.hole))]}
+      onUpload={uploadPdf}
+      onCancel={() => (pdfFile = null)}
+    />
+  {/key}
+{/if}
+
 {#if cropping}
   {#key `${cropping.hole}:${cropping.i}`}
     <CropPhoto
@@ -125,6 +165,8 @@
 {/if}
 
 <style>
+  .pdfbtn { position: relative; display: block; text-align: center; padding: 12px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 800; cursor: pointer; margin: 8px 0 4px; }
+  .pdfbtn input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
   .note { background: #eef4ff; border-radius: 10px; padding: 8px 12px; }
   .list { padding: 4px 14px; }
   .hole { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
