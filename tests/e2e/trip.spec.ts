@@ -1366,7 +1366,8 @@ test('organisers: the admin picks them in Access; they run events and add course
   await expect(org.getByRole('link', { name: /^Games/ })).toHaveCount(0);
   await expect(org.getByRole('link', { name: /^Access/ })).toHaveCount(0);
   await org.goto('/#/admin/games');
-  await expect(org.getByText('Only the admin can change this.')).toBeVisible();
+  await expect(org).toHaveURL(/#\/admin$/); // Games is hidden: back to their Admin page
+  await expect(org.getByRole('heading', { name: 'Games', exact: true })).toHaveCount(0);
 
   // Add a course (pars and SIs default to a valid card); no Delete for them.
   await org.goto('/#/admin/courses/new');

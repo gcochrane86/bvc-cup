@@ -48,6 +48,10 @@
     }
   });
 
+  // Organisers never see Games or Access: those addresses go back to their Admin page.
+  $effect(() => {
+    if (auth.ready && ADMIN_ONLY.includes(route.name) && isOrganiser() && !isAdmin()) location.replace('#/admin');
+  });
   // With the Leaderboard hidden for this event, players (not the admin) go to Scores instead.
   $effect(() => {
     if (db.loaded && !leaderboardShown() && (route.name === 'home' || route.name === 'match'))
@@ -128,10 +132,7 @@
         {#key `${route.groupId}:${route.hole}`}
           <ScoreEntry groupId={route.groupId} startHole={route.hole} />
         {/key}
-      {:else if ADMIN_ONLY.includes(route.name) && !isAdmin()}
-        <p><a href="#/admin">← Admin</a></p>
-        <p class="muted">Only the admin can change this.</p>
-      {:else if route.name === 'admin'}
+      {:else if route.name === 'admin' || (ADMIN_ONLY.includes(route.name) && !isAdmin())}
         <AdminHome />
       {:else if route.name === 'admin-players'}
         <AdminPlayers />
