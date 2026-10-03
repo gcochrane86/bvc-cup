@@ -1046,7 +1046,15 @@ test('the admin adds guide photos for a course; the Courses tab then shows them'
   await seed.getByRole('link', { name: 'Add guide photos →' }).click();
   await expect(admin.getByRole('heading', { name: 'Seed Links guide' })).toBeVisible();
   await admin.getByLabel('Add photos for hole 1', { exact: true }).setInputFiles('public/guides/glashedy/hole-01-green.webp');
-  await expect(admin.getByRole('img', { name: 'Hole 1 photo 1' })).toBeVisible({ timeout: 20_000 });
+  // The crop screen opens first: crop it square and use it.
+  const crop = admin.getByRole('dialog', { name: 'Crop hole 1 photo' });
+  await expect(crop).toBeVisible();
+  await crop.getByRole('button', { name: 'Square' }).click();
+  await crop.getByRole('button', { name: 'Use photo' }).click();
+  await expect(crop).toBeHidden();
+  const uploaded = admin.getByRole('img', { name: 'Hole 1 photo 1' });
+  await expect(uploaded).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => uploaded.evaluate((i: HTMLImageElement) => i.naturalWidth > 0 && i.naturalWidth === i.naturalHeight), { timeout: 20_000 }).toBe(true);
   await admin.goto('/#/admin/courses');
   await expect(admin.getByTestId('course-group').filter({ hasText: 'Seed Links' })).toContainText('Photo guide · 1 of 18 holes');
 
@@ -1077,6 +1085,7 @@ test("photos for a hole of a built-in guide replace that hole's pages; other hol
   await dundonald.getByRole('link', { name: 'Add guide photos →' }).click();
   await expect(admin.getByTestId('builtin-note')).toBeVisible();
   await admin.getByLabel('Add photos for hole 2', { exact: true }).setInputFiles('public/guides/glashedy/hole-01-green.webp');
+  await admin.getByRole('dialog', { name: 'Crop hole 2 photo' }).getByRole('button', { name: 'Upload without cropping' }).click();
   await expect(admin.getByRole('img', { name: 'Hole 2 photo 1' })).toBeVisible({ timeout: 20_000 });
   await admin.goto('/#/admin/courses');
   await expect(admin.getByTestId('course-group').filter({ hasText: 'Dundonald Links' })).toContainText('Guide ✓ · your photos on 1 hole');

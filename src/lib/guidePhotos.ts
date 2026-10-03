@@ -1,6 +1,7 @@
 // Course guide photos uploaded in Admin: stored in the private 'course-guides' bucket, one row each in guide_photos.
 import { must, supabase } from './supabase';
 import type { GuidePhotoRow } from './data/types';
+import { sourceRect, turnedSize, type Box } from './crop';
 
 /** Shrink to at most 1600px on the long side and re-encode as JPEG (fixes phone EXIF rotation; ~150–400 KB). */
 export async function resizeForGuide(file: Blob, max = 1600): Promise<Blob> {
@@ -18,10 +19,44 @@ export async function resizeForGuide(file: Blob, max = 1600): Promise<Blob> {
   );
 }
 
+/** Turn a photo by quarter turns, keep just the frame, shrink to at most 1600px and re-encode as JPEG. */
+export async function cropForGuide(file: Blob, box: Box, turns: number, max = 1600): Promise<Blob> {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const turned = turnCanvas(bmp, turns);
+  bmp.close();
+  const { sx, sy, sw, sh } = sourceRect(box, turned.width, turned.height);
+  const scale = Math.min(1, max / Math.max(sw, sh));
+  const out = document.createElement('canvas');
+  out.width = Math.max(1, Math.round(sw * scale));
+  out.height = Math.max(1, Math.round(sh * scale));
+  const ctx = out.getContext('2d');
+  if (!ctx) throw new Error('Canvas not supported');
+  ctx.drawImage(turned, sx, sy, sw, sh, 0, 0, out.width, out.height);
+  return new Promise((resolve, reject) =>
+    out.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode photo'))), 'image/jpeg', 0.82),
+  );
+}
+
+/** The image drawn onto a canvas after this many quarter turns clockwise. */
+export function turnCanvas(img: CanvasImageSource & { width: number; height: number }, turns: number): HTMLCanvasElement {
+  const t = ((turns % 4) + 4) % 4;
+  const { w, h } = turnedSize(img.width, img.height, t);
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  if (!ctx) throw new Error('Canvas not supported');
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate((t * Math.PI) / 2);
+  ctx.drawImage(img, -img.width / 2, -img.height / 2);
+  return c;
+}
+
 const folder = (courseName: string) => courseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-export async function uploadGuidePhoto(courseName: string, hole: number, file: Blob): Promise<void> {
-  const blob = await resizeForGuide(file);
+/** ready: already cropped and shrunk (cropForGuide), so it's uploaded as it is. */
+export async function uploadGuidePhoto(courseName: string, hole: number, file: Blob, ready = false): Promise<void> {
+  const blob = ready ? file : await resizeForGuide(file);
   const path = `${folder(courseName)}/${hole}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
   await must(supabase.storage.from('course-guides').upload(path, blob, { contentType: 'image/jpeg' }));
   await must(supabase.from('guide_photos').insert({ course_name: courseName, hole, path }));

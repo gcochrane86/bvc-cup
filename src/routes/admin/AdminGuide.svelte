@@ -1,7 +1,9 @@
 <script lang="ts">
   // Guide photos for one course (all its tees share them): add or remove photos hole by hole.
   import { db, loadAll } from '../../lib/data/store.svelte';
-  import { guidePhotoUrls, removeGuidePhoto, uploadGuidePhoto } from '../../lib/guidePhotos';
+  import { cropForGuide, guidePhotoUrls, removeGuidePhoto, uploadGuidePhoto } from '../../lib/guidePhotos';
+  import CropPhoto from '../../components/CropPhoto.svelte';
+  import type { Box } from '../../lib/crop';
   import type { GuidePhotoRow } from '../../lib/data/types';
   import { guideForCourse } from '../../lib/guides';
 
@@ -25,15 +27,28 @@
   let busy = $state<number | null>(null);
   let msg = $state<string | null>(null);
 
-  async function add(hole: number, e: Event) {
+  /** Photos picked for a hole, cropped one at a time before each uploads. */
+  let cropping = $state<{ hole: number; files: File[]; i: number } | null>(null);
+
+  function add(hole: number, e: Event) {
     const input = e.currentTarget as HTMLInputElement;
     const files = [...(input.files ?? [])];
     input.value = '';
     if (!course || !files.length) return;
-    busy = hole;
     msg = null;
+    cropping = { hole, files, i: 0 };
+  }
+
+  /** Upload the current photo (cropped, or as it is), then on to the next one picked. */
+  async function upload(crop: { box: Box; turns: number } | null) {
+    if (!course || !cropping) return;
+    const { hole, files, i } = cropping;
+    const file = files[i];
+    cropping = i + 1 < files.length ? { hole, files, i: i + 1 } : null;
+    busy = hole;
     try {
-      for (const f of files) await uploadGuidePhoto(course.name, hole, f);
+      if (crop) await uploadGuidePhoto(course.name, hole, await cropForGuide(file, crop.box, crop.turns), true);
+      else await uploadGuidePhoto(course.name, hole, file);
       await loadAll();
     } catch (err) {
       msg = `Error: ${(err as Error).message}`;
@@ -94,6 +109,19 @@
       </div>
     {/each}
   </div>
+{/if}
+
+{#if cropping}
+  {#key `${cropping.hole}:${cropping.i}`}
+    <CropPhoto
+      file={cropping.files[cropping.i]}
+      title="Hole {cropping.hole} photo"
+      count={cropping.files.length > 1 ? `${cropping.i + 1} of ${cropping.files.length}` : ''}
+      onUse={(box, turns) => upload({ box, turns })}
+      onSkip={() => upload(null)}
+      onCancel={() => (cropping = null)}
+    />
+  {/key}
 {/if}
 
 <style>
