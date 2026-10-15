@@ -19,14 +19,19 @@
     if (!e) return '';
     return e.pickedUp ? 'P' : String(e.gross);
   }
+  // A pick-up counts as net double bogey (par + the player's shots off their course handicap + 2), so every
+  // player's total covers the same holes.
   function total(pid: string, nine: HoleInfo[]): string {
     let sum = 0;
     let any = false;
     for (const h of nine) {
       const e = scores.get(scoreKey(pid, h.hole));
-      if (e && !e.pickedUp && e.gross !== null) {
-        sum += e.gross;
-        any = true;
+      if (!e) continue;
+      any = true;
+      if (!e.pickedUp && e.gross !== null) sum += e.gross;
+      else {
+        const own = playerHole(def, pid, h);
+        sum += own.par + strokesOnHole(playingHcp[pid] ?? def.strokes[pid] ?? 0, own.strokeIndex, own.of) + 2;
       }
     }
     return any ? String(sum) : '';

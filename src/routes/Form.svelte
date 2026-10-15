@@ -7,11 +7,14 @@
   import Avatar from '../components/Avatar.svelte';
 
   const METRICS: { id: FormMetric; label: string; note: string }[] = [
-    { id: 'gross', label: 'Gross', note: 'Total strokes to par (pick-ups left out).' },
-    { id: 'net', label: 'Net', note: 'Strokes to par after full course-handicap shots (pick-ups left out).' },
+    { id: 'gross', label: 'Gross', note: 'Total strokes to par. A pick-up counts as net double bogey (par + your shots + 2).' },
+    { id: 'net', label: 'Net', note: 'Strokes to par after full course-handicap shots. A pick-up counts as net double bogey (+2).' },
     { id: 'stableford', label: 'Stableford', note: 'Stableford points off full course handicap: 2 for net par, 1 more per shot better, 0 for a pick-up.' },
     { id: 'points', label: 'Points', note: "Points from confirmed matches — each player gets their side's points." },
     { id: 'birdies', label: 'Birdies', note: 'Birdies or better (gross).' },
+    { id: 'pars', label: 'Pars', note: 'Pars (gross).' },
+    { id: 'bogeys', label: 'Bogeys', note: 'Bogeys (gross).' },
+    { id: 'doubles', label: 'Doubles', note: 'Double bogeys (gross; pick-ups count as trebles+).' },
     { id: 'trebles', label: 'Trebles+', note: 'Treble bogey or worse, including pick-ups.' },
   ];
 
@@ -39,6 +42,9 @@
       case 'stableford': return String(r.stableford);
       case 'points': return formatPoints(r.points);
       case 'birdies': return String(r.birdies);
+      case 'pars': return String(r.pars);
+      case 'bogeys': return String(r.bogeys);
+      case 'doubles': return String(r.doubles);
       case 'trebles': return String(r.trebles);
     }
   }
@@ -52,13 +58,18 @@
       case 'stableford': return String(r.stableford);
       case 'points': return formatPoints(r.points);
       case 'birdies': return String(r.birdies);
+      case 'pars': return String(r.pars);
+      case 'bogeys': return String(r.bogeys);
+      case 'doubles': return String(r.doubles);
       case 'trebles': return String(r.trebles);
     }
   }
   function detail(r: FormRow): string {
     if (metric === 'gross') return r.holes ? `Gross ${r.gross} · ${r.holes} holes` : 'yet to play';
     if (metric === 'net') return r.holes ? `Net ${r.net} · ${r.holes} holes` : 'yet to play';
-    if (metric === 'stableford') return r.holes + r.pickups ? `${r.holes + r.pickups} holes` : 'yet to play';
+    if (metric === 'stableford') return r.holes ? `${r.holes} holes` : 'yet to play';
+    if (metric === 'pars' || metric === 'bogeys' || metric === 'doubles')
+      return r.holes ? `${r.birdies} birdies · ${r.pars} pars · ${r.bogeys} bogeys · ${r.doubles} doubles · ${r.trebles} trebles+` : '';
     return r.holes ? `${r.holes} holes played` : '';
   }
   const colour = (r: FormRow) => (r.team === 'A' ? 'var(--team-a)' : 'var(--team-b)');

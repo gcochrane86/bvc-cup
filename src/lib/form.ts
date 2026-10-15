@@ -1,15 +1,16 @@
 // "Form" rankings: per-player stats across the event (or one day), from the same derived view as the
-// leaderboard. Gross/net are over completed holes (pick-ups left out) and ranked to par, so players
-// who have played different numbers of holes compare fairly.
+// leaderboard. Gross/net are ranked to par, so players who have played different numbers of holes compare
+// fairly. A pick-up counts as net double bogey — the first score worth 0 Stableford points — so everyone's
+// gross and net cover the same holes.
 import { playerSeasonPoints, scoreKey, strokesOnHole, type Team } from './scoring';
 import type { EventView } from './view';
 
-export type FormMetric = 'gross' | 'net' | 'stableford' | 'points' | 'birdies' | 'trebles';
+export type FormMetric = 'gross' | 'net' | 'stableford' | 'points' | 'birdies' | 'pars' | 'bogeys' | 'doubles' | 'trebles';
 
 export interface FormRow {
   playerId: string;
   team: Team;
-  /** Holes with a gross score (pick-ups not counted). */
+  /** Holes with a score, pick-ups included. */
   holes: number;
   gross: number;
   grossToPar: number;
@@ -20,11 +21,15 @@ export interface FormRow {
   points: number;
   /** Birdies or better (gross). */
   birdies: number;
+  /** Pars, bogeys and double bogeys (gross, pick-ups not counted). */
+  pars: number;
+  bogeys: number;
+  doubles: number;
   /** Treble bogey or worse, including pick-ups. */
   trebles: number;
   /** Stableford points (full course handicap): 2 for net par, +1 per shot better, 0 for a pick-up. */
   stableford: number;
-  /** Holes picked up (they score 0 stableford points and are left out of gross/net). */
+  /** Holes picked up (they score 0 Stableford points and count as net double bogey in gross/net). */
   pickups: number;
 }
 
@@ -32,7 +37,7 @@ export function computeForm(view: EventView, roundId: string | null): FormRow[] 
   const rows = new Map<string, FormRow>(
     Object.entries(view.teamOf).map(([playerId, team]) => [
       playerId,
-      { playerId, team, holes: 0, gross: 0, grossToPar: 0, net: 0, netToPar: 0, points: 0, birdies: 0, trebles: 0, stableford: 0, pickups: 0 },
+      { playerId, team, holes: 0, gross: 0, grossToPar: 0, net: 0, netToPar: 0, points: 0, birdies: 0, pars: 0, bogeys: 0, doubles: 0, trebles: 0, stableford: 0, pickups: 0 },
     ]),
   );
   for (const rv of view.rounds) {
@@ -47,21 +52,29 @@ export function computeForm(view: EventView, roundId: string | null): FormRow[] 
         for (const h of rv.holes) {
           const e = g.scores.get(scoreKey(pid, h.hole));
           if (!e) continue;
-          if (e.pickedUp || e.gross === null) {
-            r.trebles++;
-            r.pickups++;
-            continue;
-          }
           const own = g.teeHoles[pid]?.find((x) => x.hole === h.hole) ?? h; // the player's own tee
-          const net = e.gross - strokesOnHole(courseHcp, own.strokeIndex, own.of);
+          const shots = strokesOnHole(courseHcp, own.strokeIndex, own.of);
+          const pickedUp = e.pickedUp || e.gross === null;
+          // A pick-up is net double bogey: par + the player's shots + 2 gross.
+          const gross = pickedUp ? own.par + shots + 2 : e.gross!;
+          const net = gross - shots;
           r.holes++;
-          r.gross += e.gross;
-          r.grossToPar += e.gross - own.par;
+          r.gross += gross;
+          r.grossToPar += gross - own.par;
           r.net += net;
           r.netToPar += net - own.par;
+          if (pickedUp) {
+            r.pickups++;
+            r.trebles++;
+            continue;
+          }
           r.stableford += Math.max(0, 2 + own.par - net);
-          if (e.gross <= own.par - 1) r.birdies++;
-          if (e.gross >= own.par + 3) r.trebles++;
+          const toPar = gross - own.par;
+          if (toPar <= -1) r.birdies++;
+          else if (toPar === 0) r.pars++;
+          else if (toPar === 1) r.bogeys++;
+          else if (toPar === 2) r.doubles++;
+          else r.trebles++;
         }
       }
       for (const m of g.matches) {
@@ -95,9 +108,9 @@ export interface PairFormRow {
   playerIds: [string, string];
   team: Team;
   holes: number;
-  /** Best gross to par per hole (each player's own tee par); both picked up counts +2. */
+  /** Best gross to par per hole (each player's own tee par); a pick-up counts as net double bogey. */
   grossToPar: number;
-  /** Best net to par per hole off full course handicaps; both picked up counts +2. */
+  /** Best net to par per hole off full course handicaps; both picked up counts +2 (net double bogey). */
   netToPar: number;
   /** Best Stableford points per hole (0 when both picked up). */
   stableford: number;
@@ -105,6 +118,10 @@ export interface PairFormRow {
   points: number;
   /** Holes where the pair's best gross was a birdie or better. */
   birdies: number;
+  /** Holes where the pair's best gross was a par, bogey or double bogey. */
+  pars: number;
+  bogeys: number;
+  doubles: number;
   /** Holes where the pair's best gross was a treble bogey or worse, or both picked up. */
   trebles: number;
 }
@@ -119,34 +136,38 @@ export function computePairForm(view: EventView, roundId: string | null): PairFo
       for (const [side, team] of [[fourball.def.sideA, 'A'], [fourball.def.sideB, 'B']] as const) {
         const ids = [...side].sort() as [string, string];
         const key = ids.join('+');
-        const r = rows.get(key) ?? { key, playerIds: ids, team, holes: 0, grossToPar: 0, netToPar: 0, stableford: 0, points: 0, birdies: 0, trebles: 0 };
+        const r = rows.get(key) ?? { key, playerIds: ids, team, holes: 0, grossToPar: 0, netToPar: 0, stableford: 0, points: 0, birdies: 0, pars: 0, bogeys: 0, doubles: 0, trebles: 0 };
         rows.set(key, r);
         for (const h of rv.holes) {
           const entries = ids.map((id) => g.scores.get(scoreKey(id, h.hole)));
           if (entries.some((e) => !e)) continue; // count a hole once both players have a score in
           r.holes++;
-          const played = ids
-            .map((id, i) => ({ id, e: entries[i]! }))
-            .filter(({ e }) => !e.pickedUp && e.gross !== null)
-            .map(({ id, e }) => {
-              const own = g.teeHoles[id]?.find((x) => x.hole === h.hole) ?? h;
-              // Scramble: the team's handicap; otherwise each player's full course handicap.
-              const hcp = fourball.def.teamHandicap?.[id] ?? g.playingHcp[id] ?? 0;
-              const net = e.gross! - strokesOnHole(hcp, own.strokeIndex, own.of);
-              return { gross: e.gross! - own.par, net: net - own.par, points: Math.max(0, 2 + own.par - net) };
-            });
-          if (!played.length) {
-            r.grossToPar += 2;
-            r.netToPar += 2;
-            r.trebles++;
-            continue;
-          }
-          const bestGross = Math.min(...played.map((x) => x.gross));
+          const scored = ids.map((id, i) => {
+            const e = entries[i]!;
+            const own = g.teeHoles[id]?.find((x) => x.hole === h.hole) ?? h;
+            // Scramble: the team's handicap; otherwise each player's full course handicap.
+            const hcp = fourball.def.teamHandicap?.[id] ?? g.playingHcp[id] ?? 0;
+            const shots = strokesOnHole(hcp, own.strokeIndex, own.of);
+            const pickedUp = e.pickedUp || e.gross === null;
+            // A pick-up is net double bogey: par + the player's shots + 2 gross.
+            const gross = pickedUp ? own.par + shots + 2 : e.gross!;
+            const net = gross - shots;
+            return { pickedUp, gross: gross - own.par, net: net - own.par, points: pickedUp ? 0 : Math.max(0, 2 + own.par - net) };
+          });
+          const bestGross = Math.min(...scored.map((x) => x.gross));
           r.grossToPar += bestGross;
-          r.netToPar += Math.min(...played.map((x) => x.net));
-          r.stableford += Math.max(...played.map((x) => x.points));
-          if (bestGross <= -1) r.birdies++;
-          if (bestGross >= 3) r.trebles++;
+          r.netToPar += Math.min(...scored.map((x) => x.net));
+          r.stableford += Math.max(...scored.map((x) => x.points));
+          // Both picked up: a treble+ hole, whatever the pick-ups' gross works out at.
+          if (scored.every((x) => x.pickedUp)) r.trebles++;
+          else {
+            const best = Math.min(...scored.filter((x) => !x.pickedUp).map((x) => x.gross));
+            if (best <= -1) r.birdies++;
+            else if (best === 0) r.pars++;
+            else if (best === 1) r.bogeys++;
+            else if (best === 2) r.doubles++;
+            else r.trebles++;
+          }
         }
         if (fourball.result) r.points += team === 'A' ? fourball.result.pointsA : fourball.result.pointsB;
       }
@@ -156,7 +177,7 @@ export function computePairForm(view: EventView, roundId: string | null): PairFo
 }
 
 /** What rankForm needs from a player's or a pair's row. */
-type Ranked = Pick<FormRow, 'holes' | 'grossToPar' | 'netToPar' | 'stableford' | 'points' | 'birdies' | 'trebles'>;
+type Ranked = Pick<FormRow, 'holes' | 'grossToPar' | 'netToPar' | 'stableford' | 'points' | 'birdies' | 'pars' | 'bogeys' | 'doubles' | 'trebles'>;
 
 const METRICS: Record<FormMetric, { value: (r: Ranked) => number; lowestFirst: boolean; needsHoles: boolean }> = {
   gross: { value: (r) => r.grossToPar, lowestFirst: true, needsHoles: true },
@@ -164,6 +185,9 @@ const METRICS: Record<FormMetric, { value: (r: Ranked) => number; lowestFirst: b
   stableford: { value: (r) => r.stableford, lowestFirst: false, needsHoles: false },
   points: { value: (r) => r.points, lowestFirst: false, needsHoles: false },
   birdies: { value: (r) => r.birdies, lowestFirst: false, needsHoles: false },
+  pars: { value: (r) => r.pars, lowestFirst: false, needsHoles: false },
+  bogeys: { value: (r) => r.bogeys, lowestFirst: false, needsHoles: false },
+  doubles: { value: (r) => r.doubles, lowestFirst: false, needsHoles: false },
   trebles: { value: (r) => r.trebles, lowestFirst: false, needsHoles: false },
 };
 

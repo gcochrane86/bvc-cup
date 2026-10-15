@@ -46,9 +46,10 @@ function snapshot(over: Partial<Snapshot> = {}): Snapshot {
 const row = (rows: ReturnType<typeof computeForm>, id: string) => rows.find((r) => r.playerId === id)!;
 
 describe('form', () => {
-  it('totals gross and net over completed holes, leaving pick-ups out', () => {
+  it('totals gross and net, counting a pick-up as net double bogey', () => {
     const rows = computeForm(buildEventView(snapshot())!, 'r1');
-    expect(row(rows, 'a1')).toMatchObject({ holes: 2, gross: 10, grossToPar: 2, net: 8, netToPar: 0 });
+    // a1: 3, 7, then a pick-up on hole 3 (a shot there): par 4 + 1 shot + 2 = gross 7, net 6.
+    expect(row(rows, 'a1')).toMatchObject({ holes: 3, gross: 17, grossToPar: 5, net: 14, netToPar: 2 });
     expect(row(rows, 'b1')).toMatchObject({ holes: 1, gross: 4, grossToPar: 0, net: 3, netToPar: -1 });
   });
 
@@ -56,6 +57,20 @@ describe('form', () => {
     const rows = computeForm(buildEventView(snapshot())!, 'r1');
     expect(row(rows, 'a1')).toMatchObject({ birdies: 1, trebles: 2 });
     expect(row(rows, 'b1')).toMatchObject({ birdies: 0, trebles: 0 });
+  });
+
+  it('counts pars, bogeys and double bogeys (gross)', () => {
+    const rows = computeForm(buildEventView(snapshot({
+      scores: [score('r1', 'a1', 1, 4), score('r1', 'a1', 2, 4), score('r1', 'a1', 3, 5), score('r1', 'a1', 4, 6), score('r1', 'a1', 5, null)],
+    }))!, 'r1');
+    expect(row(rows, 'a1')).toMatchObject({ pars: 2, bogeys: 1, doubles: 1, trebles: 1 });
+    expect(rankForm(rows, 'pars')[0]).toMatchObject({ rank: 1, value: 2 });
+  });
+
+  it("counts a pick-up on a hole without a shot as gross double bogey", () => {
+    // Hole 11 is SI 11: no shot off 10, so the pick-up is a 6 gross and net.
+    const rows = computeForm(buildEventView(snapshot({ scores: [score('r1', 'b1', 11, null)] }))!, 'r1');
+    expect(row(rows, 'b1')).toMatchObject({ holes: 1, gross: 6, net: 6, netToPar: 2, stableford: 0, pickups: 1, doubles: 0 });
   });
 
   it("gives each player their side's points from confirmed matches", () => {
@@ -110,7 +125,7 @@ describe('pair form', () => {
     snapshot({
       scores: [
         score('r1', 'a1', 1, 3), score('r1', 'a2', 1, 5), score('r1', 'b1', 1, 4), score('r1', 'b2', 1, null), // b2 picked up
-        score('r1', 'a1', 2, null), score('r1', 'a2', 2, null), score('r1', 'b1', 2, 5), score('r1', 'b2', 2, 6), // both As picked up
+        score('r1', 'a1', 2, null), score('r1', 'a2', 2, null), score('r1', 'b1', 2, 5), score('r1', 'b2', 2, 6), // both As picked up (gross +3: a shot + 2)
         score('r2', 'a1', 1, 4), score('r2', 'a2', 1, 4), score('r2', 'b1', 1, 4), score('r2', 'b2', 1, 4),
         score('r2', 'a1', 2, 4), // a2 has no score on r2 hole 2: not counted yet
       ],
@@ -121,7 +136,7 @@ describe('pair form', () => {
   it('counts a pair on better ball over the days chosen, adding up days with the same pair', () => {
     const rows = computePairForm(buildEventView(pairSnapshot())!, null);
     expect(rows).toHaveLength(2);
-    expect(pair(rows, 'a1', 'a2')).toMatchObject({ team: 'A', playerIds: ['a1', 'a2'], holes: 3, grossToPar: 1, netToPar: -1, stableford: 7, birdies: 1, trebles: 1, points: 1 });
+    expect(pair(rows, 'a1', 'a2')).toMatchObject({ team: 'A', playerIds: ['a1', 'a2'], holes: 3, grossToPar: 2, netToPar: -1, stableford: 7, birdies: 1, trebles: 1, points: 1 });
     expect(pair(rows, 'b1', 'b2')).toMatchObject({ team: 'B', holes: 3, grossToPar: 1, netToPar: -2, stableford: 8, birdies: 0, trebles: 0, points: 0 });
   });
 
