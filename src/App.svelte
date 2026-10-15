@@ -27,6 +27,7 @@
   import Nav from './components/Nav.svelte';
 
   onMount(initAuth);
+  const savedTime = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   /** Side colours: the teams' own, or for an individual event a neutral green v bronze. */
   const sideColours = $derived(
     db.event?.kind === 'individual'
@@ -93,7 +94,9 @@
     {#if db.notice}
       <button class="notice" onclick={() => (db.notice = null)}>{db.notice} (tap to dismiss)</button>
     {/if}
-    {#if db.error}<p class="notice error">Connection problem: {db.error}</p>{/if}
+    {#if db.error && db.offlineFrom}
+      <p class="notice" data-testid="offline">No signal: showing scores as of {savedTime(db.offlineFrom)}. Scores you enter send when signal returns.</p>
+    {:else if db.error}<p class="notice error">Connection problem: {db.error}</p>{/if}
     <main>
       {#if !db.loaded}
         <p class="center muted">Loading…</p>
@@ -130,7 +133,9 @@
     {#if db.notice}
       <button class="notice" onclick={() => (db.notice = null)}>{db.notice} (tap to dismiss)</button>
     {/if}
-    {#if db.error}<p class="notice error">Connection problem: {db.error}</p>{/if}
+    {#if db.error && db.offlineFrom}
+      <p class="notice" data-testid="offline">No signal: showing scores as of {savedTime(db.offlineFrom)}. Scores you enter send when signal returns.</p>
+    {:else if db.error}<p class="notice error">Connection problem: {db.error}</p>{/if}
     <main>
       {#if !db.loaded}
         <p class="center muted">Loading…</p>

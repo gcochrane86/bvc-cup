@@ -1,6 +1,8 @@
 import type { Session } from '@supabase/supabase-js';
 import { ADMIN_EMAIL, supabase } from './supabase';
 import { normaliseEmail, validEmail, type Member } from './access';
+import { forgetSavedEvents } from './data/saved';
+import { offlineSession, readAccessMemory, rememberAccess } from './offlineAuth';
 
 /** access: this person's place on the access list ('approved' for the admin; 'none' if not on it). */
 export const auth = $state<{
@@ -10,12 +12,32 @@ export const auth = $state<{
   role: Member['role'];
 }>({ ready: false, session: null, access: 'unknown', role: 'member' });
 
+/** The sign-in this phone holds. With no signal, an hour-old sign-in can't be renewed: the phone keeps it
+ *  (renewed once there's signal) rather than showing the sign-in page. Renewing keeps retrying for up to
+ *  30s on no signal, so after a few seconds the app opens with the kept sign-in instead of waiting. */
+async function currentSession(): Promise<Session | null> {
+  const timeout = new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 4000));
+  const got = await Promise.race([supabase.auth.getSession(), timeout]);
+  if (got === 'timeout') return offlineSession(storageKey());
+  const { data, error } = got;
+  if (data.session || error?.name !== 'AuthRetryableFetchError') return data.session;
+  return offlineSession(storageKey());
+}
+const storageKey = () => (supabase.auth as unknown as { storageKey: string }).storageKey;
+
 export async function initAuth() {
-  const { data } = await supabase.auth.getSession();
-  auth.session = data.session;
+  auth.session = await currentSession();
   await refreshAccess();
   auth.ready = true;
-  supabase.auth.onAuthStateChange((_event, session) => {
+  // Back in signal: renew a sign-in kept offline.
+  window.addEventListener('online', () => {
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) auth.session = data.session;
+    });
+  });
+  supabase.auth.onAuthStateChange((event, session) => {
+    // With no signal the client reports no sign-in at start (it couldn't renew it): keep the one kept offline.
+    if (event === 'INITIAL_SESSION' && !session && auth.session) return;
     const changed = session?.user?.id !== auth.session?.user?.id;
     auth.session = session;
     if (changed) void refreshAccess();
@@ -40,9 +62,15 @@ export async function refreshAccess() {
   if (!uid) return void (auth.access = 'unknown');
   if (isAdmin()) return void (auth.access = 'approved');
   const { data, error } = await supabase.from('members').select('status, role').eq('user_id', uid).maybeSingle();
-  if (error) return; // offline: keep what we knew
+  if (error) {
+    // Offline: keep what we knew, or what this phone last heard for this person.
+    const known = readAccessMemory(uid);
+    if (auth.access === 'unknown' && known) Object.assign(auth, known);
+    return;
+  }
   auth.access = (data?.status as Member['status'] | undefined) ?? 'none';
   auth.role = (data?.role as Member['role'] | undefined) ?? 'member';
+  rememberAccess(uid, { access: auth.access, role: auth.role });
 }
 
 const REMEMBER = 'golf.email';
@@ -86,6 +114,8 @@ export async function login(password: string, mode: 'trip' | 'admin', email = ''
 
 export async function logout() {
   await supabase.auth.signOut();
+  rememberAccess(null);
+  await forgetSavedEvents();
   auth.access = 'unknown';
   auth.role = 'member';
   location.hash = '#/';

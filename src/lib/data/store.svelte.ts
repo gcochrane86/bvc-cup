@@ -2,7 +2,8 @@ import type { GameRow } from '../games';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createStore, del, get, set, values } from 'idb-keyval';
 import { must, supabase } from '../supabase';
-import { isOrganiser } from '../auth.svelte';
+import { auth, isOrganiser } from '../auth.svelte';
+import { forgetSavedEvents, readSavedEvent, saveEvent, type SavedMode } from './saved';
 import { applyPending, isBehind, removeScoreRow, upsertScoreRow } from './merge';
 import { freshOnly } from './fresh';
 import { endWatching, watch } from '../watch.svelte';
@@ -22,6 +23,8 @@ export const db = $state({
   ...empty(),
   loaded: false,
   error: null as string | null,
+  /** Showing the copy saved on this phone (no signal yet): when it was saved (ms). */
+  offlineFrom: null as number | null,
   notice: null as string | null,
   pending: [] as PendingScore[],
   photoUrls: {} as Record<string, string>,
@@ -145,9 +148,14 @@ export const isWatching = () => watching;
 async function loadWatched() {
   try {
     const snap = (await must(supabase.rpc('watch_event', { p_token: watch.token }))) as (Snapshot & { guidePhotos: GuidePhotoRow[] }) | null;
-    if (!snap) return endWatching(); // the admin turned the link off (or replaced it)
-    Object.assign(db, { ...snap, pending: [], loaded: true, error: null });
+    if (!snap) {
+      void forgetSavedEvents(['watch']);
+      return endWatching(); // the admin turned the link off (or replaced it)
+    }
+    const pending = await outbox.pending();
+    Object.assign(db, { ...snap, scores: applyPending(snap.scores, pending), pending, loaded: true, error: null, offlineFrom: null });
     await refreshPhotoUrls();
+    await keepOnPhone('watch', watch.token, snap.scores);
   } catch (e) {
     db.error = e instanceof Error ? e.message : String(e);
   }
@@ -175,11 +183,34 @@ async function doLoad() {
       pending,
       loaded: true,
       error: null,
+      offlineFrom: null,
     });
     await refreshPhotoUrls();
+    await keepOnPhone('member', auth.session?.user?.id, scores);
   } catch (e) {
     db.error = e instanceof Error ? e.message : String(e);
   }
+}
+
+// ---- the copy saved on the phone (opening with no signal) ----
+/** serverScores: the scores as loaded (without this phone's unsent ones, which the outbox keeps). */
+async function keepOnPhone(mode: SavedMode, owner: string | null | undefined, serverScores: ScoreRow[]) {
+  if (!owner) return;
+  const { event, players, courses, courseHoles, eventPlayers, rounds, groups, groupPlayers, results, roundTees, guidePhotos, games, photoUrls } = $state.snapshot(db);
+  await saveEvent(mode, {
+    event, players, courses, courseHoles, eventPlayers, rounds, groups, groupPlayers, results, roundTees, guidePhotos, games, photoUrls,
+    scores: serverScores, savedAt: Date.now(), owner,
+  });
+}
+
+/** Show the saved copy straight away, before (or instead of, with no signal) the network load. */
+async function openSaved(mode: SavedMode) {
+  const saved = await readSavedEvent(mode, mode === 'watch' ? watch.token : auth.session?.user?.id);
+  if (!saved || db.loaded) return;
+  const pending = await outbox.pending();
+  if (db.loaded) return; // the network won the race
+  const { savedAt, owner: _owner, scores, ...rest } = saved;
+  Object.assign(db, { ...rest, scores: applyPending(scores, pending), pending, loaded: true, offlineFrom: savedAt });
 }
 
 let signedPhotos: Record<string, SignedPhoto> = {};
@@ -283,6 +314,7 @@ export function startData(mode: 'member' | 'watch' = 'member') {
   if (mode === 'watch') {
     // No realtime through a link (it needs a member's access): reload every few seconds while on screen.
     watching = true;
+    void openSaved('watch');
     void loadAll().then(() => flushOutbox());
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onOnline);
@@ -292,6 +324,7 @@ export function startData(mode: 'member' | 'watch' = 'member') {
     }, WATCH_POLL_MS);
     return;
   }
+  void openSaved('member');
   void loadAll().then(() => flushOutbox());
   channel = supabase
     .channel('golf-live')
@@ -320,5 +353,5 @@ export function stopData() {
   window.removeEventListener('online', onOnline);
   clearInterval(pollTimer);
   clearTimeout(retryTimer);
-  Object.assign(db, empty(), { loaded: false, error: null });
+  Object.assign(db, empty(), { loaded: false, error: null, offlineFrom: null });
 }
