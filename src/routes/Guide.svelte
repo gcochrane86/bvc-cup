@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import { db, photoCourses } from '../lib/data/store.svelte';
   import { guidePhotoUrls } from '../lib/guidePhotos';
+  import { guideSave } from '../lib/guideSave.svelte';
   import { courseGuide, eventGuides, guideFlyover, guideNotes, guidePages, holePhotos, initialGuide, readGuideMemory, rememberGuideHole, type GuideMemory } from '../lib/guides';
   import FlyoverPlayer from '../components/FlyoverPlayer.svelte';
 
@@ -141,6 +142,13 @@
   <button class="secondary" disabled={hole === 18} onclick={() => go(guide.slug, hole + 1)}>Hole {hole + 1} →</button>
 </div>
 <p class="muted small">{photos.length && guide.kind !== 'photos' ? 'Uploaded guide photos.' : guide.credit} Pinch to zoom.</p>
+{#if !preview && guideSave.total}
+  <p class="muted small" data-testid="guide-saved">
+    {#if guideSave.complete}Saved on this phone: every hole works with no signal.
+    {:else if guideSave.saving}Saving the guides on this phone… {guideSave.done} of {guideSave.total}
+    {:else}{guideSave.done} of {guideSave.total} guide pages saved on this phone; the rest save next time there's signal.{/if}
+  </p>
+{/if}
 {/if}
 
 <style>

@@ -3,6 +3,7 @@ import { must, supabase } from './supabase';
 import type { GuidePhotoRow } from './data/types';
 import { sourceRect, turnedSize, type Box } from './crop';
 import { GUIDE_QUALITY, guideScale } from './imageSize';
+import { guidePhotoKey } from './guideOffline';
 
 /** Shrink (see guideScale: tall pages keep their width) and re-encode as JPEG (fixes phone EXIF rotation). */
 export async function resizeForGuide(file: Blob): Promise<Blob> {
@@ -68,14 +69,20 @@ export async function removeGuidePhoto(photo: GuidePhotoRow): Promise<void> {
   await supabase.storage.from('course-guides').remove([photo.path]); // the row is what counts; a stray file is harmless
 }
 
-/** Signed URLs (1 hour) for guide photos, cached for the session. */
+/** Signed URLs (1 hour) for guide photos, cached for the session. With no signal to sign a link, the photo's
+ *  address without a token: the service worker serves the copy saved on the phone (see guideSave). */
 const cache = new Map<string, { url: string; until: number }>();
 export async function guidePhotoUrls(paths: string[]): Promise<Record<string, string>> {
   const now = Date.now();
   const missing = paths.filter((p) => !((cache.get(p)?.until ?? 0) > now));
   if (missing.length) {
-    const { data } = await supabase.storage.from('course-guides').createSignedUrls(missing, 3600);
-    for (const d of data ?? []) if (d.path && d.signedUrl) cache.set(d.path, { url: d.signedUrl, until: now + 50 * 60 * 1000 });
+    try {
+      const { data } = await supabase.storage.from('course-guides').createSignedUrls(missing, 3600);
+      for (const d of data ?? []) if (d.path && d.signedUrl) cache.set(d.path, { url: d.signedUrl, until: now + 50 * 60 * 1000 });
+    } catch {
+      /* no signal */
+    }
   }
-  return Object.fromEntries(paths.filter((p) => cache.has(p)).map((p) => [p, cache.get(p)!.url]));
+  const url = (p: string) => cache.get(p)?.url ?? guidePhotoKey(import.meta.env.VITE_SUPABASE_URL, p);
+  return Object.fromEntries(paths.map((p) => [p, url(p)]));
 }

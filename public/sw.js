@@ -8,6 +8,8 @@
 //   file name, so each photo downloads once, not again every time someone looks. File names never change
 //   (a new photo gets a new name), so a kept copy is never out of date.
 // Other Supabase data and YouTube are not touched here (scores queue in the app's outbox).
+// The app also saves the event's course guides into these two caches up front (src/lib/guideOffline.ts
+// names them too: change both together).
 const CACHE = 'golf-shell-v2';
 const PAGE_TIMEOUT_MS = 2500;
 const PHOTOS = 'golf-photos-v1';

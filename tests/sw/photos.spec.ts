@@ -37,3 +37,31 @@ test('a guide photo downloads once: the phone keeps it, so a fresh link next tim
     await db.storage.from('course-guides').remove([path]);
   }
 });
+
+test("the event's course guides are saved on the phone up front, so a hole never looked at opens with no signal", async ({ page }) => {
+  reseed();
+  const db = serviceDb();
+  const path = `seed-links/7/sw-save-${Date.now()}.jpg`;
+  await db.storage.from('course-guides').upload(path, readFileSync('public/icon-512.png'), { contentType: 'image/png' });
+  await db.from('guide_photos').insert({ course_name: 'Seed Links', hole: 7, path });
+  try {
+    await login(page);
+    await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+    // Without opening the Courses tab, hole 7's photo is downloaded in the background.
+    await expect
+      .poll(async () => page.evaluate(async () => (await (await caches.open('golf-photos-v1')).keys()).map((r) => r.url)), { timeout: 30_000 })
+      .toContainEqual(expect.stringMatching(new RegExp(`${path.replace(/[.]/g, '\\.')}$`)));
+
+    await page.context().setOffline(true);
+    await page.getByRole('link', { name: 'Courses' }).click();
+    await page.getByRole('button', { name: 'Guide hole 7' }).click();
+    await expect.poll(() => page.getByRole('img', { name: 'Hole 7 photo 1' }).evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+    await expect(page.getByTestId('guide-saved')).toContainText('Saved on this phone');
+  } finally {
+    await page.context().setOffline(false);
+    await db.from('guide_photos').delete().eq('path', path);
+    await db.storage.from('course-guides').remove([path]);
+  }
+});

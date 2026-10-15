@@ -3,7 +3,9 @@
   import { ADMIN_ONLY, auth, initAuth, isAdmin, isOrganiser } from './lib/auth.svelte';
   import { router } from './lib/router.svelte';
   import { startWatching, watch } from './lib/watch.svelte';
-  import { db, leaderboardShown, startData, stopData } from './lib/data/store.svelte';
+  import { db, leaderboardShown, photoCourses, startData, stopData } from './lib/data/store.svelte';
+  import { eventGuides } from './lib/guides';
+  import { saveGuidesOnPhone } from './lib/guideSave.svelte';
   import Login from './routes/Login.svelte';
   import Leaderboard from './routes/Leaderboard.svelte';
   import Guide from './routes/Guide.svelte';
@@ -56,6 +58,16 @@
   $effect(() => {
     if (db.loaded && !leaderboardShown() && (route.name === 'home' || route.name === 'match'))
       location.replace('#/score');
+  });
+  // Once the event has loaded, save its course guides on the phone (a few seconds later, after the scores),
+  // so every hole can be looked at with no signal. Only files it doesn't have yet are downloaded.
+  $effect(() => {
+    if (!db.loaded || !db.event) return;
+    const guides = eventGuides(db.rounds, db.courses, photoCourses());
+    const photos = db.guidePhotos;
+    if (!guides.length) return;
+    const t = setTimeout(() => void saveGuidesOnPhone(guides, photos), 3000);
+    return () => clearTimeout(t);
   });
   $effect(() => {
     if (signedIn && approved) {
